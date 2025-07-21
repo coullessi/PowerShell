@@ -1,0 +1,18 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# PowerShell files should use CRLF on Windows
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+
+# Markdown files
+*.md text eol=lf
+
+# Text files that should be normalized to LF
+*.txt text eol=lf
+
+# Binary files
+*.exe binary
+*.dll binary
+*.zip binary
