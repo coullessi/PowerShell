@@ -1,0 +1,87 @@
+# Exclude WebProject folder
+WebProject/
+
+# PowerShell Gallery Package Ignore Files (already handled by .pspackageignore)
+# These are duplicated here for git exclusion if needed
+*.log
+*.tmp
+*.bak
+sample-*.txt
+
+# Development and testing files
+Test-*.ps1
+*.Tests.ps1
+test/
+tests/
+spec/
+Demo-*.ps1
+Extended-Test.ps1
+Quick-Test.ps1
+
+# Development documentation
+TEST-RESULTS.md
+TESTING-SUMMARY.md
+notes.txt
+draft*.md
+TODO.txt
+CHANGELOG-draft.md
+
+# IDE and editor files
+.vscode/
+*.code-workspace
+.vs/
+*.swp
+*.swo
+*~
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+AzureArc_*.log
+*_Checks_Consolidated.log
+
+# Device list files (may contain sensitive information)
+devices.txt
+device-list.txt
+*devices*.txt
+*devicelist*.txt
+
+# Configuration files with sensitive data
+*.config
+appsettings.json
+secrets.json
+
+# Backup files
+*.bak
+*.backup
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Personal and development files
+Personal/
+Dev/
+Sandbox/
+
+# Old versions and archived files
+old/
+archive/
+backup/
+*.old
+
+# Specific log files
+Install-*.log
+Deploy-*.log
+Test-*.log
