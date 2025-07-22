@@ -78,81 +78,8 @@ function New-AzureArcDevice {
     Write-Host "╚════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
     Write-Host ""
 
-    # User Consent and Confirmation
-    if (-not $Force) {
-        Write-Host "🔍 SCRIPT OVERVIEW:" -ForegroundColor Yellow
-        Write-Host "   This script automates the complete Azure Arc device deployment process" -ForegroundColor White
-        Write-Host "   using Group Policy for enterprise-scale onboarding." -ForegroundColor White
-        Write-Host ""
-        Write-Host "📋 ACTIONS TO BE PERFORMED:" -ForegroundColor Yellow
-        Write-Host "   • Create or validate Azure resource groups and deployment parameters" -ForegroundColor White
-        Write-Host "   • Download Azure Connected Machine Agent and Group Policy templates" -ForegroundColor White
-        Write-Host "   • Create service principals with appropriate Azure Arc permissions" -ForegroundColor White
-        Write-Host "   • Configure remote file shares for Group Policy deployment" -ForegroundColor White
-        Write-Host "   • Create and deploy Group Policy objects to specified organizational units" -ForegroundColor White
-        Write-Host "   • Generate PowerShell scripts for automated Azure Arc agent installation" -ForegroundColor White
-        Write-Host "   • Link Group Policy objects to target organizational units" -ForegroundColor White
-        Write-Host ""
-        Write-Host "⚠️  IMPORTANT CONSIDERATIONS:" -ForegroundColor Red
-        Write-Host "   • This script will make changes to your Azure environment" -ForegroundColor White
-        Write-Host "   • Service principals will be created with Azure Arc deployment permissions" -ForegroundColor White
-        Write-Host "   • Group Policy objects will be created and linked to specified OUs" -ForegroundColor White
-        Write-Host "   • Files will be downloaded and deployed to shared network locations" -ForegroundColor White
-        Write-Host "   • Azure Arc agents will be deployed to devices in the targeted OUs" -ForegroundColor White
-        Write-Host "   • Internet connectivity is required for downloading components" -ForegroundColor White
-        Write-Host "   • Administrative privileges are required for Group Policy operations" -ForegroundColor White
-        Write-Host ""
-        Write-Host "🛡️  SECURITY & COMPLIANCE:" -ForegroundColor Green
-        Write-Host "   • Service principals are created with minimal required permissions" -ForegroundColor White
-        Write-Host "   • All Azure operations use official Microsoft Azure PowerShell modules" -ForegroundColor White
-        Write-Host "   • Group Policy deployment follows Microsoft recommended practices" -ForegroundColor White
-        Write-Host "   • No sensitive data is stored in plain text" -ForegroundColor White
-        Write-Host ""
-        Write-Host "📊 PREREQUISITES:" -ForegroundColor Magenta
-        Write-Host "   • Azure PowerShell modules (Az.Accounts, Az.Resources) must be installed" -ForegroundColor White
-        Write-Host "   • Valid Azure subscription with appropriate permissions" -ForegroundColor White
-        Write-Host "   • Active Directory environment with Group Policy management capabilities" -ForegroundColor White
-        Write-Host "   • Network access to Azure endpoints and target devices" -ForegroundColor White
-        Write-Host "   • Administrative privileges on the local machine" -ForegroundColor White
-        Write-Host ""
-        Write-Host "⚖️  DISCLAIMER & LIABILITY:" -ForegroundColor Magenta
-        Write-Host "   • This script is provided 'AS IS' without warranty of any kind" -ForegroundColor White
-        Write-Host "   • The author is not liable for any damages, data loss, or other" -ForegroundColor White
-        Write-Host "     consequences that may result from running this script" -ForegroundColor White
-        Write-Host "   • You assume full responsibility for testing and validating" -ForegroundColor White
-        Write-Host "     this script in your environment before production use" -ForegroundColor White
-        Write-Host ""
-        Write-Host "═════════════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-
-        do {
-            $consent = Read-Host "Do you consent to proceed with Azure Arc device deployment? [Y/N] (default: Y)"
-
-            # Use default if user pressed Enter without input
-            if ([string]::IsNullOrWhiteSpace($consent)) {
-                $consent = 'Y'
-                Write-Host "✅ Using default choice: Yes" -ForegroundColor Yellow
-            }
-
-            switch ($consent.ToUpper()) {
-                'Y' { 
-                    Write-Host "✅ Proceeding with Azure Arc device deployment..." -ForegroundColor Green
-                    break 
-                }
-                'N' { 
-                    Write-Host "`n❌ Script execution cancelled by user." -ForegroundColor Red
-                    Write-Host "No actions have been performed. Exiting...`n" -ForegroundColor Gray
-                    return
-                }
-                default { 
-                    Write-Host "Please enter 'Y' to proceed or 'N' to cancel." -ForegroundColor Yellow 
-                }
-            }
-        } while ($consent.ToUpper() -ne 'Y' -and $consent.ToUpper() -ne 'N')
-        
-        Write-Host ""
-        Write-Host "🚀 Initializing Azure Arc Device Deployment..." -ForegroundColor Cyan
-        Write-Host ""
-    }
+    Write-Host " Initializing Azure Arc Device Deployment..." -ForegroundColor Cyan
+    Write-Host ""
 
     # Prerequisites validation should be completed before running this script
     # Run Test-AzureArcPrerequisites.ps1 first to ensure all requirements are met
@@ -191,7 +118,7 @@ function New-AzureArcDevice {
     # Prompt for resource group
     if ([string]::IsNullOrWhiteSpace($ResourceGroupName)) {
         $defaultResourceGroup = "rg-azurearc-$(Get-Date -Format 'yyyyMMdd')"
-        $resourceGroup = Read-Host "`nProvide a resource group name for your Azure Arc deployment [default: $defaultResourceGroup]"
+        $resourceGroup = Read-Host "`nProvide a resource group name for your Azure Arc deployment `n[default: $defaultResourceGroup]"
         
         # Use default if user pressed Enter without input
         if ([string]::IsNullOrWhiteSpace($resourceGroup)) {
