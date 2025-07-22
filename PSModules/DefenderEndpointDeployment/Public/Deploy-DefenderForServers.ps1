@@ -31,11 +31,10 @@ function Deploy-DefenderForServers {
 
     # Function to display module interface
     function Write-ModuleInterface {
-        Write-Host "`n"
-        Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-        Write-Host "║                    DEFENDER ENDPOINT DEPLOYMENT MODULE                         ║" -ForegroundColor Cyan
-        Write-Host "║                        Azure Arc & MDE Integration                             ║" -ForegroundColor Cyan
-        Write-Host "╚════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+        Write-Host ""
+        # Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
+        # Write-Host "║        DEFENDER ENDPOINT DEPLOYMENT MODULE: Azure Arc & MDE Integration        ║" -ForegroundColor Cyan
+        # Write-Host "╚════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
         Write-Host ""
         Write-Host "        ██████╗ ███████╗███████╗███████╗███╗   ██╗██████╗ ███████╗██████╗ " -ForegroundColor Cyan
         Write-Host "        ██╔══██╗██╔════╝██╔════╝██╔════╝████╗  ██║██╔══██╗██╔════╝██╔══██╗" -ForegroundColor Cyan
@@ -84,7 +83,7 @@ function Deploy-DefenderForServers {
         Write-Host "   [H] Help - Detailed command information" -ForegroundColor Cyan
         Write-Host "   [Q] Quit - Exit the module" -ForegroundColor Cyan
         Write-Host ""
-        Write-Host "═══════════════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+        Write-Host "═══════════════════════════════════════" -ForegroundColor Cyan
     }
 
     # Function to handle user selection
@@ -100,7 +99,7 @@ function Deploy-DefenderForServers {
                 Write-Host "║                        AZURE ARC PREREQUISITES TESTING                         ║" -ForegroundColor Cyan
                 Write-Host "╚════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
                 Write-Host ""
-                Write-Host "🔍 ENHANCED PREREQUISITES OVERVIEW:" -ForegroundColor Yellow
+                Write-Host "🔍 PREREQUISITES CHECK OVERVIEW:" -ForegroundColor Yellow
                 Write-Host "   This enhanced function validates all prerequisites for Azure Arc deployment" -ForegroundColor White
                 Write-Host "   and automatically registers required Azure resource providers for a" -ForegroundColor White
                 Write-Host "   streamlined experience." -ForegroundColor White
@@ -113,12 +112,19 @@ function Deploy-DefenderForServers {
                 Write-Host "   • Validate system requirements and security settings" -ForegroundColor White
                 Write-Host "   • Generate comprehensive readiness report" -ForegroundColor White
                 Write-Host ""
-                Write-Host "🆕 NEW FEATURES:" -ForegroundColor Green
+                Write-Host "📊 FEATURES:" -ForegroundColor Green
                 Write-Host "   • Automatic resource provider registration (no manual step required)" -ForegroundColor White
                 Write-Host "   • Enhanced network connectivity testing" -ForegroundColor White
                 Write-Host "   • Multi-device support with detailed reporting" -ForegroundColor White
                 Write-Host ""
-                Write-Host "═════════════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+                Write-Host "⚖️  DISCLAIMER & LIABILITY:" -ForegroundColor Magenta
+                Write-Host "   • This script is provided 'AS IS' without warranty of any kind" -ForegroundColor White
+                Write-Host "   • The author is not liable for any damages, data loss, or other" -ForegroundColor White
+                Write-Host "     consequences that may result from running this script" -ForegroundColor White
+                Write-Host "   • You assume full responsibility for testing and validating" -ForegroundColor White
+                Write-Host "     this script in your environment before production use" -ForegroundColor White
+                Write-Host ""
+                Write-Host "═════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
                 $confirm = Read-Host "Do you want to proceed with prerequisites testing? [Y/N] (default: Y)"
                 if ([string]::IsNullOrWhiteSpace($confirm) -or $confirm.ToUpper() -eq "Y") {
                     Write-Host "`n🔍 Running Test-AzureArcPrerequisite..." -ForegroundColor Green
@@ -142,7 +148,7 @@ function Deploy-DefenderForServers {
                 Write-Host "║                         AZURE ARC DEVICE DEPLOYMENT                            ║" -ForegroundColor Cyan
                 Write-Host "╚════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
                 Write-Host ""
-                Write-Host "🚀 COMPLETE DEPLOYMENT OVERVIEW:" -ForegroundColor Yellow
+                Write-Host "🚀 DEPLOYMENT OVERVIEW:" -ForegroundColor Yellow
                 Write-Host "   This comprehensive function automates the entire Azure Arc deployment" -ForegroundColor White
                 Write-Host "   process including service principal creation, agent installation, and" -ForegroundColor White
                 Write-Host "   Group Policy deployment for enterprise-scale onboarding." -ForegroundColor White
@@ -154,10 +160,17 @@ function Deploy-DefenderForServers {
                 Write-Host "   • File share setup for Group Policy deployment" -ForegroundColor White
                 Write-Host "   • OU linking and configuration management" -ForegroundColor White
                 Write-Host ""
-                Write-Host "🆕 STREAMLINED WORKFLOW:" -ForegroundColor Green
+                Write-Host "📊 STREAMLINED WORKFLOW:" -ForegroundColor Green
                 Write-Host "   • All deployment steps combined into one function" -ForegroundColor White
                 Write-Host "   • Automatic configuration with interactive prompts" -ForegroundColor White
                 Write-Host "   • Enterprise-ready Group Policy deployment" -ForegroundColor White
+                Write-Host ""
+                Write-Host "⚖️  DISCLAIMER & LIABILITY:" -ForegroundColor Magenta
+                Write-Host "   • This script is provided 'AS IS' without warranty of any kind" -ForegroundColor White
+                Write-Host "   • The author is not liable for any damages, data loss, or other" -ForegroundColor White
+                Write-Host "     consequences that may result from running this script" -ForegroundColor White
+                Write-Host "   • You assume full responsibility for testing and validating" -ForegroundColor White
+                Write-Host "     this script in your environment before production use" -ForegroundColor White
                 Write-Host ""
                 Write-Host "═════════════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
                 $confirm = Read-Host "Do you want to proceed with complete Azure Arc deployment? [Y/N] (default: Y)"
@@ -201,7 +214,15 @@ function Deploy-DefenderForServers {
                 Write-Host "   • Comprehensive log collection and analysis" -ForegroundColor White
                 Write-Host "   • Support-ready diagnostic packages" -ForegroundColor White
                 Write-Host ""
-                Write-Host "═════════════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+                Write-Host "⚖️  DISCLAIMER & LIABILITY:" -ForegroundColor Magenta
+                Write-Host "   • This script is provided 'AS IS' without warranty of any kind" -ForegroundColor White
+                Write-Host "   • The author is not liable for any damages, data loss, or other" -ForegroundColor White
+                Write-Host "     consequences that may result from running this script" -ForegroundColor White
+                Write-Host "   • You assume full responsibility for testing and validating" -ForegroundColor White
+                Write-Host "     this script in your environment before production use" -ForegroundColor White
+                Write-Host ""
+
+                Write-Host "═════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
                 $confirm = Read-Host "Do you want to proceed with Azure Arc diagnostics? [Y/N] (default: Y)"
                 if ([string]::IsNullOrWhiteSpace($confirm) -or $confirm.ToUpper() -eq "Y") {
                     Write-Host "`n🔧 Running Get-AzureArcDiagnostics..." -ForegroundColor Green
