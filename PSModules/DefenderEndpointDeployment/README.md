@@ -11,14 +11,14 @@
 
 The **DefenderEndpointDeployment** module provides a comprehensive, enterprise-grade PowerShell solution for managing Azure Arc-enabled servers and Microsoft Defender for Endpoint (MDE) integration across large-scale environments. This module delivers professional-quality automation tools with an intuitive interactive interface, extensive validation capabilities, and robust error handling for mission-critical deployments.
 
-### 🌟 What's New in v1.1.0
+### 🌟 What's New in v2.0.0
 
-- ✨ **Azure Arc Diagnostics Module** - New comprehensive diagnostics function for Azure Arc agents
-- � **Enhanced Interactive Menu** - Added diagnostic option to main interactive interface
-- 📊 **Professional Diagnostics Interface** - Smooth progress animations and realistic collection phases
-- �️ **Comprehensive Log Collection** - Automated gathering of Azure Arc agent logs and status
-- 🌐 **Network Requirements Testing** - Dedicated function for Azure Arc network validation
-- � **Menu System Enhancement** - Improved numbering and organization of menu options
+- 🔄 **Streamlined Workflow** - Consolidated functions for better user experience
+- ⚡ **Automated Resource Provider Registration** - Now integrated into prerequisites testing
+- 🏗️ **Unified Azure Arc Deployment** - Service principal creation, agent installation, and Group Policy deployment combined
+- 📋 **Simplified Menu Interface** - Reduced from 8 to 3 main functions for easier navigation
+- � **Enhanced Function Integration** - Better workflow efficiency with fewer manual steps
+- 📚 **Updated Documentation** - Comprehensive updates reflecting the new structure
 
 ### 🚀 Quick Start
 
@@ -133,125 +133,123 @@ Deploy-DefenderForServers
 
 **Available Commands:**
 ```
-1 - Test Azure Arc Prerequisites                   (Test-AzureArcPrerequisites)
-2 - Comprehensive Azure Arc Connectivity Testing   (Get-AzureArcConnectivity)  
-3 - Register Azure Resource Providers              (Register-AzureResourceProviders)
-4 - Create Azure Arc Service Principal             (New-ArcServicePrincipal)
-5 - Install Azure Connected Machine Agent          (Install-AzureConnectedMachineAgent)
-6 - Deploy Arc Group Policy                        (Deploy-ArcGroupPolicy)
-7 - Create Azure Arc Device                        (New-AzureArcDevice)
-8 - Run Azure Arc Diagnostics                     (Get-AzureArcDiagnostics)
+1 - Test Azure Arc Prerequisites                   (Test-AzureArcPrerequisite)
+   • Validates Azure prerequisites and network connectivity
+   • Registers required Azure resource providers automatically
+   • Generates detailed prerequisite and connectivity reports
+
+2 - Create Azure Arc Device                        (New-AzureArcDevice)
+   • Complete Azure Arc deployment with Group Policy
+   • Creates service principals with appropriate permissions
+   • Downloads and installs Azure Connected Machine Agent
+   • Configures Group Policy objects for automated deployment
+
+3 - Run Azure Arc Diagnostics                     (Get-AzureArcDiagnostics)
+   • Runs comprehensive Azure Arc diagnostics
+   • Collects agent logs and system information
+   • Generates diagnostic reports for troubleshooting
+
 H - Show Help Documentation
 Q - Exit
 ```
 
+### ⚡ Workflow Changes in v2.0.0
+
+**Streamlined Process:** The module has been restructured for better workflow efficiency:
+
+- **Resource Provider Registration** is now automatically integrated into the prerequisites testing function
+- **Service Principal Creation**, **Agent Installation**, and **Group Policy Deployment** are now combined in the `New-AzureArcDevice` function for a streamlined workflow
+- **Simplified Menu** with only 3 main functions for easier navigation
+
 ### Command Reference
 
-#### 1️⃣ Comprehensive Azure Arc Connectivity Testing
+#### 1️⃣ Test Azure Arc Prerequisites (Enhanced)
 ```powershell
-Get-AzureArcConnectivity
-    [-ComputerName <String>]      # Target computer (default: localhost)
-    [-TestMode <String>]          # Basic, Comprehensive, or Critical
-    [-IncludeOptional]            # Include optional endpoint testing
-    [-TestTLSVersion]             # Test TLS version compatibility
-    [-ShowDetailedResults]        # Show detailed connectivity information
-    [-DeviceList <String[]>]      # Test multiple devices
-    [-Parallel]                   # Run device tests in parallel
-    [-LogPath <String>]           # Path for detailed logs
+Test-AzureArcPrerequisite
+    [-DeviceListPath <String>]           # Path to file containing device names
+    [-Force]                             # Skip user consent prompts
+    [-NetworkTestMode <String>]          # Network testing mode (Basic, Comprehensive)
+    [-IncludeOptionalEndpoints]          # Include optional Azure endpoints in testing
+    [-TestTLSVersion]                    # Test TLS version compatibility
+    [-ShowDetailedNetworkResults]        # Show detailed network test results
+    [-NetworkLogPath <String>]           # Custom network log file path
 ```
+
+**Key Features:**
+- Comprehensive prerequisites validation for Azure Arc and MDE integration
+- **Automatic Azure resource provider registration** (eliminates manual step)
+- Network connectivity testing to Azure Arc endpoints
+- Multi-device support with detailed reporting
+- Enhanced security and system requirements validation
 
 **Example:**
 ```powershell
-# Comprehensive connectivity test with optional endpoints and TLS testing
-Get-AzureArcConnectivity -TestMode Comprehensive -IncludeOptional -TestTLSVersion -ShowDetailedResults
+# Interactive prerequisites check with comprehensive validation
+Test-AzureArcPrerequisite
+
+# Test specific devices with enhanced network testing
+Test-AzureArcPrerequisite -DeviceListPath 'C:\devices.txt' -NetworkTestMode Comprehensive -IncludeOptionalEndpoints
 ```
 
-#### 2️⃣ Test Azure Arc Prerequisites  
-```powershell
-Test-AzureArcPrerequisites
-    [-DeviceList <String[]>]      # List of devices to test
-    [-LogPath <String>]           # Custom log file path
-    [-WhatIf]                     # Show what would be done
-    [-Confirm]                    # Confirm before executing
-```
-
-**Example:**
-```powershell
-# Test prerequisites on multiple devices
-Test-AzureArcPrerequisites -DeviceList @("Server01", "Server02", "Server03")
-```
-
-#### 3️⃣ Register Azure Resource Providers
-```powershell
-Register-AzureResourceProviders
-    [-SubscriptionId <String>]    # Target subscription ID
-    [-Force]                      # Force registration without confirmation
-    [-Timeout <Int32>]            # Operation timeout in seconds
-    [-WhatIf]                     # Show what would be done
-    [-Confirm]                    # Confirm before executing
-```
-
-**Example:**
-```powershell
-# Register providers with force option and custom timeout
-Register-AzureResourceProviders -SubscriptionId "12345678-1234-1234-1234-123456789012" -Force -Timeout 300
-```
-
-#### 4️⃣ Create Azure Arc Service Principal
-```powershell
-New-ArcServicePrincipal
-    -ApplicationName <String>    # Service principal name
-    -SubscriptionId <String>     # Azure subscription ID
-    [-Role <String>]            # Azure role assignment
-    [-Scope <String>]           # Permission scope
-```
-
-#### 5️⃣ Install Azure Connected Machine Agent
-```powershell
-Install-AzureConnectedMachineAgent
-    -SubscriptionId <String>      # Azure subscription ID
-    -ResourceGroupName <String>   # Target resource group
-    -TenantId <String>           # Azure tenant ID
-    -Location <String>           # Azure region
-    [-ServicePrincipalId <String>]      # Service principal ID
-    [-ServicePrincipalSecret <String>]  # Service principal secret
-    [-DeviceList <String[]>]      # List of target devices
-```
-
-#### 6️⃣ Deploy Arc Group Policy
-```powershell
-Deploy-ArcGroupPolicy
-    -PolicyName <String>         # Group policy name
-    -TargetOU <String>          # Target organizational unit
-    [-Force]                    # Force deployment
-```
-
-#### 7️⃣ Create Azure Arc Device
+#### 2️⃣ Create Azure Arc Device (Complete Deployment)
 ```powershell
 New-AzureArcDevice
-    -DeviceName <String>         # Name for the Arc device
-    -SubscriptionId <String>     # Azure subscription ID  
-    -ResourceGroupName <String>  # Target resource group
-    -Location <String>          # Azure region
-    [-Tags <Hashtable>]         # Resource tags
+    [-ResourceGroupName <String>]    # Azure resource group name (optional)
+    [-Location <String>]             # Azure region (optional)
+    [-SharePath <String>]            # Remote share path for Group Policy (optional)
+    [-Force]                         # Skip confirmation prompts
 ```
 
-#### 8️⃣ Run Azure Arc Diagnostics
+**Integrated Functionality:**
+- **Service Principal Creation** - Automatically creates service principals with appropriate permissions
+- **Agent Installation** - Downloads and optionally installs Azure Connected Machine Agent locally
+- **Group Policy Configuration** - Creates and deploys Group Policy objects for enterprise deployment
+- File share setup for Group Policy deployment
+- OU linking and configuration management
+
+**Example:**
+```powershell
+# Interactive complete Azure Arc deployment
+New-AzureArcDevice
+
+# Automated deployment with specific parameters
+New-AzureArcDevice -ResourceGroupName "rg-azurearc-prod" -Location "eastus" -Force
+```
+
+#### 3️⃣ Run Azure Arc Diagnostics
 ```powershell
 Get-AzureArcDiagnostics
-    [-LogPath <String>]         # Path for diagnostic logs
-    [-Location <String>]        # Azure region for testing
-    [-Silent]                   # Run without prompts
-    [-Force]                    # Skip confirmation prompts
+    [-LogPath <String>]              # Custom diagnostic log path
+    [-DeviceListPath <String>]       # Path to file containing device names
+    [-SkipPrompt]                    # Skip user prompts
+    [-CollectLogs]                   # Collect comprehensive logs
+    [-CreateArchive]                 # Create ZIP archive for support
 ```
 
 **Example:**
 ```powershell
-# Interactive diagnostics with user prompts
+# Interactive diagnostics collection
 Get-AzureArcDiagnostics
 
-# Automated diagnostics with custom settings
-Get-AzureArcDiagnostics -LogPath "C:\ArcDiagnostics" -Location "westus2" -Silent
+# Automated diagnostics with custom path
+Get-AzureArcDiagnostics -LogPath 'C:\ArcDiagnostics' -SkipPrompt -CollectLogs
+```
+
+#### 4️⃣ Interactive Menu System
+```powershell
+Deploy-DefenderForServers
+```
+
+**Features:**
+- Interactive menu-driven interface for the entire workflow
+- Streamlined 3-option menu system
+- Built-in help and guidance
+- Error handling and validation
+
+**Example:**
+```powershell
+# Launch interactive menu system
+Deploy-DefenderForServers
 ```
 
 ## 📊 Output Examples
@@ -329,7 +327,7 @@ WORKSTATION02
 
 # Use with commands
 $devices = Get-Content .\devices.txt
-Test-AzureArcPrerequisites -DeviceList $devices
+Test-AzureArcPrerequisite -DeviceListPath ".\devices.txt"
 ```
 
 ### Logging Configuration
@@ -339,7 +337,7 @@ $VerbosePreference = "Continue"
 $InformationPreference = "Continue"
 
 # Custom log path
-Test-AzureArcPrerequisites -LogPath "C:\Logs\ArcDeployment.log"
+Test-AzureArcPrerequisite -NetworkLogPath "C:\Logs\ArcDeployment.log"
 ```
 
 ## 🛠️ Troubleshooting
@@ -371,8 +369,8 @@ Install-Module -Name Az -Repository PSGallery -Force
 
 #### ❌ "Network Connectivity Failed" Error
 ```powershell
-# Test specific endpoints
-Get-AzureArcConnectivity -TestMode Comprehensive -ShowDetailedResults
+# Network connectivity testing is now integrated into prerequisites testing
+Test-AzureArcPrerequisite -NetworkTestMode Comprehensive -ShowDetailedNetworkResults
 
 # Check firewall and proxy settings
 Test-NetConnection -ComputerName "management.azure.com" -Port 443
@@ -415,10 +413,9 @@ Deploy-DefenderForServers
 ### Bulk Operations
 ```powershell
 # Process devices in parallel for large environments
-$devices = Get-Content .\devices.txt
-$devices | ForEach-Object -Parallel {
-    Test-AzureArcPrerequisites -DeviceList $_ -LogPath "C:\Logs\$_.log"
-} -ThrottleLimit 10
+$deviceListFile = ".\devices.txt"
+# Note: Individual device testing is now handled by the DeviceListPath parameter
+Test-AzureArcPrerequisite -DeviceListPath $deviceListFile -NetworkLogPath "C:\Logs\AllDevices.log"
 ```
 
 ### Memory Management
@@ -545,8 +542,8 @@ The module now includes comprehensive Azure Arc network requirements testing bas
 - WindowsAdminCenter
 
 ```powershell
-# Quick comprehensive test
-Get-AzureArcConnectivity -ComputerName "SERVER01" -TestMode Comprehensive -IncludeOptional -TestTLSVersion
+# Comprehensive connectivity testing is now integrated into prerequisites testing
+Test-AzureArcPrerequisite -NetworkTestMode Comprehensive -IncludeOptionalEndpoints -TestTLSVersion
 ```
 
 ## 🔧 Requirements
@@ -589,11 +586,14 @@ The interactive interface provides:
 ### 1. Prerequisites Check
 
 ```powershell
-# Test system readiness for Azure Arc
-Test-AzureArcPrerequisites -DeviceList @("SERVER01", "SERVER02", "SERVER03")
+# Test system readiness for Azure Arc (create device list file first)
+"SERVER01" | Out-File -FilePath "C:\devices.txt"
+"SERVER02" | Out-File -FilePath "C:\devices.txt" -Append  
+"SERVER03" | Out-File -FilePath "C:\devices.txt" -Append
+Test-AzureArcPrerequisite -DeviceListPath "C:\devices.txt"
 
-# Test with user consent prompt
-Test-AzureArcPrerequisites -DeviceList @("SERVER01") -RequireUserConsent
+# Test with force option (skip prompts)
+Test-AzureArcPrerequisite -DeviceListPath "C:\devices.txt" -Force
 ```
 
 ### 2. Azure Arc Onboarding
@@ -612,7 +612,7 @@ New-AzureArcDevice -ResourceGroupName "rg-azurearc-prod" -Location "East US" -Se
 
 ```powershell
 # Test system readiness for Azure Arc
-Test-AzureArcPrerequisites
+Test-AzureArcPrerequisite
 ```
 
 ### Azure Arc Onboarding
@@ -631,13 +631,9 @@ New-AzureArcDevice -ResourceGroupName "rg-azurearc" -Location "East US"
 ## 🔧 Available Functions
 
 - `Deploy-DefenderForServers` - Interactive main menu
-- `Test-AzureArcPrerequisites` - Prerequisites validation (enhanced with comprehensive network testing)
-- `Get-AzureArcConnectivity` - **NEW**: Comprehensive Azure Arc network connectivity testing (consolidates previous connectivity functions)
-- `Register-AzureResourceProviders` - Resource provider registration
-- `New-ArcServicePrincipal` - Service principal creation
-- `Install-AzureConnectedMachineAgent` - Agent installation
-- `Deploy-ArcGroupPolicy` - Group Policy deployment
-- `New-AzureArcDevice` - Complete Azure Arc onboarding
+- `Test-AzureArcPrerequisite` - Prerequisites validation (enhanced with automatic resource provider registration)
+- `New-AzureArcDevice` - Complete Azure Arc deployment (includes service principal creation, agent installation, and Group Policy deployment)
+- `Get-AzureArcDiagnostics` - Comprehensive Azure Arc diagnostics and troubleshooting
 
 ## 🤝 Support
 
@@ -669,26 +665,17 @@ New-AzureArcDevice `
 
 ### Utility Functions
 
-The module includes several utility functions for granular control:
+The module provides a streamlined workflow through three main functions:
 
 ```powershell
-# Test Azure connectivity (basic)
-Get-AzureArcConnectivity -ComputerName "SERVER01"
+# Test prerequisites with automatic resource provider registration
+Test-AzureArcPrerequisite -DeviceListPath "C:\devices.txt" -NetworkTestMode Comprehensive
 
-# Test comprehensive Azure Arc connectivity (NEW - Consolidated)
-Get-AzureArcConnectivity -ComputerName "SERVER01" -TestMode Comprehensive -IncludeOptional -TestTLSVersion
+# Complete Azure Arc deployment (service principal + agent + Group Policy)
+New-AzureArcDevice -ResourceGroupName "rg-azurearc" -Location "eastus"
 
-# Install Azure Connected Machine Agent
-Install-AzureConnectedMachineAgent -ComputerName "SERVER01" -Force
-
-# Register Azure resource providers
-Register-AzureResourceProviders
-
-# Create service principal
-$sp = New-ArcServicePrincipal -ResourceGroupName "rg-azurearc" -DisplayName "Custom Arc SP"
-
-# Deploy Group Policy
-Deploy-ArcGroupPolicy -GPOName "Arc Policy" -TargetOUs @("CN=Servers,DC=domain,DC=com") -ServicePrincipalId $sp.ApplicationId -ServicePrincipalSecret $sp.Secret -TenantId $sp.TenantId -SubscriptionId $sp.SubscriptionId -ResourceGroupName "rg-azurearc" -Location "eastus"
+# Run comprehensive diagnostics
+Get-AzureArcDiagnostics -LogPath "C:\ArcDiagnostics" -CollectLogs
 ```
 
 ## 🔐 Authentication
@@ -697,7 +684,7 @@ The module handles Azure authentication automatically:
 
 ```powershell
 # Automatic authentication check and login prompt
-Test-AzureArcPrerequisites -DeviceList @("SERVER01")
+Test-AzureArcPrerequisite -DeviceListPath @("SERVER01")
 
 # Manual authentication verification
 $authResult = Confirm-AzureAuthentication
@@ -802,13 +789,8 @@ if ($authResult) {
 ### Custom Resource Provider Registration
 
 ```powershell
-# Register custom set of providers
-Register-AzureResourceProviders -ProviderNamespaces @(
-    "Microsoft.HybridCompute",
-    "Microsoft.GuestConfiguration",
-    "Microsoft.Insights",
-    "Microsoft.OperationalInsights"
-)
+# Resource providers are now automatically registered during prerequisites testing
+Test-AzureArcPrerequisite -DeviceListPath "C:\devices.txt" -Force
 ```
 
 ### Batch Device Processing
@@ -816,7 +798,7 @@ Register-AzureResourceProviders -ProviderNamespaces @(
 ```powershell
 # Process large device lists efficiently
 $deviceList = Get-Content "C:\DeviceLists\prod-servers.txt"
-Test-AzureArcPrerequisites -DeviceList $deviceList -Parallel -MaxConcurrency 10
+Test-AzureArcPrerequisite -DeviceListPath "C:\DeviceLists\prod-servers.txt" -NetworkTestMode Comprehensive
 ```
 
 ### Custom Error Handling
@@ -854,15 +836,15 @@ Set-WSManQuickConfig -Force
 
 **3. Network Connectivity Problems**
 ```powershell
-# Test specific Azure endpoints
-Get-AzureArcConnectivity -ComputerName "PROBLEMATIC-SERVER"
+# Test network connectivity using integrated testing
+Test-AzureArcPrerequisite -NetworkTestMode Comprehensive -ShowDetailedNetworkResults
 ```
 
 **4. Resource Provider Registration Stuck**
 ```powershell
-# Force re-registration
-Unregister-AzResourceProvider -ProviderNamespace "Microsoft.HybridCompute"
-Register-AzureResourceProviders -ProviderNamespaces @("Microsoft.HybridCompute")
+# Resource provider registration is now automatic during prerequisites testing
+# If manual registration is needed, run:
+Test-AzureArcPrerequisite -Force
 ```
 
 ### Debug Mode
@@ -874,7 +856,7 @@ Enable verbose output for detailed troubleshooting:
 $VerbosePreference = "Continue"
 $DebugPreference = "Continue"
 
-Test-AzureArcPrerequisites -DeviceList @("SERVER01") -Verbose -Debug
+Test-AzureArcPrerequisite -DeviceListPath "C:\SERVER01.txt" -ShowDetailedNetworkResults
 ```
 
 ## 📈 Performance Considerations
@@ -892,19 +874,26 @@ For enterprise deployments with hundreds of servers:
 ### Resource Management
 
 ```powershell
-# Optimize for large deployments
-$batchSize = 50
-$deviceBatches = Split-Array -InputArray $allDevices -BatchSize $batchSize
-
-foreach ($batch in $deviceBatches) {
-    Test-AzureArcPrerequisites -DeviceList $batch
+# Batch processing is now handled automatically with device list files
+# Create device list files for each batch and process them sequentially
+for ($i = 1; $i -le $totalBatches; $i++) {
+    $batchFile = "C:\DeviceBatch$i.txt"
+    Test-AzureArcPrerequisite -DeviceListPath $batchFile
     Start-Sleep -Seconds 30  # Rate limiting
 }
 ```
 
 ## 🔄 Version History
 
-### v1.0.9 (Current)
+### v2.0.0 (Current)
+- 🚀 **Major restructure**: Consolidated 8 functions into 3 streamlined workflows
+- ✅ **Enhanced Test-AzureArcPrerequisite**: Now includes automatic Azure resource provider registration
+- ✅ **Enhanced New-AzureArcDevice**: Complete deployment including service principal creation, agent installation, and Group Policy deployment
+- ✅ **Simplified menu system**: Reduced from 8 options to 3 main functions
+- ✅ **Improved user experience**: Automated workflow with fewer manual steps
+- ✅ **Updated documentation**: Comprehensive guide reflecting new structure
+
+### v1.0.9
 - ✅ Updated to use modern PowerShell Gallery publishing with PSResourceGet
 - ✅ Cleaned up documentation and removed unnecessary content
 - ✅ Improved module metadata for better PowerShell Gallery presentation

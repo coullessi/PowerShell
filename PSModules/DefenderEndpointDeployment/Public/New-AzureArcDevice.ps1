@@ -353,15 +353,81 @@ function New-AzureArcDevice {
     Write-Host "✅ Remote share '$RemoteShare' is ready for deployment" -ForegroundColor Green
     Write-Host "📁 All files will be stored in: $path" -ForegroundColor Gray
 
-    # 4. Download the onboarding files
+    # 4. Download and prepare Azure Arc Components (enhanced functionality)
     Write-Host "`n📥 Downloading Azure Arc Components" -ForegroundColor Cyan
     Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor Cyan
     
-    # Download Azure Connected Machine Agent
-    Write-Host "Downloading Azure Connected Machine Agent..." -ForegroundColor Yellow
+    # Download Azure Connected Machine Agent with enhanced error handling
+    Write-Host "📦 Downloading Azure Connected Machine Agent..." -ForegroundColor Yellow
+    $agentPath = "$path\AzureConnectedMachineAgent.msi"
+    
     try {
-        Invoke-WebRequest -Uri "https://aka.ms/AzureConnectedMachineAgent" -OutFile "$path\AzureConnectedMachineAgent.msi"
-        Write-Host "✅ Azure Connected Machine Agent downloaded successfully" -ForegroundColor Green
+        # Check if agent already exists
+        if (Test-Path $agentPath) {
+            Write-Host "⚠️  Agent installer already exists. Checking if update is needed..." -ForegroundColor Yellow
+            $overwrite = Read-Host "Do you want to download a fresh copy? [Y/N] (default: N)"
+            if ($overwrite.ToUpper() -eq 'Y') {
+                Remove-Item $agentPath -Force
+                Write-Host "🗑️  Existing installer removed" -ForegroundColor Gray
+            } else {
+                Write-Host "✅ Using existing Azure Connected Machine Agent installer" -ForegroundColor Green
+            }
+        }
+        
+        if (-not (Test-Path $agentPath)) {
+            $downloadUrl = "https://aka.ms/AzureConnectedMachineAgent"
+            Write-Host "🌐 Downloading from: $downloadUrl" -ForegroundColor Gray
+            
+            # Download with progress indication
+            $webClient = New-Object System.Net.WebClient
+            $webClient.DownloadFile($downloadUrl, $agentPath)
+            $webClient.Dispose()
+            
+            # Verify download
+            if (Test-Path $agentPath) {
+                $fileSize = (Get-Item $agentPath).Length / 1MB
+                Write-Host "✅ Azure Connected Machine Agent downloaded successfully" -ForegroundColor Green
+                Write-Host "📊 File size: $([math]::Round($fileSize, 2)) MB" -ForegroundColor Gray
+            } else {
+                throw "Download completed but file not found"
+            }
+        }
+        
+        # Optional: Install agent locally for testing
+        $installLocally = Read-Host "`n🔧 Would you like to install the Azure Connected Machine Agent on this machine for testing? [Y/N] (default: N)"
+        if ($installLocally.ToUpper() -eq 'Y') {
+            Write-Host "🔧 Installing Azure Connected Machine Agent locally..." -ForegroundColor Yellow
+            
+            try {
+                # Check if already installed
+                $existingAgent = Get-ItemProperty "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" | Where-Object { $_.DisplayName -like "*Azure Connected Machine Agent*" }
+                
+                if ($existingAgent -and -not $Force) {
+                    Write-Host "✅ Azure Connected Machine Agent is already installed locally" -ForegroundColor Green
+                } else {
+                    if ($existingAgent) {
+                        Write-Host "⚠️  Agent already installed, but Force parameter specified. Reinstalling..." -ForegroundColor Yellow
+                    }
+                    
+                    $installArgs = @("/i", $agentPath, "/quiet", "/norestart")
+                    $installProcess = Start-Process -FilePath "msiexec.exe" -ArgumentList $installArgs -Wait -PassThru -NoNewWindow
+                    
+                    if ($installProcess.ExitCode -eq 0) {
+                        Write-Host "✅ Azure Connected Machine Agent installed successfully on local machine" -ForegroundColor Green
+                        Write-Host "💡 Agent is installed but not connected. Use Group Policy or manual connection for onboarding." -ForegroundColor Yellow
+                    } else {
+                        Write-Host "⚠️  Agent installation completed with exit code: $($installProcess.ExitCode)" -ForegroundColor Yellow
+                        Write-Host "💡 This may indicate a reboot is required or agent was already installed" -ForegroundColor Gray
+                    }
+                }
+            }
+            catch {
+                Write-Host "❌ Failed to install agent locally: $($_.Exception.Message)" -ForegroundColor Red
+                Write-Host "💡 Agent file is still available for Group Policy deployment" -ForegroundColor Yellow
+            }
+        } else {
+            Write-Host "⏭️  Skipping local installation. Agent available for Group Policy deployment." -ForegroundColor Gray
+        }
     }
     catch {
         Write-Host "❌ Failed to download Azure Connected Machine Agent: $($_.Exception.Message)" -ForegroundColor Red
@@ -438,7 +504,7 @@ function New-AzureArcDevice {
         }
     }
 
-    # 5. Create a service principal for the Azure Connected Machine Agent
+    # 5. Create a service principal for the Azure Connected Machine Agent (enhanced functionality)
     Write-Host "`n🔐 Creating Service Principal" -ForegroundColor Cyan
     Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor Cyan
     Write-Host "Creating Azure Arc service principal for onboarding..." -ForegroundColor Yellow
@@ -446,23 +512,56 @@ function New-AzureArcDevice {
     $date = Get-Date
     $ArcServerOnboardingDetail = New-Item -ItemType File -Path "$path\ArcServerOnboarding.txt"
     "------------------------------------------------------------------------------" | Out-File -FilePath $ArcServerOnboardingDetail -Append
-    "`nService principal creation date: $date`nSecret expiration date: $($date.AddDays(7))" | Out-File -FilePath $ArcServerOnboardingDetail -Append
+    "`nService principal creation date: $date`nSecret expiration date: $($date.AddDays(30))" | Out-File -FilePath $ArcServerOnboardingDetail -Append
     
     try {
-        $ServicePrincipal = New-AzADServicePrincipal -EndDate $date.AddDays(7) -DisplayName "Azure Arc Onboarding Account - Windows" -Role "Azure Connected Machine Onboarding" -Scope "/subscriptions/$subId/resourceGroups/$resourceGroup"
-        Write-Host "✅ Service principal created successfully!" -ForegroundColor Green
+        # Enhanced service principal creation with better configuration
+        $displayName = "Azure Arc Deployment Account - DefenderEndpointDeployment"
+        $expirationDate = $date.AddDays(30)  # Longer expiration period
+        $scope = "/subscriptions/$subId/resourceGroups/$resourceGroup"
         
-        # Save only non-sensitive information to file (no secret for security)
-        $ServicePrincipal | Format-Table AppId, DisplayName, @{ Name = "Role"; Expression = { "Azure Connected Machine Onboarding" } } | Out-File -FilePath $ArcServerOnboardingDetail -Append
-        "`n------------------------------------------------------------------------------" | Out-File -FilePath $ArcServerOnboardingDetail -Append
+        Write-Host "📋 Service Principal Configuration:" -ForegroundColor Yellow
+        Write-Host "  Display Name: $displayName" -ForegroundColor Gray
+        Write-Host "  Scope: $scope" -ForegroundColor Gray
+        Write-Host "  Expiration: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor Gray
+
+        # Create the service principal with enhanced error handling
+        $ServicePrincipal = New-AzADServicePrincipal -DisplayName $displayName -Role "Azure Connected Machine Onboarding" -Scope $scope -EndDate $expirationDate
         
-        $AppId = $ServicePrincipal.AppId
-        $Secret = $ServicePrincipal.PasswordCredentials.SecretText
-        
-        Write-Host "✅ Service principal details saved to: $($ArcServerOnboardingDetail.FullName)" -ForegroundColor Green
-        Write-Host "🔑 Application ID: $AppId" -ForegroundColor Gray
-        Write-Host "⚠️  Secret: [HIDDEN FOR SECURITY - Use from memory during deployment]" -ForegroundColor Yellow
-        Write-Host "⏰ Secret expires: $($date.AddDays(7).ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor Gray
+        if ($ServicePrincipal) {
+            Write-Host "✅ Service principal created successfully!" -ForegroundColor Green
+            
+            # Save detailed service principal information
+            $spDetails = @"
+Service Principal Details:
+Application ID: $($ServicePrincipal.AppId)
+Object ID: $($ServicePrincipal.Id)
+Display Name: $($ServicePrincipal.DisplayName)
+Tenant ID: $TenantId
+Subscription ID: $subId
+Resource Group: $resourceGroup
+Scope: $scope
+Creation Date: $($date.ToString('yyyy-MM-dd HH:mm:ss'))
+Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
+"@
+            $spDetails | Out-File -FilePath $ArcServerOnboardingDetail -Append
+            
+            $AppId = $ServicePrincipal.AppId
+            $Secret = $ServicePrincipal.PasswordCredentials.SecretText
+            
+            Write-Host "✅ Service principal details saved to: $($ArcServerOnboardingDetail.FullName)" -ForegroundColor Green
+            Write-Host "🔑 Application ID: $AppId" -ForegroundColor Gray
+            Write-Host "⚠️  Secret: [HIDDEN FOR SECURITY - Use from memory during deployment]" -ForegroundColor Yellow
+            Write-Host "⏰ Secret expires: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor Gray
+            
+            Write-Host "`n⚠️  IMPORTANT SECURITY NOTES:" -ForegroundColor Red
+            Write-Host "  • Store the client secret securely - it cannot be retrieved again" -ForegroundColor Yellow
+            Write-Host "  • The secret expires on $($expirationDate.ToString('yyyy-MM-dd'))" -ForegroundColor Yellow
+            Write-Host "  • Limit access to these credentials to authorized personnel only" -ForegroundColor Yellow
+        } else {
+            Write-Host "❌ Failed to create service principal" -ForegroundColor Red
+            throw "Service principal creation failed"
+        }
     }
     catch {
         Write-Host "❌ Failed to create service principal: $($_.Exception.Message)" -ForegroundColor Red

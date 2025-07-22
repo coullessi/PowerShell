@@ -1,7 +1,7 @@
 function Test-AzureResourceProviders {
     <#
     .SYNOPSIS
-        Tests and optionally registers Azure Resource Providers required for Azure Arc.
+        Tests and registers Azure Resource Providers required for Azure Arc.
     #>
     if (-not $script:azureLoginCompleted -or $script:resourceProvidersChecked) {
         return
@@ -12,7 +12,7 @@ function Test-AzureResourceProviders {
     $WarningPreference = 'SilentlyContinue'
     
     try {
-        Write-Step "Checking Azure Resource Provider registrations"
+        Write-Step "Checking and registering Azure Resource Provider registrations"
         $providers = @(
             "Microsoft.HybridCompute",
             "Microsoft.GuestConfiguration", 
@@ -20,311 +20,105 @@ function Test-AzureResourceProviders {
             "Microsoft.HybridConnectivity"
         )
         
-        $unregisteredProviders = @()
+        $results = @()
         
-        # Show progress while checking providers
-        Write-Progress -Activity "Checking Resource Providers" -Status "Initializing..." -PercentComplete 0
+        # Show progress while checking and registering providers
+        Write-Progress -Activity "Processing Resource Providers" -Status "Initializing..." -PercentComplete 0
         
         for ($i = 0; $i -lt $providers.Count; $i++) {
             $provider = $providers[$i]
             $percentComplete = [math]::Round((($i + 1) / $providers.Count) * 100)
-            Write-Progress -Activity "Checking Resource Providers" -Status "Checking $provider... ($($i + 1)/$($providers.Count))" -PercentComplete $percentComplete
+            Write-Progress -Activity "Processing Resource Providers" -Status "Processing $provider... ($($i + 1)/$($providers.Count))" -PercentComplete $percentComplete
             
             try {
+                # Check current status
                 $resourceProvider = Get-AzResourceProvider -ProviderNamespace $provider -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+                
                 if ($resourceProvider) {
-                    $status = $resourceProvider.RegistrationState
+                    $currentStatus = $resourceProvider.RegistrationState
+                    
+                    if ($currentStatus -eq "Registered") {
+                        Write-Host "    ✅ $provider : Already registered" -ForegroundColor Green
+                        $results += [PSCustomObject]@{
+                            Provider = $provider
+                            Status = "Already Registered"
+                            Success = $true
+                        }
+                        continue
+                    }
+
+                    # Register the provider
+                    Write-Host "    🔄 $provider : Registering..." -ForegroundColor Yellow
+                    Register-AzResourceProvider -ProviderNamespace $provider -ErrorAction Stop | Out-Null
+                    
+                    # Wait for registration to complete (with shorter timeout for better UX)
+                    $timeout = 120  # 2 minutes
+                    $timer = 0
+                    $interval = 5
+                    
+                    do {
+                        Start-Sleep -Seconds $interval
+                        $timer += $interval
+                        
+                        $providerStatus = Get-AzResourceProvider -ProviderNamespace $provider -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+                        $status = $providerStatus.RegistrationState
+                        
+                    } while ($timer -lt $timeout -and $status -ne "Registered")
+                    
                     if ($status -eq "Registered") {
-                        Write-Host "    ✅ $provider : Registered" -ForegroundColor Green
+                        Write-Host "    ✅ $provider : Successfully registered" -ForegroundColor Green
+                        $results += [PSCustomObject]@{
+                            Provider = $provider
+                            Status = "Successfully Registered"
+                            Success = $true
+                        }
                     } else {
-                        Write-Host "    ⚠️  $provider : Not registered" -ForegroundColor Yellow
-                        $unregisteredProviders += $provider
+                        Write-Host "    ⚠️  $provider : Registration timeout (may complete in background)" -ForegroundColor Yellow
+                        $results += [PSCustomObject]@{
+                            Provider = $provider
+                            Status = "Registration Timeout"
+                            Success = $false
+                        }
                     }
                 } else {
                     Write-Host "    ❌ $provider : Provider not found" -ForegroundColor Red
-                    $unregisteredProviders += $provider
+                    $results += [PSCustomObject]@{
+                        Provider = $provider
+                        Status = "Provider Not Found"
+                        Success = $false
+                    }
                 }
             } catch {
-                Write-Host "    ❌ $provider : Error checking registration - $($_.Exception.Message)" -ForegroundColor Red
-                $unregisteredProviders += $provider
+                Write-Host "    ❌ $provider : Registration failed - $($_.Exception.Message)" -ForegroundColor Red
+                $results += [PSCustomObject]@{
+                    Provider = $provider
+                    Status = "Registration Failed"
+                    Success = $false
+                }
             }
         }
         
-        Write-Progress -Activity "Checking Resource Providers" -Completed
-    
-        # Offer to register unregistered providers
-        if ($unregisteredProviders.Count -gt 0) {
-            Write-Host "`n⚠️  Found $($unregisteredProviders.Count) unregistered resource provider(s)" -ForegroundColor Yellow
-            Write-Host "   Unregistered providers: $($unregisteredProviders -join ', ')" -ForegroundColor Gray
-            Write-Host "`n💡 These resource providers are required for Azure Arc functionality:" -ForegroundColor Cyan
-            Write-Host "   • Microsoft.HybridCompute     - Core Azure Arc agent functionality" -ForegroundColor Gray
-            Write-Host "   • Microsoft.GuestConfiguration - Guest configuration policies" -ForegroundColor Gray
-            Write-Host "   • Microsoft.AzureArcData      - Azure Arc data services" -ForegroundColor Gray
-            Write-Host "   • Microsoft.HybridConnectivity - Hybrid connectivity features" -ForegroundColor Gray
-            
-            Write-Host "`n🔧 Registration Options:" -ForegroundColor Cyan
-            Write-Host "   A - Register ALL unregistered providers automatically" -ForegroundColor Green
-            Write-Host "   S - Select specific providers to register" -ForegroundColor Yellow
-            Write-Host "   N - Skip registration (you can register manually later)" -ForegroundColor Gray
-            
-            $registrationAttempted = $false
-            
-            do {
-                $choice = Read-Host "`nWould you like to register resource providers? [A/S/N] (default: A)"
-                
-                # Use default if user pressed Enter without input
-                if ([string]::IsNullOrWhiteSpace($choice)) {
-                    $choice = 'A'
-                    Write-Host "✅ Using default choice: Register All" -ForegroundColor Green
-                }
-                switch ($choice.ToUpper()) {
-                    'A' {
-                        Write-Host "`n🚀 Registering all unregistered providers in parallel..." -ForegroundColor Green
-                        $registrationAttempted = $true
-                        
-                        # Use new parallel registration function
-                        $parallelSuccess = Register-AzureResourceProvidersParallel -ProviderNamespaces $unregisteredProviders
-                        
-                        if ($parallelSuccess) {
-                            Write-Host "`n✅ All resource providers registered successfully!" -ForegroundColor Green
-                        } else {
-                            Write-Host "`n⚠️  Some providers may still be completing registration" -ForegroundColor Yellow
-                            Write-Host "   Check Azure portal for final status" -ForegroundColor Gray
-                        }
-                        break
-                    }
-                    'S' {
-                        Write-Host "`n📋 Select providers to register:" -ForegroundColor Cyan
-                        for ($i = 0; $i -lt $unregisteredProviders.Count; $i++) {
-                            Write-Host "   $($i + 1). $($unregisteredProviders[$i])" -ForegroundColor Gray
-                        }
-                        
-                        do {
-                            $selection = Read-Host "`nEnter provider numbers to register (e.g., 1,3 or 'all' for all) [default: all]"
-                            
-                            # Use default if user pressed Enter without input
-                            if ([string]::IsNullOrWhiteSpace($selection)) {
-                                $selection = 'all'
-                                Write-Host "✅ Using default choice: all" -ForegroundColor Green
-                            }
-                            
-                            if ($selection.ToLower() -eq 'all') {
-                                $selectedProviders = $unregisteredProviders
-                                break
-                            } else {
-                                try {
-                                    $indices = $selection.Split(',') | ForEach-Object { [int]$_.Trim() - 1 }
-                                    $selectedProviders = @()
-                                    foreach ($index in $indices) {
-                                        if ($index -ge 0 -and $index -lt $unregisteredProviders.Count) {
-                                            $selectedProviders += $unregisteredProviders[$index]
-                                        } else {
-                                            throw "Invalid selection"
-                                        }
-                                    }
-                                    break
-                                } catch {
-                                    Write-Host "   Invalid selection. Please try again." -ForegroundColor Red
-                                }
-                            }
-                        } while ($true)
-                        
-                        Write-Host "`n🔧 Registering selected providers..." -ForegroundColor Green
-                        $registrationAttempted = $true
-                        
-                        $parallelSuccess = Register-AzureResourceProvidersParallel -ProviderNamespaces $selectedProviders
-                        
-                        if ($parallelSuccess) {
-                            Write-Host "`n✅ Selected resource providers registered successfully!" -ForegroundColor Green
-                        } else {
-                            Write-Host "`n⚠️  Provider registration may still be in progress" -ForegroundColor Yellow
-                        }
-                        break
-                    }
-                    'N' {
-                        Write-Host "`n⏭️  Skipping resource provider registration" -ForegroundColor Gray
-                        Write-Host "   💡 You can register providers manually using:" -ForegroundColor Gray
-                        Write-Host "      Register-AzResourceProvider -ProviderNamespace <ProviderName>" -ForegroundColor Gray
-                        Write-Host "   📋 Or use the Azure portal: Home > Subscriptions > Resource providers" -ForegroundColor Gray
-                        break
-                    }
-                    default {
-                        Write-Host "   Please enter 'A' for all, 'S' for selective, or 'N' to skip." -ForegroundColor Yellow
-                    }
-                }
-            } while ($choice.ToUpper() -notin @('A', 'S', 'N'))
-            
-            # Re-check registration status after any registration attempts
-            if ($registrationAttempted) {
-                Write-Host "`n🔍 Re-checking resource provider registration status..." -ForegroundColor Cyan
-                $stillUnregistered = @()
-                
-                # Show progress during re-checking
-                Write-Progress -Activity "Re-checking Resource Providers" -Status "Initializing..." -PercentComplete 0
-                
-                for ($i = 0; $i -lt $providers.Count; $i++) {
-                    $provider = $providers[$i]
-                    $percentComplete = [math]::Round((($i + 1) / $providers.Count) * 100)
-                    Write-Progress -Activity "Re-checking Resource Providers" -Status "Re-checking $provider... ($($i + 1)/$($providers.Count))" -PercentComplete $percentComplete
-                    
-                    try {
-                        $resourceProvider = Get-AzResourceProvider -ProviderNamespace $provider -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
-                        if ($resourceProvider -and $resourceProvider.RegistrationState -eq "Registered") {
-                            Write-Host "    ✅ $provider : Confirmed registered" -ForegroundColor Green
-                        } else {
-                            Write-Host "    ⚠️  $provider : Still not registered" -ForegroundColor Yellow
-                            $stillUnregistered += $provider
-                        }
-                    } catch {
-                        Write-Host "    ❌ $provider : Error re-checking - $($_.Exception.Message)" -ForegroundColor Red
-                        $stillUnregistered += $provider
-                    }
-                }
-                
-                Write-Progress -Activity "Re-checking Resource Providers" -Completed
-                
-                # Store the current unregistered providers for later use in status reporting
-                $script:unregisteredProviders = $stillUnregistered
-                
-                # Only mark as checked if all providers are now registered
-                if ($stillUnregistered.Count -eq 0) {
-                    Write-Host "`n✅ All resource providers are now registered!" -ForegroundColor Green
-                    $script:resourceProvidersChecked = $true
-                } else {
-                    Write-Host "`n⚠️  $($stillUnregistered.Count) resource provider(s) still need attention: $($stillUnregistered -join ', ')" -ForegroundColor Yellow
-                    Write-Host "   Resource provider check will remain incomplete until all are registered." -ForegroundColor Gray
-                    # Do NOT set $script:resourceProvidersChecked = $true here
-                }
-            } else {
-                # User chose to skip - mark as checked but store unregistered providers for status reporting
-                $script:unregisteredProviders = $unregisteredProviders
-                Write-Host "`n📝 Resource provider check marked as completed (user chose to skip registration)" -ForegroundColor Gray
-                Write-Host "   Note: Unregistered providers may cause issues during Azure Arc onboarding" -ForegroundColor Yellow
-                $script:resourceProvidersChecked = $true
-            }
-            
+        Write-Progress -Activity "Processing Resource Providers" -Completed
+        
+        # Display registration summary
+        Write-Host "`n� Resource Provider Registration Summary:" -ForegroundColor Cyan
+        $successCount = ($results | Where-Object { $_.Success }).Count
+        $totalCount = $results.Count
+
+        if ($successCount -eq $totalCount) {
+            Write-Host "✅ All resource providers registered successfully! ($successCount/$totalCount)" -ForegroundColor Green
+            $script:resourceProvidersChecked = $true
+            $script:unregisteredProviders = @()
         } else {
-            Write-Host "`n✅ All required resource providers are registered!" -ForegroundColor Green
-            $script:unregisteredProviders = @()  # No unregistered providers
+            Write-Host "⚠️  Some resource provider registrations incomplete ($successCount/$totalCount)" -ForegroundColor Yellow
+            $script:unregisteredProviders = ($results | Where-Object { -not $_.Success }).Provider
+            # Still mark as checked since we attempted registration
             $script:resourceProvidersChecked = $true
         }
     }
     finally {
         # Restore original warning preference
         $WarningPreference = $OriginalWarningPreference
-    }
-}
-
-function Register-AzureResourceProvidersParallel {
-    <#
-    .SYNOPSIS
-        Registers multiple Azure Resource Providers in parallel.
-    
-    .PARAMETER ProviderNamespaces
-        Array of resource provider namespaces to register.
-    #>
-    param(
-        [string[]]$ProviderNamespaces
-    )
-    
-    Write-Host "    🚀 Initiating parallel registration of $($ProviderNamespaces.Count) resource providers..." -ForegroundColor Cyan
-    
-    # Start all registrations simultaneously (fire-and-forget approach)
-    foreach ($provider in $ProviderNamespaces) {
-        try {
-            Write-Host "    🔄 Starting registration: $provider" -ForegroundColor Yellow
-            Register-AzResourceProvider -ProviderNamespace $provider -ErrorAction SilentlyContinue -WarningAction SilentlyContinue | Out-Null
-        } catch {
-            Write-Host "    ⚠️  Failed to start registration for $provider`: $($_.Exception.Message)" -ForegroundColor Yellow
-        }
-    }
-    
-    Write-Host "    ⏱️  All registrations initiated. Monitoring progress (up to 60 seconds)..." -ForegroundColor Cyan
-    
-    # Monitor progress with optimized polling
-    $timeout = 60  # Reduced overall timeout for parallel operations
-    $interval = 3   # Very fast polling for parallel monitoring
-    $timer = 0
-    $completed = @()
-    $lastStatusUpdate = 0
-    $lastCompletedCount = 0  # Initialize this variable
-    
-    # Show initial progress bar
-    Write-Progress -Activity "Registering Resource Providers" -Status "Initializing registration for $($ProviderNamespaces.Count) providers..." -PercentComplete 0
-    
-    # Give initial registrations a moment to start
-    Start-Sleep -Seconds 2
-    $timer += 2
-    
-    do {
-        $timer += $interval
-        
-        # Check status of all providers
-        $stillPending = @()
-        foreach ($provider in $ProviderNamespaces) {
-            if ($provider -notin $completed) {
-                try {
-                    $providerStatus = Get-AzResourceProvider -ProviderNamespace $provider -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
-                    if ($providerStatus.RegistrationState -eq "Registered") {
-                        $completed += $provider
-                        Write-Host "    ✅ $provider : Registered" -ForegroundColor Green
-                    } else {
-                        $stillPending += $provider
-                    }
-                } catch {
-                    $stillPending += $provider
-                }
-            }
-        }
-        
-        # Update progress more frequently for better user experience
-        if (($timer - $lastStatusUpdate) -ge 3 -or $completed.Count -ne $lastCompletedCount) {
-            $percentComplete = [math]::Round(($completed.Count / $ProviderNamespaces.Count) * 100)
-            $remaining = $ProviderNamespaces.Count - $completed.Count
-            $statusMessage = if ($completed.Count -eq 0) {
-                "Registration in progress... ($timer s elapsed)"
-            } else {
-                "$($completed.Count)/$($ProviderNamespaces.Count) completed, $remaining pending ($timer s elapsed)"
-            }
-            Write-Progress -Activity "Registering Resource Providers" -Status $statusMessage -PercentComplete $percentComplete
-            $lastStatusUpdate = $timer
-            $lastCompletedCount = $completed.Count
-        }
-        
-        # Break if all are completed
-        if ($completed.Count -eq $ProviderNamespaces.Count) {
-            Write-Progress -Activity "Registering Resource Providers" -Status "All providers registered successfully!" -PercentComplete 100
-            Start-Sleep -Seconds 1  # Brief pause to show completion
-            break
-        }
-        
-        Start-Sleep -Seconds $interval
-        
-    } while ($timer -lt $timeout)
-    
-    Write-Progress -Activity "Registering Resource Providers" -Completed
-    
-    # Final status report
-    $successful = $completed.Count
-    $pending = $ProviderNamespaces.Count - $successful
-    
-    if ($successful -eq $ProviderNamespaces.Count) {
-        Write-Host "    ✅ All $successful resource providers registered successfully!" -ForegroundColor Green
-        $script:resourceProvidersRegistered = $true
-        return $true
-    } elseif ($successful -gt 0) {
-        Write-Host "    ⚠️  $successful/$($ProviderNamespaces.Count) providers registered, $pending still pending" -ForegroundColor Yellow
-        Write-Host "    💡 Remaining registrations will continue in the background" -ForegroundColor Gray
-        if ($pending -gt 0) {
-            $stillPendingList = $ProviderNamespaces | Where-Object { $_ -notin $completed }
-            Write-Host "    📋 Pending: $($stillPendingList -join ', ')" -ForegroundColor Gray
-        }
-        $script:resourceProvidersRegistered = $true
-        return $false
-    } else {
-        Write-Host "    ❌ No providers completed registration within timeout period" -ForegroundColor Red
-        Write-Host "    💡 Registrations may still be in progress. Check Azure portal" -ForegroundColor Gray
-        return $false
     }
 }
 

@@ -75,13 +75,8 @@ RequiredModules = @(
 FunctionsToExport = @(
     'New-AzureArcDevice',
     'Test-AzureArcPrerequisite',
-    'Install-AzureConnectedMachineAgent',
-    'Register-AzureResourceProviders',
-    'New-ArcServicePrincipal',
-    'Deploy-ArcGroupPolicy',
     'Deploy-DefenderForServers',
-    'Get-AzureArcDiagnostics',
-    'Test-AzureArcDiagnostics'
+    'Get-AzureArcDiagnostics'
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
