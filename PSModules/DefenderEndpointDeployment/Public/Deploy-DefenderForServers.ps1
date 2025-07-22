@@ -32,10 +32,7 @@ function Deploy-DefenderForServers {
     # Function to display module interface
     function Write-ModuleInterface {
         Write-Host ""
-        # Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-        # Write-Host "║        DEFENDER ENDPOINT DEPLOYMENT MODULE: Azure Arc & MDE Integration        ║" -ForegroundColor Cyan
-        # Write-Host "╚════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
-        Write-Host ""
+        Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
         Write-Host "        ██████╗ ███████╗███████╗███████╗███╗   ██╗██████╗ ███████╗██████╗ " -ForegroundColor Cyan
         Write-Host "        ██╔══██╗██╔════╝██╔════╝██╔════╝████╗  ██║██╔══██╗██╔════╝██╔══██╗" -ForegroundColor Cyan
         Write-Host "        ██║  ██║█████╗  █████╗  █████╗  ██╔██╗ ██║██║  ██║█████╗  ██████╔╝" -ForegroundColor Cyan
@@ -49,6 +46,7 @@ function Deploy-DefenderForServers {
         Write-Host "        ██╔══╝  ██║╚██╗██║██║  ██║██╔═══╝ ██║   ██║██║██║╚██╗██║   ██║   " -ForegroundColor Cyan
         Write-Host "        ███████╗██║ ╚████║██████╔╝██║     ╚██████╔╝██║██║ ╚████║   ██║   " -ForegroundColor Cyan
         Write-Host "        ╚══════╝╚═╝  ╚═══╝╚═════╝ ╚═╝      ╚═════╝ ╚═╝╚═╝  ╚═══╝   ╚═╝   " -ForegroundColor Cyan
+        Write-Host "╚════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
         Write-Host ""
         Write-Host "📋 MODULE OVERVIEW:" -ForegroundColor Green
         Write-Host "   Comprehensive PowerShell module for Azure Arc onboarding and Microsoft Defender" -ForegroundColor White
@@ -96,7 +94,7 @@ function Deploy-DefenderForServers {
             "1" {
                 Clear-Host
                 Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-                Write-Host "║                        AZURE ARC PREREQUISITES TESTING                         ║" -ForegroundColor Cyan
+                Write-Host "║ ====================== AZURE ARC PREREQUISITES TESTING ======================= ║" -ForegroundColor Cyan
                 Write-Host "╚════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
                 Write-Host ""
                 Write-Host "🔍 PREREQUISITES CHECK OVERVIEW:" -ForegroundColor Yellow
@@ -145,7 +143,7 @@ function Deploy-DefenderForServers {
             "2" {
                 Clear-Host
                 Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-                Write-Host "║                         AZURE ARC DEVICE DEPLOYMENT                            ║" -ForegroundColor Cyan
+                Write-Host "║ ======================== AZURE ARC DEVICE DEPLOYMENT ========================= ║" -ForegroundColor Cyan
                 Write-Host "╚════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
                 Write-Host ""
                 Write-Host "🚀 DEPLOYMENT OVERVIEW:" -ForegroundColor Yellow
@@ -155,7 +153,7 @@ function Deploy-DefenderForServers {
                 Write-Host ""
                 Write-Host "📋 INTEGRATED FUNCTIONALITY:" -ForegroundColor Yellow
                 Write-Host "   • Service Principal Creation - Automatically creates service principals" -ForegroundColor White
-                Write-Host "   • Agent Installation - Downloads and optionally installs Azure Connected Machine Agent" -ForegroundColor White
+                Write-Host "   • Agent Installation - Downloads and installs Azure Connected Machine Agent" -ForegroundColor White
                 Write-Host "   • Group Policy Configuration - Creates and deploys Group Policy objects" -ForegroundColor White
                 Write-Host "   • File share setup for Group Policy deployment" -ForegroundColor White
                 Write-Host "   • OU linking and configuration management" -ForegroundColor White
@@ -193,7 +191,7 @@ function Deploy-DefenderForServers {
             "3" {
                 Clear-Host
                 Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-                Write-Host "║                      AZURE ARC DIAGNOSTICS & TROUBLESHOOTING                   ║" -ForegroundColor Cyan
+                Write-Host "║ ================== AZURE ARC DIAGNOSTICS & TROUBLESHOOTING =================== ║" -ForegroundColor Cyan
                 Write-Host "╚════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
                 Write-Host ""
                 Write-Host "🔧 COMPREHENSIVE DIAGNOSTICS OVERVIEW:" -ForegroundColor Yellow
@@ -245,7 +243,7 @@ function Deploy-DefenderForServers {
                 do {
                     Clear-Host
                     Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-                    Write-Host "║                              DETAILED HELP SYSTEM                              ║" -ForegroundColor Cyan
+                    Write-Host "║ ==========================   DETAILED HELP SYSTEM   ========================== ║" -ForegroundColor Cyan
                     Write-Host "╚════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
                     Write-Host ""
                     Write-Host "📚 Available commands for detailed help:" -ForegroundColor Yellow
