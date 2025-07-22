@@ -12,15 +12,13 @@ function Deploy-DefenderForServers {
 
     # Check if required functions are available
     $requiredFunctions = @(
-        'Test-AzureArcPrerequisites',
-        'Test-AzureConnectivity',
-        'Test-AzureArcNetworkRequirements',
+        'Test-AzureArcPrerequisite',
         'Register-AzureResourceProviders',
         'New-ArcServicePrincipal',
         'Install-AzureConnectedMachineAgent',
         'Deploy-ArcGroupPolicy',
         'New-AzureArcDevice',
-        'Test-AzureArcDiagnostics'
+        'Get-AzureArcDiagnostics'
     )
 
     $missingFunctions = @()
@@ -39,7 +37,7 @@ function Deploy-DefenderForServers {
     }
 
     # Function to display the module interface
-    function Show-ModuleInterface {
+    function Write-ModuleInterface {
         Clear-Host
         
         # ASCII Art Header
@@ -78,42 +76,38 @@ function Deploy-DefenderForServers {
     }
 
     # Function to display the interactive menu
-    function Show-InteractiveMenu {
+    function Write-InteractiveMenu {
         Write-Host "🛠️  AVAILABLE COMMANDS:" -ForegroundColor Yellow
-        Write-Host "┌─────────────────────────────────────────┬─────────────────────────────────────────────────────┐"
-        Write-Host "│ [1] Test-AzureArcPrerequisites          │ Validates Azure authentication and prerequisites    │"
-        Write-Host "├─────────────────────────────────────────┼─────────────────────────────────────────────────────┤"
-        Write-Host "│ [2] Test-AzureConnectivity              │ Tests connectivity to Azure endpoints               │"
-        Write-Host "├─────────────────────────────────────────┼─────────────────────────────────────────────────────┤"
-        Write-Host "│ [3] Test-AzureArcNetworkRequirements    │ Tests network requirements for Azure Arc            │"
-        Write-Host "├─────────────────────────────────────────┼─────────────────────────────────────────────────────┤"
-        Write-Host "│ [4] Register-AzureResourceProviders     │ Registers required Azure resource providers         │"
-        Write-Host "├─────────────────────────────────────────┼─────────────────────────────────────────────────────┤"
-        Write-Host "│ [5] New-ArcServicePrincipal             │ Creates service principals for Azure Arc            │"
-        Write-Host "├─────────────────────────────────────────┼─────────────────────────────────────────────────────┤"
-        Write-Host "│ [6] Install-AzureConnectedMachineAgent  │ Installs Azure Connected Machine Agent              │"
-        Write-Host "├─────────────────────────────────────────┼─────────────────────────────────────────────────────┤"
-        Write-Host "│ [7] Deploy-ArcGroupPolicy               │ Deploys Group Policy for Azure Arc deployment       │"
-        Write-Host "├─────────────────────────────────────────┼─────────────────────────────────────────────────────┤"
-        Write-Host "│ [8] New-AzureArcDevice                  │ Creates and configures Azure Arc-enabled devices    │"
-        Write-Host "├─────────────────────────────────────────┼─────────────────────────────────────────────────────┤"
-        Write-Host "│ [9] Test-AzureArcDiagnostics            │ Runs comprehensive Azure Arc diagnostics            │"
-        Write-Host "├─────────────────────────────────────────┼─────────────────────────────────────────────────────┤"
-        Write-Host "│ [H] Help for specific command           │ Get detailed help for any command                   │"
-        Write-Host "├─────────────────────────────────────────┼─────────────────────────────────────────────────────┤"
-        Write-Host "│ [Q] Quit                                │ Exit the module                                     │"
-        Write-Host "└─────────────────────────────────────────┴─────────────────────────────────────────────────────┘"
+        Write-Host "┌─────────────────────────────────────────┬────────────────────────────────────────────────────────┐"
+        Write-Host "│ [1] Test-AzureArcPrerequisite           │ Validates Azure prerequisites and network connectivity │"
+        Write-Host "├─────────────────────────────────────────┼────────────────────────────────────────────────────────┤"
+        Write-Host "│ [2] Register-AzureResourceProviders     │ Registers required Azure resource providers            │"
+        Write-Host "├─────────────────────────────────────────┼────────────────────────────────────────────────────────┤"
+        Write-Host "│ [3] New-ArcServicePrincipal             │ Creates service principals for Azure Arc               │"
+        Write-Host "├─────────────────────────────────────────┼────────────────────────────────────────────────────────┤"
+        Write-Host "│ [4] Install-AzureConnectedMachineAgent  │ Installs Azure Connected Machine Agent                 │"
+        Write-Host "├─────────────────────────────────────────┼────────────────────────────────────────────────────────┤"
+        Write-Host "│ [5] Deploy-ArcGroupPolicy               │ Deploys Group Policy for Azure Arc deployment          │"
+        Write-Host "├─────────────────────────────────────────┼────────────────────────────────────────────────────────┤"
+        Write-Host "│ [6] New-AzureArcDevice                  │ Creates and configures Azure Arc-enabled devices       │"
+        Write-Host "├─────────────────────────────────────────┼────────────────────────────────────────────────────────┤"
+        Write-Host "│ [7] Get-AzureArcDiagnostics             │ Runs comprehensive Azure Arc diagnostics               │"
+        Write-Host "├─────────────────────────────────────────┼────────────────────────────────────────────────────────┤"
+        Write-Host "│ [H] Help for specific command           │ Get detailed help for any command                      │"
+        Write-Host "├─────────────────────────────────────────┼────────────────────────────────────────────────────────┤"
+        Write-Host "│ [Q] Quit                                │ Exit the module                                        │"
+        Write-Host "└─────────────────────────────────────────┴────────────────────────────────────────────────────────┘"
         Write-Host ""
         Write-Host "💡 GETTING STARTED:" -ForegroundColor Magenta
         Write-Host "   • Start with option [1] to validate your environment" -ForegroundColor White
-        Write-Host "   • Use option [8] for complete Azure Arc deployment" -ForegroundColor White
-        Write-Host "   • Use option [9] for troubleshooting and diagnostics" -ForegroundColor White
+        Write-Host "   • Use option [7] for complete Azure Arc deployment" -ForegroundColor White
+        Write-Host "   • Use option [8] for troubleshooting and diagnostics" -ForegroundColor White
         Write-Host "   • Type 'H' for detailed help on any command" -ForegroundColor White
         Write-Host ""
     }
 
     # Function to handle user selection
-    function Invoke-UserSelection {
+    function Start-UserSelection {
         param (
             [string]$Selection
         )
@@ -122,21 +116,22 @@ function Deploy-DefenderForServers {
             "1" {
                 Clear-Host
                 Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-                Write-Host "║  ==================  AZURE ARC PREREQUISITES CHECKER ==================      ║" -ForegroundColor Cyan
+                Write-Host "║  ================  AZURE ARC PREREQUISITES & NETWORK CHECKER ================  ║" -ForegroundColor Cyan
                 Write-Host "╚════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
                 Write-Host ""
                 Write-Host "🔍 SCRIPT OVERVIEW:" -ForegroundColor Yellow
                 Write-Host "   This script will validate your Azure authentication status and check all" -ForegroundColor White
-                Write-Host "   prerequisites required for Azure Arc deployment, including PowerShell" -ForegroundColor White
-                Write-Host "   modules and permissions." -ForegroundColor White
+                Write-Host "   prerequisites required for Azure Arc deployment, including comprehensive" -ForegroundColor White
+                Write-Host "   network connectivity testing to Azure Arc endpoints." -ForegroundColor White
                 Write-Host ""
                 Write-Host "📋 ACTIONS TO BE PERFORMED:" -ForegroundColor Yellow
                 Write-Host "   • Check PowerShell version compatibility" -ForegroundColor White
                 Write-Host "   • Validate Azure PowerShell modules availability" -ForegroundColor White
                 Write-Host "   • Test Azure Arc Connected Machine Agent status" -ForegroundColor White
+                Write-Host "   • Perform comprehensive network connectivity testing" -ForegroundColor White
                 Write-Host "   • Authenticate to Azure (browser-based login)" -ForegroundColor White
                 Write-Host "   • Check Azure resource provider registrations" -ForegroundColor White
-                Write-Host "   • Generate detailed prerequisite reports" -ForegroundColor White
+                Write-Host "   • Generate detailed prerequisite and connectivity reports" -ForegroundColor White
                 Write-Host ""
                 Write-Host "⚠️  IMPORTANT CONSIDERATIONS:" -ForegroundColor Red
                 Write-Host "   • Azure authentication will be required (browser-based login)" -ForegroundColor White
@@ -144,12 +139,12 @@ function Deploy-DefenderForServers {
                 Write-Host "   • Administrative privileges recommended for complete checks" -ForegroundColor White
                 Write-Host "   • No modifications will be made to your system configuration" -ForegroundColor White
                 Write-Host ""
-                Write-Host "🛡️  DATA & PRIVACY:" -ForegroundColor Green
+                Write-Host "🛡️  DATA ``& PRIVACY:" -ForegroundColor Green
                 Write-Host "   • All data processing occurs locally on your machine" -ForegroundColor White
                 Write-Host "   • No data is transmitted to third parties" -ForegroundColor White
                 Write-Host "   • Azure credentials are handled by official Microsoft modules" -ForegroundColor White
                 Write-Host ""
-                Write-Host "⚖️  DISCLAIMER & LIABILITY:" -ForegroundColor Magenta
+                Write-Host "⚖️  DISCLAIMER ``& LIABILITY:" -ForegroundColor Magenta
                 Write-Host "   • This script is provided 'AS IS' without warranty of any kind" -ForegroundColor White
                 Write-Host "   • The author is not liable for any damages, data loss, or other" -ForegroundColor White
                 Write-Host "     consequences that may result from running this script" -ForegroundColor White
@@ -159,13 +154,13 @@ function Deploy-DefenderForServers {
                 Write-Host "═════════════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
                 $confirm = Read-Host "Do you consent to proceed with prerequisites check? [Y/N] (default: Y)"
                 if ([string]::IsNullOrWhiteSpace($confirm) -or $confirm.ToUpper() -eq "Y") {
-                    Write-Host "`n🔍 Running Test-AzureArcPrerequisites..." -ForegroundColor Green
+                    Write-Host "`n🔍 Running Test-AzureArcPrerequisite..." -ForegroundColor Green
                     try {
-                        Test-AzureArcPrerequisites -Force
-                        Write-Host "`n✅ Test-AzureArcPrerequisites completed successfully." -ForegroundColor Green
+                        Test-AzureArcPrerequisite -Force
+                        Write-Host "`n✅ Test-AzureArcPrerequisite completed successfully." -ForegroundColor Green
                     }
                     catch {
-                        Write-Host "`n❌ Error executing Test-AzureArcPrerequisites: $($_.Exception.Message)" -ForegroundColor Red
+                        Write-Host "`n❌ Error executing Test-AzureArcPrerequisite: $($_.Exception.Message)" -ForegroundColor Red
                         Write-Host "Please ensure the module is properly imported and all dependencies are available." -ForegroundColor Yellow
                     }
                     Write-Host "`nPress any key to return to the main menu..." -ForegroundColor Yellow
@@ -177,114 +172,10 @@ function Deploy-DefenderForServers {
             "2" {
                 Clear-Host
                 Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-                Write-Host "║  ==================  AZURE CONNECTIVITY TESTER ==================            ║" -ForegroundColor Cyan
-                Write-Host "╚════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
-                Write-Host ""
-                Write-Host "🔍 SCRIPT OVERVIEW:" -ForegroundColor Yellow
-                Write-Host "   This script will test network connectivity to required Azure endpoints" -ForegroundColor White
-                Write-Host "   and verify that your system can communicate with Azure Arc services." -ForegroundColor White
-                Write-Host ""
-                Write-Host "📋 ACTIONS TO BE PERFORMED:" -ForegroundColor Yellow
-                Write-Host "   • Test connectivity to Azure management endpoints" -ForegroundColor White
-                Write-Host "   • Verify DNS resolution for Azure services" -ForegroundColor White
-                Write-Host "   • Check network ports and protocols" -ForegroundColor White
-                Write-Host "   • Validate firewall and proxy configurations" -ForegroundColor White
-                Write-Host "   • Generate connectivity diagnostic reports" -ForegroundColor White
-                Write-Host ""
-                Write-Host "⚠️  IMPORTANT CONSIDERATIONS:" -ForegroundColor Red
-                Write-Host "   • Network connectivity tests will be performed" -ForegroundColor White
-                Write-Host "   • Internet access is required for Azure endpoints" -ForegroundColor White
-                Write-Host "   • Firewall and proxy settings may affect results" -ForegroundColor White
-                Write-Host "   • No modifications will be made to network configuration" -ForegroundColor White
-                Write-Host ""
-                Write-Host "🛡️  DATA & PRIVACY:" -ForegroundColor Green
-                Write-Host "   • All connectivity tests occur from your local machine" -ForegroundColor White
-                Write-Host "   • No sensitive data is transmitted during tests" -ForegroundColor White
-                Write-Host "   • Test results are processed locally" -ForegroundColor White
-                Write-Host ""
-                Write-Host "⚖️  DISCLAIMER & LIABILITY:" -ForegroundColor Magenta
-                Write-Host "   • This script is provided 'AS IS' without warranty of any kind" -ForegroundColor White
-                Write-Host "   • The author is not liable for any network connectivity issues" -ForegroundColor White
-                Write-Host "   • Use at your own discretion in your network environment" -ForegroundColor White
-                Write-Host ""
-                Write-Host "═════════════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-                $confirm = Read-Host "Do you consent to proceed with connectivity testing? [Y/N] (default: Y)"
-                if ([string]::IsNullOrWhiteSpace($confirm) -or $confirm.ToUpper() -eq "Y") {
-                    Write-Host "`n🌐 Running Test-AzureConnectivity..." -ForegroundColor Green
-                    try {
-                        Test-AzureConnectivity
-                        Write-Host "`n✅ Test-AzureConnectivity completed successfully." -ForegroundColor Green
-                    }
-                    catch {
-                        Write-Host "`n❌ Error executing Test-AzureConnectivity: $($_.Exception.Message)" -ForegroundColor Red
-                        Write-Host "Please ensure the module is properly imported and all dependencies are available." -ForegroundColor Yellow
-                    }
-                    Write-Host "`nPress any key to return to the main menu..." -ForegroundColor Yellow
-                    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-                } else {
-                    Write-Host "`n❌ Operation cancelled by user." -ForegroundColor Yellow
-                }
-            }
-            "3" {
-                Clear-Host
-                Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-                Write-Host "║  ==================  AZURE ARC NETWORK REQUIREMENTS ==================       ║" -ForegroundColor Cyan
-                Write-Host "╚════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
-                Write-Host ""
-                Write-Host "🔍 SCRIPT OVERVIEW:" -ForegroundColor Yellow
-                Write-Host "   This script will test specific network requirements for Azure Arc" -ForegroundColor White
-                Write-Host "   including required endpoints, ports, and protocols for successful" -ForegroundColor White
-                Write-Host "   connectivity and operation." -ForegroundColor White
-                Write-Host ""
-                Write-Host "📋 ACTIONS TO BE PERFORMED:" -ForegroundColor Yellow
-                Write-Host "   • Test Azure Arc specific endpoints connectivity" -ForegroundColor White
-                Write-Host "   • Verify required TCP/UDP ports accessibility" -ForegroundColor White
-                Write-Host "   • Check TLS/SSL certificate validation" -ForegroundColor White
-                Write-Host "   • Validate proxy and firewall configurations" -ForegroundColor White
-                Write-Host "   • Test Microsoft services dependencies" -ForegroundColor White
-                Write-Host "   • Generate network requirements compliance report" -ForegroundColor White
-                Write-Host ""
-                Write-Host "⚠️  IMPORTANT CONSIDERATIONS:" -ForegroundColor Red
-                Write-Host "   • Comprehensive network testing will be performed" -ForegroundColor White
-                Write-Host "   • Multiple Azure Arc endpoints will be tested" -ForegroundColor White
-                Write-Host "   • Internet connectivity is required" -ForegroundColor White
-                Write-Host "   • Corporate firewall/proxy may affect results" -ForegroundColor White
-                Write-Host ""
-                Write-Host "🛡️  DATA & PRIVACY:" -ForegroundColor Green
-                Write-Host "   • Network tests are performed locally from your machine" -ForegroundColor White
-                Write-Host "   • No sensitive information is transmitted" -ForegroundColor White
-                Write-Host "   • Test results are processed and stored locally" -ForegroundColor White
-                Write-Host ""
-                Write-Host "⚖️  DISCLAIMER & LIABILITY:" -ForegroundColor Magenta
-                Write-Host "   • This script is provided 'AS IS' without warranty of any kind" -ForegroundColor White
-                Write-Host "   • Network requirements may change based on Azure updates" -ForegroundColor White
-                Write-Host "   • Consult official Microsoft documentation for latest requirements" -ForegroundColor White
-                Write-Host ""
-                Write-Host "═════════════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-                $confirm = Read-Host "Do you consent to proceed with network requirements testing? [Y/N] (default: Y)"
-                if ([string]::IsNullOrWhiteSpace($confirm) -or $confirm.ToUpper() -eq "Y") {
-                    Write-Host "`n🌐 Running Test-AzureArcNetworkRequirements..." -ForegroundColor Green
-                    try {
-                        Test-AzureArcNetworkRequirements
-                        Write-Host "`n✅ Test-AzureArcNetworkRequirements completed successfully." -ForegroundColor Green
-                    }
-                    catch {
-                        Write-Host "`n❌ Error executing Test-AzureArcNetworkRequirements: $($_.Exception.Message)" -ForegroundColor Red
-                        Write-Host "Please ensure the module is properly imported and all dependencies are available." -ForegroundColor Yellow
-                    }
-                    Write-Host "`nPress any key to return to the main menu..." -ForegroundColor Yellow
-                    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-                } else {
-                    Write-Host "`n❌ Operation cancelled by user." -ForegroundColor Yellow
-                }
-            }
-            "4" {
-                Clear-Host
-                Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
                 Write-Host "║  ==================  AZURE RESOURCE PROVIDERS REGISTRATION ==================  ║" -ForegroundColor Cyan
                 Write-Host "╚════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
                 Write-Host ""
-                Write-Host "� SCRIPT OVERVIEW:" -ForegroundColor Yellow
+                Write-Host "🔍 SCRIPT OVERVIEW:" -ForegroundColor Yellow
                 Write-Host "   This script will register the required Azure resource providers" -ForegroundColor White
                 Write-Host "   in your subscription that are necessary for Azure Arc functionality" -ForegroundColor White
                 Write-Host "   and Microsoft Defender integration." -ForegroundColor White
@@ -303,12 +194,12 @@ function Deploy-DefenderForServers {
                 Write-Host "   • Resource provider registration may take several minutes" -ForegroundColor White
                 Write-Host "   • Changes will be made to your Azure subscription" -ForegroundColor White
                 Write-Host ""
-                Write-Host "🛡️  DATA & PRIVACY:" -ForegroundColor Green
+                Write-Host "🛡️  DATA `& PRIVACY:" -ForegroundColor Green
                 Write-Host "   • Authentication handled by official Microsoft Azure modules" -ForegroundColor White
                 Write-Host "   • Only resource provider registrations are modified" -ForegroundColor White
                 Write-Host "   • No user data or configurations are accessed" -ForegroundColor White
                 Write-Host ""
-                Write-Host "⚖️  DISCLAIMER & LIABILITY:" -ForegroundColor Magenta
+                Write-Host "⚖️  DISCLAIMER `& LIABILITY:" -ForegroundColor Magenta
                 Write-Host "   • This script is provided 'AS IS' without warranty of any kind" -ForegroundColor White
                 Write-Host "   • Ensure you have appropriate permissions before proceeding" -ForegroundColor White
                 Write-Host "   • Resource provider changes affect your Azure subscription" -ForegroundColor White
@@ -331,7 +222,7 @@ function Deploy-DefenderForServers {
                     Write-Host "`n❌ Operation cancelled by user." -ForegroundColor Yellow
                 }
             }
-            "5" {
+            "3" {
                 Clear-Host
                 Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
                 Write-Host "║   ==================  AZURE ARC SERVICE PRINCIPAL CREATOR ==================   ║" -ForegroundColor Cyan
@@ -356,12 +247,12 @@ function Deploy-DefenderForServers {
                 Write-Host "   • Generated credentials must be stored securely" -ForegroundColor White
                 Write-Host "   • Changes will be made to your Azure AD tenant" -ForegroundColor White
                 Write-Host ""
-                Write-Host "🛡️  DATA & PRIVACY:" -ForegroundColor Green
+                Write-Host "🛡️  DATA `& PRIVACY:" -ForegroundColor Green
                 Write-Host "   • Service principal credentials are generated securely" -ForegroundColor White
                 Write-Host "   • No personal data is collected or stored" -ForegroundColor White
                 Write-Host "   • You control the service principal lifecycle" -ForegroundColor White
                 Write-Host ""
-                Write-Host "⚖️  DISCLAIMER & LIABILITY:" -ForegroundColor Magenta
+                Write-Host "⚖️  DISCLAIMER `& LIABILITY:" -ForegroundColor Magenta
                 Write-Host "   • This script is provided 'AS IS' without warranty of any kind" -ForegroundColor White
                 Write-Host "   • You are responsible for securing service principal credentials" -ForegroundColor White
                 Write-Host "   • Follow your organization's security policies for service accounts" -ForegroundColor White
@@ -384,7 +275,7 @@ function Deploy-DefenderForServers {
                     Write-Host "`n❌ Operation cancelled by user." -ForegroundColor Yellow
                 }
             }
-            "6" {
+            "4" {
                 Clear-Host
                 Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
                 Write-Host "║  ==================  AZURE CONNECTED MACHINE AGENT INSTALLER ================  ║" -ForegroundColor Cyan
@@ -409,12 +300,12 @@ function Deploy-DefenderForServers {
                 Write-Host "   • System will install Microsoft software components" -ForegroundColor White
                 Write-Host "   • Windows services will be created and started" -ForegroundColor White
                 Write-Host ""
-                Write-Host "🛡️  DATA & PRIVACY:" -ForegroundColor Green
+                Write-Host "🛡️  DATA `& PRIVACY:" -ForegroundColor Green
                 Write-Host "   • Installer downloaded from official Microsoft sources" -ForegroundColor White
                 Write-Host "   • Agent communicates only with Microsoft Azure services" -ForegroundColor White
                 Write-Host "   • No personal data is collected during installation" -ForegroundColor White
                 Write-Host ""
-                Write-Host "⚖️  DISCLAIMER & LIABILITY:" -ForegroundColor Magenta
+                Write-Host "⚖️  DISCLAIMER `& LIABILITY:" -ForegroundColor Magenta
                 Write-Host "   • This script is provided 'AS IS' without warranty of any kind" -ForegroundColor White
                 Write-Host "   • Ensure you have appropriate permissions for software installation" -ForegroundColor White
                 Write-Host "   • Test in non-production environment before deployment" -ForegroundColor White
@@ -437,7 +328,7 @@ function Deploy-DefenderForServers {
                     Write-Host "`n❌ Operation cancelled by user." -ForegroundColor Yellow
                 }
             }
-            "7" {
+            "5" {
                 Clear-Host
                 Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
                 Write-Host "║    ==================  AZURE ARC GROUP POLICY DEPLOYMENT  ==================   ║" -ForegroundColor Cyan
@@ -462,12 +353,12 @@ function Deploy-DefenderForServers {
                 Write-Host "   • Service principal credentials must be available" -ForegroundColor White
                 Write-Host "   • Changes will be deployed to Active Directory" -ForegroundColor White
                 Write-Host ""
-                Write-Host "🛡️  DATA & PRIVACY:" -ForegroundColor Green
+                Write-Host "🛡️  DATA `& PRIVACY:" -ForegroundColor Green
                 Write-Host "   • Group Policy configurations stored in Active Directory" -ForegroundColor White
                 Write-Host "   • Service principal credentials handled securely" -ForegroundColor White
                 Write-Host "   • No personal user data is collected" -ForegroundColor White
                 Write-Host ""
-                Write-Host "⚖️  DISCLAIMER & LIABILITY:" -ForegroundColor Magenta
+                Write-Host "⚖️  DISCLAIMER `& LIABILITY:" -ForegroundColor Magenta
                 Write-Host "   • This script is provided 'AS IS' without warranty of any kind" -ForegroundColor White
                 Write-Host "   • Test Group Policy changes in non-production environment first" -ForegroundColor White
                 Write-Host "   • Follow your organization's change management procedures" -ForegroundColor White
@@ -490,7 +381,7 @@ function Deploy-DefenderForServers {
                     Write-Host "`n❌ Operation cancelled by user." -ForegroundColor Yellow
                 }
             }
-            "8" {
+            "6" {
                 Clear-Host
                 Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
                 Write-Host "║  ======================  AZURE ARC DEVICE ONBOARDING  ======================   ║" -ForegroundColor Cyan
@@ -515,12 +406,12 @@ function Deploy-DefenderForServers {
                 Write-Host "   • Device will be registered in your Azure subscription" -ForegroundColor White
                 Write-Host "   • Azure policies may be automatically applied" -ForegroundColor White
                 Write-Host ""
-                Write-Host "🛡️  DATA & PRIVACY:" -ForegroundColor Green
+                Write-Host "🛡️  DATA `& PRIVACY:" -ForegroundColor Green
                 Write-Host "   • Device metadata will be sent to Azure for management" -ForegroundColor White
                 Write-Host "   • Communication secured with TLS/SSL encryption" -ForegroundColor White
                 Write-Host "   • Data handled according to Microsoft privacy policies" -ForegroundColor White
                 Write-Host ""
-                Write-Host "⚖️  DISCLAIMER & LIABILITY:" -ForegroundColor Magenta
+                Write-Host "⚖️  DISCLAIMER `& LIABILITY:" -ForegroundColor Magenta
                 Write-Host "   • This script is provided 'AS IS' without warranty of any kind" -ForegroundColor White
                 Write-Host "   • Device will be managed by Azure Arc after onboarding" -ForegroundColor White
                 Write-Host "   • Ensure compliance with your organization's policies" -ForegroundColor White
@@ -543,7 +434,7 @@ function Deploy-DefenderForServers {
                     Write-Host "`n❌ Operation cancelled by user." -ForegroundColor Yellow
                 }
             }
-            "9" {
+            "7" {
                 Clear-Host
                 Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
                 Write-Host "║  ===================  AZURE ARC DIAGNOSTICS & LOG COLLECTION ================  ║" -ForegroundColor Cyan
@@ -568,13 +459,13 @@ function Deploy-DefenderForServers {
                 Write-Host "   • Network connectivity to Azure endpoints will be tested" -ForegroundColor White
                 Write-Host "   • Log files will be created in your specified directory" -ForegroundColor White
                 Write-Host ""
-                Write-Host "🛡️  DATA & PRIVACY:" -ForegroundColor Green
+                Write-Host "🛡️  DATA `& PRIVACY:" -ForegroundColor Green
                 Write-Host "   • All data processing occurs locally on your machine" -ForegroundColor White
                 Write-Host "   • No data is transmitted to third parties" -ForegroundColor White
                 Write-Host "   • Generated logs may contain system configuration information" -ForegroundColor White
                 Write-Host "   • You control where log files are stored and can review before sharing" -ForegroundColor White
                 Write-Host ""
-                Write-Host "⚖️  DISCLAIMER & LIABILITY:" -ForegroundColor Magenta
+                Write-Host "⚖️  DISCLAIMER `& LIABILITY:" -ForegroundColor Magenta
                 Write-Host "   • This script is provided 'AS IS' without warranty of any kind" -ForegroundColor White
                 Write-Host "   • Review generated logs before sharing with support" -ForegroundColor White
                 Write-Host "   • No modifications will be made to your system configuration" -ForegroundColor White
@@ -582,13 +473,13 @@ function Deploy-DefenderForServers {
                 Write-Host "═════════════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
                 $confirm = Read-Host "Do you consent to proceed with Azure Arc diagnostics? [Y/N] (default: Y)"
                 if ([string]::IsNullOrWhiteSpace($confirm) -or $confirm.ToUpper() -eq "Y") {
-                    Write-Host "`n🔍 Running Test-AzureArcDiagnostics..." -ForegroundColor Green
+                    Write-Host "`n🔍 Running Get-AzureArcDiagnostics..." -ForegroundColor Green
                     try {
-                        Test-AzureArcDiagnostics -SkipPrompt
-                        Write-Host "`n✅ Test-AzureArcDiagnostics completed successfully." -ForegroundColor Green
+                        Get-AzureArcDiagnostics -SkipPrompt
+                        Write-Host "`n✅ Get-AzureArcDiagnostics completed successfully." -ForegroundColor Green
                     }
                     catch {
-                        Write-Host "`n❌ Error executing Test-AzureArcDiagnostics: $($_.Exception.Message)" -ForegroundColor Red
+                        Write-Host "`n❌ Error executing Get-AzureArcDiagnostics: $($_.Exception.Message)" -ForegroundColor Red
                         Write-Host "Please ensure the module is properly imported and all dependencies are available." -ForegroundColor Yellow
                     }
                     Write-Host "`nPress any key to return to the main menu..." -ForegroundColor Yellow
@@ -601,33 +492,33 @@ function Deploy-DefenderForServers {
                 $exitHelp = $false
                 do {
                     Write-Host "`nAvailable commands for detailed help:" -ForegroundColor Yellow
-                    Write-Host "[1] Test-AzureArcPrerequisites" -ForegroundColor White
-                    Write-Host "[2] Test-AzureConnectivity" -ForegroundColor White
-                    Write-Host "[3] Test-AzureArcNetworkRequirements" -ForegroundColor White
-                    Write-Host "[4] Register-AzureResourceProviders" -ForegroundColor White
-                    Write-Host "[5] New-ArcServicePrincipal" -ForegroundColor White
-                    Write-Host "[6] Install-AzureConnectedMachineAgent" -ForegroundColor White
-                    Write-Host "[7] Deploy-ArcGroupPolicy" -ForegroundColor White
-                    Write-Host "[8] New-AzureArcDevice" -ForegroundColor White
-                    Write-Host "[9] Test-AzureArcDiagnostics" -ForegroundColor White
+                    Write-Host "[1] Test-AzureArcPrerequisite" -ForegroundColor White
+                    Write-Host "[2] Register-AzureResourceProviders" -ForegroundColor White
+                    Write-Host "[3] New-ArcServicePrincipal" -ForegroundColor White
+                    Write-Host "[4] Install-AzureConnectedMachineAgent" -ForegroundColor White
+                    Write-Host "[5] Deploy-ArcGroupPolicy" -ForegroundColor White
+                    Write-Host "[6] New-AzureArcDevice" -ForegroundColor White
+                    Write-Host "[7] Get-AzureArcDiagnostics" -ForegroundColor White
                     Write-Host "[Q] Return to main menu" -ForegroundColor White
                     Write-Host ""
                     
-                    $helpSelection = Read-Host "Select a command number (1-9) for detailed help or 'Q' to return to main menu"
+                    $helpSelection = Read-Host "Select a command number (1-7) for detailed help or 'Q' to return to main menu"
                     
                     switch ($helpSelection.ToUpper()) {
                         "1" {
-                            Write-Host "`n📖 Displaying detailed help for Test-AzureArcPrerequisites..." -ForegroundColor Green
+                            Write-Host "`n📖 Displaying detailed help for Test-AzureArcPrerequisite..." -ForegroundColor Green
                             Write-Host ""
                             Write-Host "SYNOPSIS" -ForegroundColor Yellow
-                            Write-Host "    Checks prerequisites for Azure Arc onboarding and Microsoft Defender for Endpoint integration." -ForegroundColor White
+                            Write-Host "    Checks prerequisites for Azure Arc onboarding and Microsoft Defender for Endpoint integration," -ForegroundColor White
+                            Write-Host "    including comprehensive network connectivity testing." -ForegroundColor White
                             Write-Host ""
                             Write-Host "DESCRIPTION" -ForegroundColor Yellow
                             Write-Host "    This function performs comprehensive prerequisites validation for Azure Arc onboarding" -ForegroundColor White
-                            Write-Host "    and Microsoft Defender for Endpoint integration across multiple devices." -ForegroundColor White
+                            Write-Host "    and Microsoft Defender for Endpoint integration across multiple devices. It now includes" -ForegroundColor White
+                            Write-Host "    all network connectivity testing capabilities previously available in Get-AzureArcConnectivity." -ForegroundColor White
                             Write-Host ""
                             Write-Host "SYNTAX" -ForegroundColor Yellow
-                            Write-Host "    Test-AzureArcPrerequisites [[-DeviceListPath] <String>] [-Force]" -ForegroundColor White
+                            Write-Host "    Test-AzureArcPrerequisite [[-DeviceListPath] <String>] [-Force] [[-NetworkTestMode] <String>] [-IncludeOptionalEndpoints] [-TestTLSVersion] [-ShowDetailedNetworkResults] [[-NetworkLogPath] <String>]" -ForegroundColor White
                             Write-Host ""
                             Write-Host "PARAMETERS" -ForegroundColor Yellow
                             Write-Host "    -DeviceListPath <String>" -ForegroundColor White
@@ -637,67 +528,15 @@ function Deploy-DefenderForServers {
                             Write-Host "        Skip user consent prompts and proceed with checks." -ForegroundColor Gray
                             Write-Host ""
                             Write-Host "EXAMPLES" -ForegroundColor Yellow
-                            Write-Host "    Example 1: Interactive prerequisites check" -ForegroundColor White
-                            Write-Host "    Test-AzureArcPrerequisites" -ForegroundColor Gray
+                            Write-Host "    Example 1: Interactive prerequisites check with comprehensive network testing" -ForegroundColor White
+                            Write-Host "    Test-AzureArcPrerequisite" -ForegroundColor Gray
                             Write-Host ""
-                            Write-Host "    Example 2: Check specific devices" -ForegroundColor White
-                            Write-Host "    Test-AzureArcPrerequisites -DeviceListPath 'C:\devices.txt'" -ForegroundColor Gray
+                            Write-Host "    Example 2: Check specific devices with basic network testing" -ForegroundColor White
+                            Write-Host "    Test-AzureArcPrerequisite -DeviceListPath 'C:\devices.txt' -NetworkTestMode Basic" -ForegroundColor Gray
                             Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
                             $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
                         }
                         "2" {
-                            Write-Host "`n📖 Displaying detailed help for Test-AzureConnectivity..." -ForegroundColor Green
-                            Write-Host ""
-                            Write-Host "SYNOPSIS" -ForegroundColor Yellow
-                            Write-Host "    Tests network connectivity to required Azure endpoints." -ForegroundColor White
-                            Write-Host ""
-                            Write-Host "DESCRIPTION" -ForegroundColor Yellow
-                            Write-Host "    This function tests connectivity to Azure management endpoints and validates" -ForegroundColor White
-                            Write-Host "    that your system can communicate with Azure Arc services." -ForegroundColor White
-                            Write-Host ""
-                            Write-Host "SYNTAX" -ForegroundColor Yellow
-                            Write-Host "    Test-AzureConnectivity [[-ComputerName] <String>]" -ForegroundColor White
-                            Write-Host ""
-                            Write-Host "PARAMETERS" -ForegroundColor Yellow
-                            Write-Host "    -ComputerName <String>" -ForegroundColor White
-                            Write-Host "        Name of the computer to test connectivity from (default: localhost)." -ForegroundColor Gray
-                            Write-Host ""
-                            Write-Host "EXAMPLES" -ForegroundColor Yellow
-                            Write-Host "    Example 1: Test local connectivity" -ForegroundColor White
-                            Write-Host "    Test-AzureConnectivity" -ForegroundColor Gray
-                            Write-Host ""
-                            Write-Host "    Example 2: Test remote computer connectivity" -ForegroundColor White
-                            Write-Host "    Test-AzureConnectivity -ComputerName 'SERVER01'" -ForegroundColor Gray
-                            Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
-                            $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-                        }
-                        "3" {
-                            Write-Host "`n📖 Displaying detailed help for Test-AzureArcNetworkRequirements..." -ForegroundColor Green
-                            Write-Host ""
-                            Write-Host "SYNOPSIS" -ForegroundColor Yellow
-                            Write-Host "    Tests specific network requirements for Azure Arc connectivity." -ForegroundColor White
-                            Write-Host ""
-                            Write-Host "DESCRIPTION" -ForegroundColor Yellow
-                            Write-Host "    This function validates network requirements for Azure Arc including" -ForegroundColor White
-                            Write-Host "    required endpoints, ports, and protocols for successful operation." -ForegroundColor White
-                            Write-Host ""
-                            Write-Host "SYNTAX" -ForegroundColor Yellow
-                            Write-Host "    Test-AzureArcNetworkRequirements [[-ComputerName] <String>] [[-Timeout] <Int32>] [[-LogPath] <String>]" -ForegroundColor White
-                            Write-Host ""
-                            Write-Host "PARAMETERS" -ForegroundColor Yellow
-                            Write-Host "    -ComputerName <String>" -ForegroundColor White
-                            Write-Host "        Name of the computer to test (default: localhost)." -ForegroundColor Gray
-                            Write-Host ""
-                            Write-Host "    -Timeout <Int32>" -ForegroundColor White
-                            Write-Host "        Timeout in seconds for connectivity tests (default: 30)." -ForegroundColor Gray
-                            Write-Host ""
-                            Write-Host "EXAMPLES" -ForegroundColor Yellow
-                            Write-Host "    Example 1: Test local network requirements" -ForegroundColor White
-                            Write-Host "    Test-AzureArcNetworkRequirements" -ForegroundColor Gray
-                            Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
-                            $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-                        }
-                        "4" {
                             Write-Host "`n📖 Displaying detailed help for Register-AzureResourceProviders..." -ForegroundColor Green
                             Write-Host ""
                             Write-Host "SYNOPSIS" -ForegroundColor Yellow
@@ -720,7 +559,7 @@ function Deploy-DefenderForServers {
                             Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
                             $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
                         }
-                        "5" {
+                        "3" {
                             Write-Host "`n📖 Displaying detailed help for New-ArcServicePrincipal..." -ForegroundColor Green
                             Write-Host ""
                             Write-Host "SYNOPSIS" -ForegroundColor Yellow
@@ -739,7 +578,7 @@ function Deploy-DefenderForServers {
                             Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
                             $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
                         }
-                        "6" {
+                        "4" {
                             Write-Host "`n📖 Displaying detailed help for Install-AzureConnectedMachineAgent..." -ForegroundColor Green
                             Write-Host ""
                             Write-Host "SYNOPSIS" -ForegroundColor Yellow
@@ -758,7 +597,7 @@ function Deploy-DefenderForServers {
                             Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
                             $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
                         }
-                        "7" {
+                        "5" {
                             Write-Host "`n📖 Displaying detailed help for Deploy-ArcGroupPolicy..." -ForegroundColor Green
                             Write-Host ""
                             Write-Host "SYNOPSIS" -ForegroundColor Yellow
@@ -777,7 +616,7 @@ function Deploy-DefenderForServers {
                             Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
                             $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
                         }
-                        "8" {
+                        "6" {
                             Write-Host "`n📖 Displaying detailed help for New-AzureArcDevice..." -ForegroundColor Green
                             Write-Host ""
                             Write-Host "SYNOPSIS" -ForegroundColor Yellow
@@ -803,8 +642,8 @@ function Deploy-DefenderForServers {
                             Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
                             $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
                         }
-                        "9" {
-                            Write-Host "`n📖 Displaying detailed help for Test-AzureArcDiagnostics..." -ForegroundColor Green
+                        "7" {
+                            Write-Host "`n📖 Displaying detailed help for Get-AzureArcDiagnostics..." -ForegroundColor Green
                             Write-Host ""
                             Write-Host "SYNOPSIS" -ForegroundColor Yellow
                             Write-Host "    Runs comprehensive Azure Arc diagnostics and collects system information." -ForegroundColor White
@@ -815,7 +654,7 @@ function Deploy-DefenderForServers {
                             Write-Host "    to help troubleshoot Azure Arc deployment and operation issues." -ForegroundColor White
                             Write-Host ""
                             Write-Host "SYNTAX" -ForegroundColor Yellow
-                            Write-Host "    Test-AzureArcDiagnostics [[-LogPath] <String>] [[-Location] <String>] [-Silent] [-SkipPrompt] [-Force]" -ForegroundColor White
+                            Write-Host "    Get-AzureArcDiagnostics [[-LogPath] <String>] [[-Location] <String>] [-Silent] [-SkipPrompt] [-Force]" -ForegroundColor White
                             Write-Host ""
                             Write-Host "PARAMETERS" -ForegroundColor Yellow
                             Write-Host "    -LogPath <String>" -ForegroundColor White
@@ -829,11 +668,11 @@ function Deploy-DefenderForServers {
                             Write-Host ""
                             Write-Host "EXAMPLES" -ForegroundColor Yellow
                             Write-Host "    Example 1: Run basic diagnostics" -ForegroundColor White
-                            Write-Host "    Test-AzureArcDiagnostics" -ForegroundColor Gray
+                            Write-Host "    Get-AzureArcDiagnostics" -ForegroundColor Gray
                             Write-Host "    Runs comprehensive Azure Arc diagnostics with default settings." -ForegroundColor Gray
                             Write-Host ""
                             Write-Host "    Example 2: Run diagnostics with custom settings" -ForegroundColor White
-                            Write-Host "    Test-AzureArcDiagnostics -LogPath 'C:\ArcDiagnostics' -Location 'westus2' -Silent" -ForegroundColor Gray
+                            Write-Host "    Get-AzureArcDiagnostics -LogPath 'C:\ArcDiagnostics' -Location 'westus2' -Silent" -ForegroundColor Gray
                             Write-Host "    Runs silently with specified log path and Azure region." -ForegroundColor Gray
                             Write-Host ""
                             Write-Host "NOTES" -ForegroundColor Yellow
@@ -871,11 +710,11 @@ function Deploy-DefenderForServers {
 
     # Main execution loop
     do {
-        Show-ModuleInterface
-        Show-InteractiveMenu
+        Write-ModuleInterface
+        Write-InteractiveMenu
         
         $selection = Read-Host "Please select an option [1-9, H, Q]"
-        $continue = Invoke-UserSelection -Selection $selection
+        $continue = Start-UserSelection -Selection $selection
         
     } while ($continue)
 }

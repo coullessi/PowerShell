@@ -1,6 +1,6 @@
 # Azure Arc Agent Diagnostics - Integrated Module Function
 
-> **✨ New in v1.1.0**: Now integrated as `Test-AzureArcDiagnostics` function with smooth, animated progress bar and realistic collection phases!
+> **✨ New in v1.1.0**: Now integrated as `Get-AzureArcDiagnostics` function with smooth, animated progress bar and realistic collection phases!
 
 ## Quick Start
 
@@ -15,13 +15,13 @@ Import-Module DefenderEndpointDeployment
 # Launch the interactive interface
 Deploy-DefenderForServers
 
-# Select option [9] Test-AzureArcDiagnostics from the menu
+# Select option [9] Get-AzureArcDiagnostics from the menu
 ```
 
 ### 3. Direct Function Call
 ```powershell
 # Run diagnostics directly
-Test-AzureArcDiagnostics
+Get-AzureArcDiagnostics
 ```
 
 ### 4. Follow the Prompts
@@ -66,17 +66,17 @@ Look for the ZIP file in your chosen directory (default: `C:\ArcAgentLogs`)
 
 ### Interactive Mode
 ```powershell
-Test-AzureArcDiagnostics
+Get-AzureArcDiagnostics
 ```
 
 ### Custom Path and Region
 ```powershell
-Test-AzureArcDiagnostics -LogPath "D:\Logs" -Location "westus2"
+Get-AzureArcDiagnostics -LogPath "D:\Logs" -Location "westus2"
 ```
 
 ### Silent/Automated Mode
 ```powershell
-Test-AzureArcDiagnostics -LogPath "C:\ArcDiagnostics" -Silent -Force
+Get-AzureArcDiagnostics -LogPath "C:\ArcDiagnostics" -Silent -Force
 ```
 
 ## Troubleshooting
@@ -104,9 +104,9 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ## Getting Help
 Use PowerShell's built-in help system for detailed parameter information:
 ```powershell
-Get-Help Test-AzureArcDiagnostics -Detailed
-Get-Help Test-AzureArcDiagnostics -Examples
-Get-Help Test-AzureArcDiagnostics -Full
+Get-Help Get-AzureArcDiagnostics -Detailed
+Get-Help Get-AzureArcDiagnostics -Examples
+Get-Help Get-AzureArcDiagnostics -Full
 ```
 
 ## Need More Help?

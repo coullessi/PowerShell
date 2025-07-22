@@ -1,4 +1,4 @@
-function Show-ConsolidatedResults {
+function Write-ConsolidatedResults {
     <#
     .SYNOPSIS
         Displays consolidated results for all devices checked.

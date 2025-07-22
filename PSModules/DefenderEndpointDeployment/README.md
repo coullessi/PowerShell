@@ -134,35 +134,36 @@ Deploy-DefenderForServers
 **Available Commands:**
 ```
 1 - Test Azure Arc Prerequisites                   (Test-AzureArcPrerequisites)
-2 - Test Azure Connectivity and Endpoints          (Test-AzureConnectivity)  
-3 - Test Azure Arc Network Requirements           (Test-AzureArcNetworkRequirements)
-4 - Register Azure Resource Providers              (Register-AzureResourceProviders)
-5 - Create Azure Arc Service Principal             (New-ArcServicePrincipal)
-6 - Install Azure Connected Machine Agent          (Install-AzureConnectedMachineAgent)
-7 - Deploy Arc Group Policy                        (Deploy-ArcGroupPolicy)
-8 - Create Azure Arc Device                        (New-AzureArcDevice)
-9 - Run Azure Arc Diagnostics                     (Test-AzureArcDiagnostics)
+2 - Comprehensive Azure Arc Connectivity Testing   (Get-AzureArcConnectivity)  
+3 - Register Azure Resource Providers              (Register-AzureResourceProviders)
+4 - Create Azure Arc Service Principal             (New-ArcServicePrincipal)
+5 - Install Azure Connected Machine Agent          (Install-AzureConnectedMachineAgent)
+6 - Deploy Arc Group Policy                        (Deploy-ArcGroupPolicy)
+7 - Create Azure Arc Device                        (New-AzureArcDevice)
+8 - Run Azure Arc Diagnostics                     (Get-AzureArcDiagnostics)
 H - Show Help Documentation
 Q - Exit
 ```
 
 ### Command Reference
 
-#### 1️⃣ Test Azure Connectivity
+#### 1️⃣ Comprehensive Azure Arc Connectivity Testing
 ```powershell
-Test-AzureConnectivity
-    -Region <String>              # Azure region for connectivity testing
-    [-Timeout <Int32>]            # Timeout in seconds (default: 30)
+Get-AzureArcConnectivity
+    [-ComputerName <String>]      # Target computer (default: localhost)
+    [-TestMode <String>]          # Basic, Comprehensive, or Critical
     [-IncludeOptional]            # Include optional endpoint testing
-    [-Detailed]                   # Show detailed connectivity information
-    [-WhatIf]                     # Show what would be done
-    [-Confirm]                    # Confirm before executing
+    [-TestTLSVersion]             # Test TLS version compatibility
+    [-ShowDetailedResults]        # Show detailed connectivity information
+    [-DeviceList <String[]>]      # Test multiple devices
+    [-Parallel]                   # Run device tests in parallel
+    [-LogPath <String>]           # Path for detailed logs
 ```
 
 **Example:**
 ```powershell
-# Test connectivity to US East region with optional endpoints
-Test-AzureConnectivity -Region "eastus" -IncludeOptional -Detailed
+# Comprehensive connectivity test with optional endpoints and TLS testing
+Get-AzureArcConnectivity -TestMode Comprehensive -IncludeOptional -TestTLSVersion -ShowDetailedResults
 ```
 
 #### 2️⃣ Test Azure Arc Prerequisites  
@@ -180,16 +181,7 @@ Test-AzureArcPrerequisites
 Test-AzureArcPrerequisites -DeviceList @("Server01", "Server02", "Server03")
 ```
 
-#### 3️⃣ Test Network Requirements
-```powershell
-Test-AzureArcNetworkRequirements
-    [-DeviceList <String[]>]      # List of devices to test
-    [-LogPath <String>]           # Custom log file path
-    [-WhatIf]                     # Show what would be done
-    [-Confirm]                    # Confirm before executing
-```
-
-#### 4️⃣ Register Azure Resource Providers
+#### 3️⃣ Register Azure Resource Providers
 ```powershell
 Register-AzureResourceProviders
     [-SubscriptionId <String>]    # Target subscription ID
@@ -205,6 +197,15 @@ Register-AzureResourceProviders
 Register-AzureResourceProviders -SubscriptionId "12345678-1234-1234-1234-123456789012" -Force -Timeout 300
 ```
 
+#### 4️⃣ Create Azure Arc Service Principal
+```powershell
+New-ArcServicePrincipal
+    -ApplicationName <String>    # Service principal name
+    -SubscriptionId <String>     # Azure subscription ID
+    [-Role <String>]            # Azure role assignment
+    [-Scope <String>]           # Permission scope
+```
+
 #### 5️⃣ Install Azure Connected Machine Agent
 ```powershell
 Install-AzureConnectedMachineAgent
@@ -217,21 +218,15 @@ Install-AzureConnectedMachineAgent
     [-DeviceList <String[]>]      # List of target devices
 ```
 
-#### 6️⃣ Install Azure Connected Machine Agent
-```powershell
-Install-AzureConnectedMachineAgent
-    -SubscriptionId <String>      # Azure subscription ID
-    [-DeviceList <String[]>]      # List of target devices
-```
-
-#### 7️⃣ Deploy Arc Group Policy
+#### 6️⃣ Deploy Arc Group Policy
 ```powershell
 Deploy-ArcGroupPolicy
     -PolicyName <String>         # Group policy name
+    -TargetOU <String>          # Target organizational unit
     [-Force]                    # Force deployment
 ```
 
-#### 8️⃣ Create Azure Arc Device
+#### 7️⃣ Create Azure Arc Device
 ```powershell
 New-AzureArcDevice
     -DeviceName <String>         # Name for the Arc device
@@ -241,9 +236,9 @@ New-AzureArcDevice
     [-Tags <Hashtable>]         # Resource tags
 ```
 
-#### 9️⃣ Run Azure Arc Diagnostics
+#### 8️⃣ Run Azure Arc Diagnostics
 ```powershell
-Test-AzureArcDiagnostics
+Get-AzureArcDiagnostics
     [-LogPath <String>]         # Path for diagnostic logs
     [-Location <String>]        # Azure region for testing
     [-Silent]                   # Run without prompts
@@ -253,23 +248,10 @@ Test-AzureArcDiagnostics
 **Example:**
 ```powershell
 # Interactive diagnostics with user prompts
-Test-AzureArcDiagnostics
+Get-AzureArcDiagnostics
 
 # Automated diagnostics with custom settings
-Test-AzureArcDiagnostics -LogPath "C:\ArcDiagnostics" -Location "westus2" -Silent
-```
-    -PolicyName <String>         # Group policy name
-    -TargetOU <String>          # Target organizational unit
-    [-Force]                    # Force deployment
-```
-
-#### 8️⃣ Create Arc Service Principal
-```powershell
-New-ArcServicePrincipal
-    -ApplicationName <String>    # Service principal name
-    -SubscriptionId <String>     # Azure subscription ID
-    [-Role <String>]            # Azure role assignment
-    [-Scope <String>]           # Permission scope
+Get-AzureArcDiagnostics -LogPath "C:\ArcDiagnostics" -Location "westus2" -Silent
 ```
 
 ## 📊 Output Examples
@@ -390,7 +372,7 @@ Install-Module -Name Az -Repository PSGallery -Force
 #### ❌ "Network Connectivity Failed" Error
 ```powershell
 # Test specific endpoints
-Test-AzureConnectivity -Region "eastus" -Detailed
+Get-AzureArcConnectivity -TestMode Comprehensive -ShowDetailedResults
 
 # Check firewall and proxy settings
 Test-NetConnection -ComputerName "management.azure.com" -Port 443
@@ -564,7 +546,7 @@ The module now includes comprehensive Azure Arc network requirements testing bas
 
 ```powershell
 # Quick comprehensive test
-Test-AzureArcNetworkRequirements -ComputerName "SERVER01" -IncludeOptional -TestTLSVersion
+Get-AzureArcConnectivity -ComputerName "SERVER01" -TestMode Comprehensive -IncludeOptional -TestTLSVersion
 ```
 
 ## 🔧 Requirements
@@ -650,8 +632,7 @@ New-AzureArcDevice -ResourceGroupName "rg-azurearc" -Location "East US"
 
 - `Deploy-DefenderForServers` - Interactive main menu
 - `Test-AzureArcPrerequisites` - Prerequisites validation (enhanced with comprehensive network testing)
-- `Test-AzureConnectivity` - Basic network connectivity testing
-- `Test-AzureArcNetworkRequirements` - **NEW**: Comprehensive Azure Arc network requirements testing
+- `Get-AzureArcConnectivity` - **NEW**: Comprehensive Azure Arc network connectivity testing (consolidates previous connectivity functions)
 - `Register-AzureResourceProviders` - Resource provider registration
 - `New-ArcServicePrincipal` - Service principal creation
 - `Install-AzureConnectedMachineAgent` - Agent installation
@@ -692,10 +673,10 @@ The module includes several utility functions for granular control:
 
 ```powershell
 # Test Azure connectivity (basic)
-Test-AzureConnectivity -ComputerName "SERVER01"
+Get-AzureArcConnectivity -ComputerName "SERVER01"
 
-# Test comprehensive Azure Arc network requirements (NEW - Enhanced)
-Test-AzureArcNetworkRequirements -ComputerName "SERVER01" -IncludeOptional -TestTLSVersion
+# Test comprehensive Azure Arc connectivity (NEW - Consolidated)
+Get-AzureArcConnectivity -ComputerName "SERVER01" -TestMode Comprehensive -IncludeOptional -TestTLSVersion
 
 # Install Azure Connected Machine Agent
 Install-AzureConnectedMachineAgent -ComputerName "SERVER01" -Force
@@ -874,7 +855,7 @@ Set-WSManQuickConfig -Force
 **3. Network Connectivity Problems**
 ```powershell
 # Test specific Azure endpoints
-Test-AzureConnectivity -ComputerName "PROBLEMATIC-SERVER"
+Get-AzureArcConnectivity -ComputerName "PROBLEMATIC-SERVER"
 ```
 
 **4. Resource Provider Registration Stuck**

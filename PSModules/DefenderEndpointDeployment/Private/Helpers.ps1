@@ -82,15 +82,28 @@ function Test-Prerequisites {
         Check     = $Check
         Result    = $Result
         Details   = $Details
+        Timestamp = Get-Date
     }
     
-    if (-not $script:allResults[$DeviceName]) {
+    # Initialize device entry as array if it doesn't exist
+    if (-not $script:allResults.ContainsKey($DeviceName)) {
         $script:allResults[$DeviceName] = @()
     }
+    
+    # Add entry to device array
     $script:allResults[$DeviceName] += $entry
     
-    # Write to consolidated log file
-    "[$DeviceName]`t$Check`t$Result`t$Details" | Out-File -FilePath $script:globalLogFile -Append
+    # Write detailed entry to consolidated log file with timestamp
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    "[$timestamp] [$DeviceName] $Check : $Result - $Details" | Out-File -FilePath $script:globalLogFile -Append
+    
+    # Add remediation guidance for errors and warnings
+    if ($Result -eq "Error" -or $Result -eq "Warning") {
+        $remediation = Get-RemediationGuidance -Check $Check -Result $Result -Details $Details
+        if ($remediation) {
+            "    REMEDIATION: $remediation" | Out-File -FilePath $script:globalLogFile -Append
+        }
+    }
     
     # Provide immediate feedback with color coding
     $color = switch ($Result) {
@@ -101,6 +114,81 @@ function Test-Prerequisites {
         default { "White" }
     }
     Write-Host "    [$Result] $Check - $Details" -ForegroundColor $color
+}
+
+function Get-RemediationGuidance {
+    <#
+    .SYNOPSIS
+        Provides specific remediation guidance for failed checks.
+    
+    .PARAMETER Check
+        The name of the failed check.
+    
+    .PARAMETER Result
+        The result status (Error/Warning).
+    
+    .PARAMETER Details
+        Additional details about the failure.
+    #>
+    param(
+        [string]$Check,
+        [string]$Result,
+        [string]$Details
+    )
+    
+    switch ($Check) {
+        "Network Connectivity" {
+            return "Configure firewall to allow outbound HTTPS (443) to Azure endpoints. Verify DNS resolution and proxy settings. Check Service Tags: AzureActiveDirectory, AzureResourceManager, AzureArcInfrastructure, Storage."
+        }
+        "Windows Version" {
+            return "Upgrade to supported Windows version: Windows 10 1709+, Windows 11, or Windows Server 2012 R2+. Current version is not compatible with Azure Arc."
+        }
+        "PowerShell Version" {
+            return "Install PowerShell 5.1+ or PowerShell 7+. Download from: https://docs.microsoft.com/powershell/scripting/install/installing-powershell"
+        }
+        "Azure PowerShell (Az)" {
+            return "Install Azure PowerShell module: Install-Module -Name Az -Repository PSGallery -Force -Scope CurrentUser"
+        }
+        "Windows Services" {
+            return "Start required Windows services. Run as administrator: Get-Service | Where-Object {`$_.Name -in @('WinRM','BITS','wuauserv')} | Start-Service"
+        }
+        "WMI Functionality" {
+            return "Rebuild WMI repository: winmgmt /resetrepository && winmgmt /salvagerepository. Restart WMI service: Restart-Service Winmgmt"
+        }
+        "Execution Policy" {
+            return "Set PowerShell execution policy: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force"
+        }
+        "Azure Arc Agent" {
+            return "Download and install Azure Connected Machine Agent from: https://aka.ms/AzureConnectedMachineAgent"
+        }
+        "System Memory" {
+            return "Add more RAM to meet minimum 4GB requirement for optimal Azure Arc performance."
+        }
+        "System Drive Space" {
+            return "Free up disk space to meet minimum 2GB requirement. Run disk cleanup: cleanmgr /sagerun:1"
+        }
+        "Registry Permissions" {
+            return "Ensure current user or service account has adequate registry permissions for Azure Arc operations."
+        }
+        "Certificate Store" {
+            return "Update Windows certificate store to include required Azure root certificates. Run Windows Update."
+        }
+        ".NET Framework" {
+            return "Install .NET Framework 4.7.2 or later: https://dotnet.microsoft.com/download/dotnet-framework"
+        }
+        "Group Policy" {
+            return "Review and resolve Group Policy conflicts that may interfere with Azure Arc operations. Check domain policies."
+        }
+        "Windows Security" {
+            return "Enable Windows Security Center and ensure real-time protection is active."
+        }
+        "Windows Update" {
+            return "Configure Windows Update service. Enable automatic updates: Set-Service -Name wuauserv -StartupType Automatic; Start-Service wuauserv"
+        }
+        default {
+            return "Review Azure Arc documentation for specific guidance: https://docs.microsoft.com/azure/azure-arc/"
+        }
+    }
 }
 
 function Test-DeviceConnectivity {
