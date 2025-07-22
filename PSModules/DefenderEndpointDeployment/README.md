@@ -11,33 +11,7 @@
 
 The **DefenderEndpointDeployment** module provides a comprehensive, enterprise-grade PowerShell solution for managing Azure Arc-enabled servers and Microsoft Defender for Endpoint (MDE) integration across large-scale environments. This module delivers professional-quality automation tools with an intuitive interactive interface, extensive validation capabilities, and robust error handling for mission-critical deployments.
 
-### 🌟 What's New in v1.1.0
-
-| Feature | Description |
-|---------|-------------|
-| ✅ **Enhanced Prerequisites Testing** | Comprehensive Azure Arc prerequisites validation |
-| 🔧 **Azure Arc Device Creation** | Streamlined device onboarding with Group Policy support |
-| 🔍 **Comprehensive Diagnostics** | Advanced troubleshooting and log collection |
-| 🎮 **Interactive Menu System** | Selection of a function to run |
-| 🔐 **Automated Authentication** | Seamless Azure authentication handling |
-
-### 🚀 Quick Start
-
-**Use the interactive entry point for the best experience:**
-
-```powershell
-# Import and run the module
-Import-Module DefenderEndpointDeployment
-Deploy-DefenderForServers
-```
-
-The interactive interface provides a professional menu system with:
-- 🎯 **Numbered Commands** (1-3) for all major operations
-- 📖 **Built-in Help System** (H) with detailed documentation
-- ✅ **Confirmation Prompts** for all operations
-- 🔄 **User-Controlled Navigation** with "Press any key to continue"
-
-### 🎯 Core Functions
+##  Core Functions
 
 The module provides four main functions accessible through an interactive menu:
 
@@ -64,12 +38,21 @@ The module provides four main functions accessible through an interactive menu:
 - Built-in help and guidance system
 - User-friendly navigation and operation flow
 
-## 🏢 Author & Organization
+## 🚀 Quick Start
 
-- **👨‍💻 Author**: Lessi Coulibaly
-- **🏢 Organization**: Less-IT (AI and CyberSecurity)
-- **🌐 Website**: [https://lessit.net](https://lessit.net)
-- **📧 Contact**: support@lessit.net
+**Use the interactive entry point for the best experience:**
+
+```powershell
+# Import and run the module
+Import-Module DefenderEndpointDeployment
+Deploy-DefenderForServers
+```
+
+The interactive interface provides a professional menu system with:
+- 🎯 **Numbered Commands** (1-3) for all major operations
+- 📖 **Built-in Help System** (H) with detailed documentation
+- ✅ **Confirmation Prompts** for all operations
+- 🔄 **User-Controlled Navigation** with "Press any key to continue"
 
 ## 📦 Installation
 
@@ -177,6 +160,16 @@ Set-WSManQuickConfig -Force
 Test-AzureArcPrerequisite -NetworkTestMode Comprehensive
 ```
 
+## 🌟 What's New in v1.1.0
+
+| Feature | Description |
+|---------|-------------|
+| ✅ **Enhanced Prerequisites Testing** | Comprehensive Azure Arc prerequisites validation |
+| 🔧 **Azure Arc Device Creation** | Streamlined device onboarding with Group Policy support |
+| 🔍 **Comprehensive Diagnostics** | Advanced troubleshooting and log collection |
+| 🎮 **Interactive Menu System** | Selection of a function to run |
+| 🔐 **Automated Authentication** | Seamless Azure authentication handling |
+
 ## 🔄 Version History
 
 ### v1.1.0 (Current)
@@ -188,6 +181,13 @@ Test-AzureArcPrerequisite -NetworkTestMode Comprehensive
 ### v1.0.0
 - 🎯 Initial release with core Azure Arc functionality
 - 📊 Basic prerequisites validation and device onboarding
+
+## 🏢 Author & Organization
+
+- **👨‍💻 Author**: Lessi Coulibaly
+- **🏢 Organization**: Less-IT (AI and CyberSecurity)
+- **🌐 Website**: [https://lessit.net](https://lessit.net)
+- **📧 Contact**: support@lessit.net
 
 ## 🤝 Contributing
 
