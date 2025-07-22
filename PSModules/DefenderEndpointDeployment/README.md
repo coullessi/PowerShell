@@ -118,25 +118,13 @@ Deploy-DefenderForServers
 
 ### Interactive Menu Commands
 
-```
-1 - Test Azure Arc Prerequisites                   (Test-AzureArcPrerequisite)
-   • Validates system requirements and network connectivity
-   • Checks PowerShell environment and Azure modules
-   • Multi-device validation support
-
-2 - Create Azure Arc Device                        (New-AzureArcDevice)
-   • Creates and configures Azure Arc devices
-   • Service principal management and Group Policy deployment
-   • Enterprise-scale automated deployment
-
-3 - Run Azure Arc Diagnostics                     (Get-AzureArcDiagnostics)
-   • Comprehensive Azure Arc agent diagnostics
-   • Log collection and connectivity testing
-   • Troubleshooting and support report generation
-
-H - Show Help Documentation
-Q - Exit
-```
+| Command | Function | Description |
+|---------|----------|-------------|
+| **1** | Test-AzureArcPrerequisite | • Validates system requirements and network connectivity<br>• Checks PowerShell environment and Azure modules<br>• Multi-device validation support |
+| **2** | New-AzureArcDevice | • Creates and configures Azure Arc devices<br>• Service principal management and Group Policy deployment<br>• Enterprise-scale automated deployment |
+| **3** | Get-AzureArcDiagnostics | • Comprehensive Azure Arc agent diagnostics<br>• Log collection and connectivity testing<br>• Troubleshooting and support report generation |
+| **H** | Show Help Documentation | Display detailed help and documentation |
+| **Q** | Exit | Exit the interactive menu |
 
 ### Direct Function Usage
 
