@@ -8,9 +8,9 @@ This guide provides instructions for publishing the DefenderEndpointDeployment m
 
 - ✅ Module manifest validated (DefenderEndpointDeployment.psd1)
 - ✅ All functions tested and working
-- ✅ Documentation files present (README.md, EXAMPLES.md, INSTALLATION-GUIDE.md)
+- ✅ Documentation files present (README.md)
 - ✅ License file present
-- ✅ Version updated to 1.0.9
+- ✅ Version updated to 1.1.0
 
 ## Publishing Commands
 

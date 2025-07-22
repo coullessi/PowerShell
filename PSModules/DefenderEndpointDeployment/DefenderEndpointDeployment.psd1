@@ -12,7 +12,7 @@
 RootModule = 'DefenderEndpointDeployment.psm1'
 
 # Version number of this module.
-ModuleVersion = '2.0.0'
+ModuleVersion = '1.1.0'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Desktop', 'Core')
@@ -116,74 +116,31 @@ PrivateData = @{
 
         # ReleaseNotes of this module
         ReleaseNotes = @'
-## Version 2.0.0 Release Notes - MAJOR UPDATE
+## Version 1.1.0 Release Notes
 
-### 🚀 COMPREHENSIVE AZURE ARC & MDE PREREQUISITES VALIDATION
-Complete rewrite of the Test-AzureArcPrerequisite function with enterprise-grade validation capabilities:
+### 🎯 Enterprise-Grade Azure Arc Deployment Module
+Complete PowerShell solution for Azure Arc onboarding and Microsoft Defender integration.
 
-### ✅ Operating System Requirements Validation
-- **Windows Version Compatibility**: Validates Windows 10 1709+, Windows 11, Server 2012 R2+
-- **Processor Architecture Support**: Checks x64 and ARM64 compatibility 
-- **System Resource Validation**: Memory (4GB+) and disk space (2GB+) requirements
-- **Build Number Verification**: Ensures minimum required Windows builds
+### � Key Features
+- **Interactive Menu System**: Professional interface with ASCII art and color-coded output
+- **Comprehensive Prerequisites Testing**: System validation, network connectivity, and PowerShell environment checks
+- **Azure Arc Device Management**: Automated device creation with Group Policy integration
+- **Advanced Diagnostics**: Troubleshooting tools with log collection and analysis
+- **Multi-Device Support**: Enterprise-scale batch processing capabilities
 
-### 💻 PowerShell & Execution Environment
-- **PowerShell Version Testing**: Validates 5.1+ compatibility
-- **.NET Framework Validation**: Checks 4.7.2+ requirements
-- **Execution Policy Assessment**: Ensures proper script execution capabilities
-- **Azure PowerShell Module Detection**: Validates Az module availability
+### 🔧 Core Functions
+1. **Test-AzureArcPrerequisite** - Complete prerequisites validation
+2. **New-AzureArcDevice** - Azure Arc device creation and configuration
+3. **Get-AzureArcDiagnostics** - Comprehensive diagnostics and troubleshooting
+4. **Deploy-DefenderForServers** - Interactive menu for all operations
 
-### 🌐 Network Connectivity & Security
-- **Comprehensive Endpoint Testing**: Azure Resource Manager, AAD, Arc services
-- **TLS Protocol Validation**: Ensures TLS 1.2+ support and cipher compatibility
-- **Certificate Store Verification**: Validates Azure root certificates
-- **DNS Resolution Testing**: Confirms critical domain accessibility
-- **Proxy Configuration Support**: Handles enterprise proxy environments
+### 🎮 User Experience
+- Professional menu-driven interface
+- Color-coded status indicators
+- Built-in help and guidance system
+- Automated error handling and recovery
 
-### 🔧 Azure Arc Agent Requirements
-- **Installation Status Validation**: Checks Azure Connected Machine Agent
-- **Service Health Monitoring**: Validates HIMDS and GCArcService status
-- **Configuration Integrity**: Verifies agent configuration files
-- **Version Compatibility**: Ensures supported agent versions
-
-### 🛡️ Microsoft Defender Integration (Optional Deep Validation)
-- **Windows Defender Antivirus Status**: Real-time protection validation
-- **MDE Service Compatibility**: Microsoft Defender for Endpoint readiness
-- **Defender for Cloud Extension**: Extension installation verification
-- **Security Center Connectivity**: Workspace connectivity validation
-
-### ⚙️ Windows System Requirements
-- **Critical Services Validation**: WinRM, Windows Update, WMI, Event Log
-- **Registry Permissions Testing**: Azure Arc operation permissions
-- **Windows Update Service**: Availability and configuration validation
-- **System File Integrity**: Core Windows component validation
-
-### 🔒 Security & Compliance
-- **Windows Security Center**: Health status validation
-- **Group Policy Conflict Detection**: Identifies blocking policies
-- **Certificate Store Analysis**: Azure certificate validation
-- **Security Configuration Review**: Compliance assessment
-
-### 🔧 Enterprise Features
-- **Automated Remediation Scripts**: PowerShell scripts for issue resolution
-- **Multi-Device Batch Processing**: Enterprise-scale device validation
-- **Comprehensive Reporting**: Detailed logs and summaries
-- **Flexible Test Modes**: Basic, Critical, and Comprehensive validation levels
-- **Interactive Progress Tracking**: Real-time validation progress
-
-### 📊 Enhanced User Experience
-- **Professional Interface**: Color-coded results and clear categorization
-- **Detailed Remediation Guidance**: Step-by-step issue resolution
-- **Customizable Validation Levels**: Choose validation depth
-- **Enterprise Deployment Ready**: Supports large-scale environments
-
-### Previous Features Maintained
-- Enhanced file path handling with quote support
-- Azure authentication and resource provider management  
-- Interactive menu system with comprehensive help
-- Professional diagnostics and logging capabilities
-
-For documentation and enterprise support: https://lessit.net
+For documentation and support: https://lessit.net
 '@
 
         # Prerelease string of this module
