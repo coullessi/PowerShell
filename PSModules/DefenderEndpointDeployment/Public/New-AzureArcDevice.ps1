@@ -28,6 +28,9 @@ function New-AzureArcDevice {
     .PARAMETER SharePath
         Optional path for the remote share used for Group Policy deployment. If not provided, user will be prompted.
 
+    .PARAMETER UseStandardizedDirectory
+        Use the module's standardized directory selection system to coordinate with other module functions.
+
     .PARAMETER Force
         Skip confirmation prompts and proceed with default values where applicable.
 
@@ -67,6 +70,9 @@ function New-AzureArcDevice {
         
         [Parameter(Mandatory = $false)]
         [string]$SharePath,
+        
+        [Parameter(Mandatory = $false)]
+        [switch]$UseStandardizedDirectory,
         
         [Parameter(Mandatory = $false)]
         [switch]$Force
@@ -178,8 +184,17 @@ function New-AzureArcDevice {
         throw
     }
     
-    # Prompt user for remote share path
-    if ([string]::IsNullOrWhiteSpace($SharePath)) {
+    # Prompt user for remote share path with standardized directory support
+    if ($UseStandardizedDirectory) {
+        # Use standardized directory system
+        $path = Get-StandardizedOutputDirectory -Purpose "Azure Arc Device Deployment" -DefaultName "AzureArcDeployment" -Quiet:$false
+        if (-not $path) {
+            Write-Host "❌ Failed to obtain standardized output directory" -ForegroundColor Red
+            throw "Failed to obtain standardized output directory"
+        }
+        Write-Host "✅ Using standardized directory: $path" -ForegroundColor Green
+    }
+    elseif ([string]::IsNullOrWhiteSpace($SharePath)) {
         $defaultPath = "$env:HOMEDRIVE\AzureArc"
         Write-Host "`n💡 The remote share will store Azure Arc deployment files and scripts." -ForegroundColor Yellow
         $path = Read-Host "Provide the full or relative path for the Azure Arc remote share [default: $defaultPath]"

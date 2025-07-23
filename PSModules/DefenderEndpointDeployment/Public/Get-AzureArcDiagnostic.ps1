@@ -167,7 +167,10 @@ function Get-AzureArcDiagnostic {
         [switch]$Force,
 
         [Parameter(Mandatory = $false, HelpMessage = "Suppress non-essential output")]
-        [switch]$Quiet
+        [switch]$Quiet,
+        
+        [Parameter(Mandatory = $false, HelpMessage = "Use standardized output directory from other module functions")]
+        [switch]$UseStandardizedDirectory
     )
 
     begin {
@@ -203,8 +206,19 @@ function Get-AzureArcDiagnostic {
 
     process {
         try {
-            # Handle log path selection
-            if (-not $LogPath) {
+            # Handle log path selection with standardized directory support
+            if ($UseStandardizedDirectory) {
+                # Use standardized directory system
+                $LogPath = Get-StandardizedOutputDirectory -Purpose "Azure Arc Diagnostics" -DefaultName "AzureArcDiagnostics" -Quiet:$Quiet
+                if (-not $LogPath) {
+                    Write-Error "Failed to obtain standardized output directory"
+                    return $false
+                }
+                if (-not $Quiet) {
+                    Write-Host "Using standardized directory for diagnostics: $LogPath"
+                }
+            }
+            elseif (-not $LogPath) {
                 if ($Force) {
                     $LogPath = $PWD.Path
                     if (-not $Quiet) {

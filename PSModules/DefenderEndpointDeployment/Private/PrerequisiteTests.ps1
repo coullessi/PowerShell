@@ -585,7 +585,8 @@ function Test-DeviceCheck {
         
         # Generate remediation script if requested
         if ($GenerateRemediationScript -and $script:remediationScriptContent.Count -gt 4) {
-            $remediationFile = "AzureArc_Remediation_$($DeviceName)_$(Get-Date -Format 'yyyyMMdd_HHmmss').ps1"
+            # Use standardized output directory for remediation scripts
+            $remediationFile = New-StandardizedOutputFile -FileName "AzureArc_Remediation_$($DeviceName)" -Extension ".ps1"
             $script:remediationScriptContent | Out-File -FilePath $remediationFile -Encoding UTF8
             Write-Host "`n📜 Remediation script generated: $remediationFile" -ForegroundColor Cyan
         }
