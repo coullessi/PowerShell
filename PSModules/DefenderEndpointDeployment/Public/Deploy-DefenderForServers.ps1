@@ -55,7 +55,7 @@ function Deploy-DefenderForServers {
         Write-Host "🎯 RECOMMENDED WORKFLOW:" -ForegroundColor Cyan
         Write-Host "   • [1]: Start with the validation of your environment and register Azure providers" -ForegroundColor White
         Write-Host "   • [2]: Complete Azure Arc deployment with service principals and Group Policy" -ForegroundColor White
-        Write-Host "   • [3]: Perform troubleshooting and diagnostics" -ForegroundColor White
+        Write-Host "   • [3]: Perform comprehensive Azure Arc diagnostics and troubleshooting" -ForegroundColor White
         Write-Host ""
     }
 
@@ -73,10 +73,10 @@ function Deploy-DefenderForServers {
         Write-Host "       ├─ Azure Connected Machine Agent installation" -ForegroundColor Gray
         Write-Host "       └─ Group Policy configuration and deployment" -ForegroundColor Gray
         Write-Host ""
-        Write-Host "   [3] Run Azure Arc Diagnostics" -ForegroundColor Green
-        Write-Host "       ├─ Comprehensive connectivity testing" -ForegroundColor Gray
-        Write-Host "       ├─ Agent status validation" -ForegroundColor Gray
-        Write-Host "       └─ Log collection and troubleshooting" -ForegroundColor Gray
+        Write-Host "   [3] Azure Arc Diagnostics" -ForegroundColor Green
+        Write-Host "       ├─ Comprehensive Azure Arc agent diagnostics" -ForegroundColor Gray
+        Write-Host "       ├─ Connectivity testing and health validation" -ForegroundColor Gray
+        Write-Host "       └─ Complete log collection and troubleshooting reports" -ForegroundColor Gray
         Write-Host ""
         Write-Host "   [H] Help - Detailed command information" -ForegroundColor Cyan
         Write-Host "   [Q] Quit - Exit the module" -ForegroundColor Cyan
@@ -191,46 +191,60 @@ function Deploy-DefenderForServers {
             "3" {
                 Clear-Host
                 Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-                Write-Host "║ ================== AZURE ARC DIAGNOSTICS & TROUBLESHOOTING =================== ║" -ForegroundColor Cyan
+                Write-Host "║ =================== AZURE ARC DIAGNOSTICS & TROUBLESHOOTING ================== ║" -ForegroundColor Cyan
                 Write-Host "╚════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
                 Write-Host ""
-                Write-Host "🔧 COMPREHENSIVE DIAGNOSTICS OVERVIEW:" -ForegroundColor Yellow
-                Write-Host "   This diagnostic function provides comprehensive analysis of your Azure Arc" -ForegroundColor White
-                Write-Host "   deployment including connectivity testing, agent status validation," -ForegroundColor White
-                Write-Host "   and detailed log collection for troubleshooting." -ForegroundColor White
+                Write-Host "🔍 AZURE ARC DIAGNOSTICS OVERVIEW:" -ForegroundColor Yellow
+                Write-Host "   This comprehensive diagnostic tool performs systematic health checks and" -ForegroundColor White
+                Write-Host "   log collection for Azure Arc Connected Machine Agent troubleshooting." -ForegroundColor White
                 Write-Host ""
-                Write-Host "📋 DIAGNOSTIC CAPABILITIES:" -ForegroundColor Yellow
-                Write-Host "   • Comprehensive connectivity testing to Azure Arc endpoints" -ForegroundColor White
-                Write-Host "   • Azure Connected Machine Agent status validation" -ForegroundColor White
-                Write-Host "   • Multi-device diagnostic support" -ForegroundColor White
-                Write-Host "   • Automated log archiving for support cases" -ForegroundColor White
-                Write-Host "   • Detailed health and performance reporting" -ForegroundColor White
-                Write-Host "   • Configuration validation and recommendations" -ForegroundColor White
+                Write-Host "📋 DIAGNOSTIC OPERATIONS PERFORMED:" -ForegroundColor Yellow
+                Write-Host "   • Agent Status Analysis - Current configuration and connection state" -ForegroundColor White
+                Write-Host "   • Connectivity Validation - Network reachability and authentication tests" -ForegroundColor White
+                Write-Host "   • Complete Log Collection - Comprehensive diagnostic archive generation" -ForegroundColor White
                 Write-Host ""
-                Write-Host "🎯 TROUBLESHOOTING FEATURES:" -ForegroundColor Green
-                Write-Host "   • Automated issue detection and resolution suggestions" -ForegroundColor White
-                Write-Host "   • Comprehensive log collection and analysis" -ForegroundColor White
-                Write-Host "   • Support-ready diagnostic packages" -ForegroundColor White
+                Write-Host "🎯 WORKFLOW & COMMANDS EXECUTED:" -ForegroundColor Green
+                Write-Host "   ┌─────────────────────────────────────────────────────────────────────────────┐" -ForegroundColor Gray
+                Write-Host "   │ Command               │ Description                                         │" -ForegroundColor Gray
+                Write-Host "   ├─────────────────────────────────────────────────────────────────────────────┤" -ForegroundColor Gray
+                Write-Host "   │ azcmagent show        │ Displays agent configuration and connection status  │" -ForegroundColor Gray
+                Write-Host "   │ azcmagent check       │ Performs connectivity and health validation tests   │" -ForegroundColor Gray
+                Write-Host "   │ azcmagent logs --full │ Generates complete diagnostic log archive           │" -ForegroundColor Gray
+                Write-Host "   └─────────────────────────────────────────────────────────────────────────────┘" -ForegroundColor Gray
+                Write-Host ""
+                Write-Host "📊 OUTPUT & DELIVERABLES:" -ForegroundColor Green
+                Write-Host "   • Detailed diagnostic log with timestamped results and recommendations" -ForegroundColor White
+                Write-Host "   • Complete ZIP archive containing comprehensive Azure Arc diagnostic data" -ForegroundColor White
+                Write-Host "   • Professional troubleshooting report suitable for Microsoft Support" -ForegroundColor White
                 Write-Host ""
                 Write-Host "⚖️  DISCLAIMER & LIABILITY:" -ForegroundColor Magenta
-                Write-Host "   • This script is provided 'AS IS' without warranty of any kind" -ForegroundColor White
+                Write-Host "   • This diagnostic tool is provided 'AS IS' without warranty of any kind" -ForegroundColor White
+                Write-Host "   • Diagnostic logs may contain sensitive system information" -ForegroundColor White
+                Write-Host "   • Review log contents before sharing with external parties" -ForegroundColor White
+                Write-Host "   • Store diagnostic files in secure locations with appropriate access controls" -ForegroundColor White
                 Write-Host "   • The author is not liable for any damages, data loss, or other" -ForegroundColor White
                 Write-Host "     consequences that may result from running this script" -ForegroundColor White
                 Write-Host "   • You assume full responsibility for testing and validating" -ForegroundColor White
                 Write-Host "     this script in your environment before production use" -ForegroundColor White
-                Write-Host ""
 
-                Write-Host "═════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-                $confirm = Read-Host "Do you want to proceed with Azure Arc diagnostics? [Y/N] (default: Y)"
+                Write-Host ""
+                Write-Host "═══════════════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+                $confirm = Read-Host "Do you want to proceed with Azure Arc diagnostics collection? [Y/N] (default: Y)"
+                Clear-Host  
+                Write-Host ""
                 if ([string]::IsNullOrWhiteSpace($confirm) -or $confirm.ToUpper() -eq "Y") {
-                    Write-Host "`n🔧 Running Get-AzureArcDiagnostics..." -ForegroundColor Green
+                    Write-Host "`n🚀 Running Get-AzureArcDiagnostic..." -ForegroundColor Green
                     try {
-                        Get-AzureArcDiagnostics -SkipPrompt -CollectLogs
-                        Write-Host "`n✅ Azure Arc diagnostics completed successfully." -ForegroundColor Green
+                        $result = Get-AzureArcDiagnostic
+                        if ($result) {
+                            Write-Host "`n✅ Azure Arc diagnostics completed successfully." -ForegroundColor Green
+                        } else {
+                            Write-Host "`n⚠️ Azure Arc diagnostics completed with some issues. Check the log file for details." -ForegroundColor Yellow
+                        }
                     }
                     catch {
-                        Write-Host "`n❌ Error during diagnostics: $($_.Exception.Message)" -ForegroundColor Red
-                        Write-Host "Some diagnostic functions may require administrative privileges." -ForegroundColor Yellow
+                        Write-Host "`n❌ Error during Azure Arc diagnostics: $($_.Exception.Message)" -ForegroundColor Red
+                        Write-Host "Please check the error details and try again." -ForegroundColor Yellow
                     }
                     Write-Host "`nPress any key to return to the main menu..." -ForegroundColor Yellow
                     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
@@ -249,7 +263,7 @@ function Deploy-DefenderForServers {
                     Write-Host "📚 Available commands for detailed help:" -ForegroundColor Yellow
                     Write-Host "[1] Test-AzureArcPrerequisite" -ForegroundColor White
                     Write-Host "[2] New-AzureArcDevice" -ForegroundColor White
-                    Write-Host "[3] Get-AzureArcDiagnostics" -ForegroundColor White
+                    Write-Host "[3] Get-AzureArcDiagnostic" -ForegroundColor White
                     Write-Host "[Q] Return to main menu" -ForegroundColor White
                     Write-Host ""
                     
@@ -325,29 +339,34 @@ function Deploy-DefenderForServers {
                         "3" {
                             Clear-Host
                             Write-Host "╔════════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-                            Write-Host "║                          Get-AzureArcDiagnostics Help                          ║" -ForegroundColor Cyan
+                            Write-Host "║                         Get-AzureArcDiagnostic Help                            ║" -ForegroundColor Cyan
                             Write-Host "╚════════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
                             Write-Host ""
                             Write-Host "SYNOPSIS" -ForegroundColor Yellow
-                            Write-Host "    Comprehensive Azure Arc diagnostics and troubleshooting" -ForegroundColor White
+                            Write-Host "    Performs comprehensive Azure Arc agent diagnostics and collects detailed" -ForegroundColor White
+                            Write-Host "    logs for troubleshooting and support analysis" -ForegroundColor White
                             Write-Host ""
                             Write-Host "SYNTAX" -ForegroundColor Yellow
-                            Write-Host "    Get-AzureArcDiagnostics [[-LogPath] <String>] [[-DeviceListPath] <String>]" -ForegroundColor White
-                            Write-Host "        [-SkipPrompt] [-CollectLogs] [-CreateArchive]" -ForegroundColor White
+                            Write-Host "    Get-AzureArcDiagnostic [[-LogPath] <String>] [-Force] [-Quiet]" -ForegroundColor White
                             Write-Host ""
                             Write-Host "DESCRIPTION" -ForegroundColor Yellow
-                            Write-Host "    This function provides comprehensive diagnostics for Azure Arc deployments" -ForegroundColor White
-                            Write-Host "    including connectivity testing, agent status validation, and log collection." -ForegroundColor White
+                            Write-Host "    This comprehensive diagnostic function systematically executes Azure Arc" -ForegroundColor White
+                            Write-Host "    agent commands to assess health, configuration, and operational status." -ForegroundColor White
+                            Write-Host "    Generates professional diagnostic reports suitable for Microsoft Support." -ForegroundColor White
                             Write-Host ""
-                            Write-Host "FEATURES" -ForegroundColor Yellow
-                            Write-Host "    • Comprehensive diagnostic data collection" -ForegroundColor White
-                            Write-Host "    • Multi-device diagnostic support" -ForegroundColor White
-                            Write-Host "    • Automated log archiving for support cases" -ForegroundColor White
-                            Write-Host "    • Detailed connectivity and health reporting" -ForegroundColor White
+                            Write-Host "DIAGNOSTIC WORKFLOW" -ForegroundColor Yellow
+                            Write-Host "    • azcmagent show - Displays agent configuration and connection status" -ForegroundColor White
+                            Write-Host "    • azcmagent check - Performs connectivity and health validation tests" -ForegroundColor White
+                            Write-Host "    • azcmagent logs --full - Generates complete diagnostic log archive" -ForegroundColor White
+                            Write-Host ""
+                            Write-Host "OUTPUT DELIVERABLES" -ForegroundColor Yellow
+                            Write-Host "    • Timestamped diagnostic log with detailed results and recommendations" -ForegroundColor White
+                            Write-Host "    • Complete ZIP archive containing comprehensive Azure Arc diagnostic data" -ForegroundColor White
+                            Write-Host "    • Professional troubleshooting report with remediation guidance" -ForegroundColor White
                             Write-Host ""
                             Write-Host "EXAMPLES" -ForegroundColor Yellow
-                            Write-Host "    Get-AzureArcDiagnostics" -ForegroundColor Cyan
-                            Write-Host "    Get-AzureArcDiagnostics -LogPath 'C:\ArcDiagnostics' -CollectLogs" -ForegroundColor Cyan
+                            Write-Host "    Get-AzureArcDiagnostic" -ForegroundColor Cyan
+                            Write-Host "    Get-AzureArcDiagnostic -LogPath 'C:\AzureArcDiagnostics' -Force" -ForegroundColor Cyan
                             Write-Host ""
                             Write-Host "Press any key to return to help menu..." -ForegroundColor Yellow
                             $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")

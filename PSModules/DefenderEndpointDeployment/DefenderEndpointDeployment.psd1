@@ -12,7 +12,7 @@
 RootModule = 'DefenderEndpointDeployment.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.1.0'
+ModuleVersion = '1.2.0'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Desktop', 'Core')
@@ -30,7 +30,7 @@ CompanyName = 'Less-IT (AI and CyberSecurity)'
 Copyright = '(c) 2025 Lessi Coulibaly. All rights reserved.'
 
 # Description of the functionality provided by this module
-Description = 'Comprehensive PowerShell module for Azure Arc onboarding and Microsoft Defender for Endpoint (MDE) integration through Defender for Servers. Features enterprise-grade prerequisites validation covering OS compatibility, system requirements, PowerShell environment, network connectivity, Windows services, security configuration, and MDE readiness. Includes automated remediation script generation, detailed reporting, and multi-device batch processing for enterprise environments.'
+Description = 'Comprehensive PowerShell module for Azure Arc onboarding and Microsoft Defender for Endpoint (MDE) integration through Defender for Servers. Features enterprise-grade prerequisites validation covering OS compatibility, system requirements, PowerShell environment, network connectivity, Windows services, security configuration, and MDE readiness. Includes automated remediation script generation, detailed reporting, multi-device batch processing for enterprise environments, and comprehensive Azure Arc diagnostic tools for troubleshooting and support.'
 
 # Minimum version of the PowerShell engine required by this module
 PowerShellVersion = '5.1'
@@ -76,7 +76,7 @@ FunctionsToExport = @(
     'New-AzureArcDevice',
     'Test-AzureArcPrerequisite',
     'Deploy-DefenderForServers',
-    'Get-AzureArcDiagnostics'
+    'Get-AzureArcDiagnostic'
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
@@ -103,7 +103,7 @@ PrivateData = @{
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.
-        Tags = @('Azure', 'AzureArc', 'Defender', 'MicrosoftDefender', 'Endpoint', 'Security', 'Management', 'Deployment', 'Prerequisites', 'MDE', 'Enterprise', 'PowerShell', 'Automation')
+        Tags = @('Azure', 'AzureArc', 'Defender', 'MicrosoftDefender', 'Endpoint', 'Security', 'Management', 'Deployment', 'Prerequisites', 'MDE', 'Enterprise', 'PowerShell', 'Automation', 'Diagnostics', 'Troubleshooting', 'Logging')
 
         # A URL to the license for this module.
         LicenseUri = 'https://github.com/LessIT/DefenderEndpointDeployment/blob/main/LICENSE'
@@ -116,12 +116,17 @@ PrivateData = @{
 
         # ReleaseNotes of this module
         ReleaseNotes = @'
-## Version 1.1.0 Release Notes
+## Version 1.2.0 Release Notes
 
-### 🎯 Enterprise-Grade Azure Arc Deployment Module
+### � New Features
+- **Azure Arc Diagnostics Tool**: Comprehensive diagnostic collection with Get-AzureArcDiagnostic function
+- **Enhanced Troubleshooting**: Automated execution of azcmagent commands with detailed logging
+- **Professional Diagnostic Reports**: Timestamped logs with recommendations and remediation guidance
+
+### �🎯 Enterprise-Grade Azure Arc Deployment Module
 Complete PowerShell solution for Azure Arc onboarding and Microsoft Defender integration.
 
-### � Key Features
+### ⚡ Key Features
 - **Interactive Menu System**: Professional interface with ASCII art and color-coded output
 - **Comprehensive Prerequisites Testing**: System validation, network connectivity, and PowerShell environment checks
 - **Azure Arc Device Management**: Automated device creation with Group Policy integration
@@ -131,8 +136,8 @@ Complete PowerShell solution for Azure Arc onboarding and Microsoft Defender int
 ### 🔧 Core Functions
 1. **Test-AzureArcPrerequisite** - Complete prerequisites validation
 2. **New-AzureArcDevice** - Azure Arc device creation and configuration
-3. **Get-AzureArcDiagnostics** - Comprehensive diagnostics and troubleshooting
-4. **Deploy-DefenderForServers** - Interactive menu for all operations
+3. **Deploy-DefenderForServers** - Interactive menu for all operations
+4. **Get-AzureArcDiagnostic** - Comprehensive Azure Arc agent diagnostics and log collection
 
 ### 🎮 User Experience
 - Professional menu-driven interface

@@ -19,7 +19,7 @@
     https://lessit.net
 
 .VERSION
-    1.0.8
+    1.2.0
 #>
 
 # Get the path to the module

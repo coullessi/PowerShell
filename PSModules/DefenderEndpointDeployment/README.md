@@ -27,12 +27,6 @@ The module provides four main functions accessible through an interactive menu:
 - Group Policy deployment for enterprise environments
 - Agent installation and setup
 
-#### 3️⃣ Get-AzureArcDiagnostics
-- Comprehensive Azure Arc diagnostics and troubleshooting
-- Agent log collection and analysis
-- Connectivity validation and health checks
-- Automated diagnostic report generation
-
 #### 4️⃣ Deploy-DefenderForServers
 - Interactive menu system for all functions
 - Built-in help and guidance system
@@ -105,7 +99,6 @@ Deploy-DefenderForServers
 |---------|----------|-------------|
 | **1** | Test-AzureArcPrerequisite | • Validates system requirements and network connectivity<br>• Checks PowerShell environment and Azure modules<br>• Multi-device validation support |
 | **2** | New-AzureArcDevice | • Creates and configures Azure Arc devices<br>• Service principal management and Group Policy deployment<br>• Enterprise-scale automated deployment |
-| **3** | Get-AzureArcDiagnostics | • Comprehensive Azure Arc agent diagnostics<br>• Log collection and connectivity testing<br>• Troubleshooting and support report generation |
 | **H** | Show Help Documentation | Display detailed help and documentation |
 | **Q** | Exit | Exit the interactive menu |
 
@@ -117,9 +110,6 @@ Test-AzureArcPrerequisite -DeviceListPath "C:\devices.txt"
 
 # Create Azure Arc device with Group Policy
 New-AzureArcDevice -ResourceGroupName "rg-azurearc" -Location "eastus"
-
-# Run diagnostics with log collection
-Get-AzureArcDiagnostics -CollectLogs -CreateArchive
 ```
 
 ## 📊 Requirements
