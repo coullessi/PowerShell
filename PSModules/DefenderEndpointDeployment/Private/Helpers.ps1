@@ -381,7 +381,10 @@ function Initialize-AzureAuthenticationAndSubscription {
     .DESCRIPTION
         This function provides consistent Azure authentication and subscription selection across all functions
         in the DefenderEndpointDeployment module. It ensures users are authenticated, retrieves all available
-        subscriptions, and allows subscription selection to set the appropriate context.
+        subscriptions, and always prompts for subscription selection to set the appropriate context.
+        
+        Even if the user is already logged in and authenticated, this function will present all available
+        subscriptions for selection to ensure the user can choose the correct subscription context.
     
     .PARAMETER SubscriptionId
         Optional. Azure subscription ID to use. If provided, the function will validate and use this subscription.
@@ -454,46 +457,24 @@ function Initialize-AzureAuthenticationAndSubscription {
             return $result
         }
 
+        # Always display available subscriptions to user for selection
         # Use provided subscription or prompt user
         if ($SubscriptionId) {
             $selectedSub = $subs | Where-Object { $_.Id -eq $SubscriptionId }
             if (-not $selectedSub) {
-                Write-Host "[-] Subscription ID '$SubscriptionId' not found. Available subscriptions:" -ForegroundColor Red
-                Write-Host ""
-                for ($i = 0; $i -lt $subs.Count; $i++) {
-                    Write-Host "[$($i+1)] $($subs[$i].Name) ($($subs[$i].Id))" -ForegroundColor Yellow
-                }
-                Write-Host ""
-                
-                # Prompt user to select from available subscriptions
-                $defaultSub = 1
-                do {
-                    $subRank = Read-Host "Select a subscription (default: $defaultSub)"
-                    if ([string]::IsNullOrWhiteSpace($subRank)) { 
-                        $subRank = $defaultSub 
-                    } else {
-                        # Try to convert to integer
-                        try {
-                            $subRank = [int]$subRank
-                        } catch {
-                            Write-Host "[-] Please enter a valid number." -ForegroundColor Yellow
-                            $subRank = 0  # Force retry
-                            continue
-                        }
-                    }
-                    
-                    if ($subRank -lt 1 -or $subRank -gt $subs.Count) {
-                        Write-Host "[-] Enter a valid number between 1 and $($subs.Count)" -ForegroundColor Yellow
-                    }
-                } while ($subRank -lt 1 -or $subRank -gt $subs.Count)
-
-                $selectedSub = $subs[$subRank - 1]
+                Write-Host "[-] Subscription ID '$SubscriptionId' not found. Please check and try again." -ForegroundColor Red
+                # Fall through to subscription selection prompt
+                $SubscriptionId = $null
+            } else {
+                $subName = $selectedSub.Name
+                $subId = $selectedSub.Id
+                Write-Host "[+] Using provided subscription: $subName" -ForegroundColor Green
             }
-            $subName = $selectedSub.Name
-            $subId = $selectedSub.Id
-            Write-Host "[+] Using subscription: $subName" -ForegroundColor Green
-        } else {
-            # Display available subscriptions and prompt user
+        }
+        
+        # If no subscription provided or invalid subscription, prompt user to select
+        if (-not $SubscriptionId) {
+            # Display available subscriptions - show only subscription names (no sensitive info)
             Write-Host ""
             Write-Host "[*] Available subscription(s):" -ForegroundColor Green
             for ($i = 0; $i -lt $subs.Count; $i++) {

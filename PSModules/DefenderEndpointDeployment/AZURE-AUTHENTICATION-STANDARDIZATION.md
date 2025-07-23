@@ -1,5 +1,89 @@
 # Azure Authentication Standardization - DefenderEndpointDeployment Module
 
+## UPDATED - July 2025
+
+### Recent Changes Made
+This document has been updated to reflect the latest standardization of Azure authentication across the entire DefenderEndpointDeployment PowerShell module.
+
+## Requirements Implemented
+1. **Consistent Authentication**: All functions use the same standardized authentication process via `Initialize-AzureAuthenticationAndSubscription`
+2. **Always Show Subscriptions**: Even if the user is already logged in, present all available subscriptions for selection
+3. **No Sensitive Information**: Only subscription names are displayed to users (no subscription IDs or tenant IDs)
+4. **User-Friendly Selection**: Numbered list format for subscription selection with validation
+
+## Files Updated
+
+### Core Authentication Function
+- **`Private/Helpers.ps1`**
+  - Enhanced `Initialize-AzureAuthenticationAndSubscription` function
+  - Always prompts for subscription selection regardless of login status
+  - Only displays subscription names (no IDs or sensitive information)
+  - Improved error handling and user experience
+
+### Public Functions Updated
+- **`Public/Set-AzureArcResourcePricing.ps1`**
+  - Replaced custom authentication logic with standardized function
+  - Removed duplicate subscription selection code
+  - Now uses `Initialize-AzureAuthenticationAndSubscription` consistently
+
+- **`Public/Test-AzureArcPrerequisite.ps1`**
+  - Already using standardized authentication function
+  - Added proper `$azureLoginSuccess` variable assignment
+  - Confirmed proper handling of authentication results
+
+- **`Public/New-AzureArcDevice.ps1`**
+  - Already using standardized authentication function
+  - Updated service principal details output to show subscription name instead of ID
+  - Removed tenant ID from user-visible output
+
+### Test Files Updated
+- **`Test-SubscriptionSelection.ps1`**
+  - Updated to not display subscription ID in test output
+  - Now only shows subscription name
+
+## Functions That Don't Need Changes
+- **`Public/Deploy-DefenderForServers.ps1`**: Menu system only, no authentication logic
+- **`Public/Get-AzureArcDiagnostic.ps1`**: No authentication logic present
+
+## Key Benefits
+1. **Consistent User Experience**: All functions now follow the same authentication flow
+2. **Enhanced Security**: No sensitive information (subscription IDs, tenant IDs) displayed to users
+3. **Better Usability**: Always shows available subscriptions for user selection
+4. **Maintainability**: Single source of truth for authentication logic
+
+## Authentication Flow
+1. Check if user is authenticated (if not, prompt for login)
+2. Get all available subscriptions
+3. If subscription ID parameter provided, validate it exists
+4. If no subscription provided or invalid, show numbered list of subscription names
+5. User selects subscription by number
+6. Set Azure context to selected subscription
+7. Return success result with subscription details
+
+## Error Handling
+- Graceful handling of authentication failures
+- Clear error messages for invalid subscription selections
+- Automatic retry for authentication issues
+- Proper validation of user input during subscription selection
+
+## Security Considerations
+- Subscription IDs and tenant IDs are never displayed to users
+- Only subscription names are shown for selection
+- Authentication tokens are handled securely by Azure PowerShell module
+- Service principal details are logged only when necessary for configuration
+
+## Testing Recommendations
+Before deploying these changes:
+1. Test with multiple subscriptions to verify selection works correctly
+2. Test with invalid subscription ID parameters
+3. Test authentication flow with both authenticated and unauthenticated users
+4. Verify no sensitive information is displayed in any output
+5. Test all public functions to ensure they work with the new authentication system
+
+---
+
+# Original Documentation - Historical Reference
+
 ## Overview
 This update ensures consistent Azure authentication across the entire DefenderEndpointDeployment module. All functions now use the same authentication pattern that was originally implemented in `Set-AzureArcResourcePricing.ps1`.
 

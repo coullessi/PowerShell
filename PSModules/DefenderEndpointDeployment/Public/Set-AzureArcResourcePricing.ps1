@@ -109,81 +109,18 @@ Write-Host "[*] Azure Authentication & Setup" -ForegroundColor Cyan
 
 Clear-Host
 
-# Check if user is authenticated, if not, authenticate
-try {
-    $context = Get-AzContext -ErrorAction Stop
-    if (-not $context -or -not $context.Account) {
-        Write-Host "[*] No Azure authentication found. Authenticating..." -ForegroundColor Yellow
-        Connect-AzAccount -ErrorAction Stop | Out-Null
-        $context = Get-AzContext
-    }
-    Write-Host "[+] Authenticated as: $($context.Account.Id)" -ForegroundColor Green
-}
-catch {
-    Write-Host "[-] Authentication failed. Please try again." -ForegroundColor Red
-    Connect-AzAccount -ErrorAction Stop | Out-Null
-    $context = Get-AzContext
-    Write-Host "[+] Authenticated as: $($context.Account.Id)" -ForegroundColor Green
+# Use standardized authentication and subscription selection
+$authResult = Initialize-AzureAuthenticationAndSubscription -SubscriptionId $SubscriptionId
+if (-not $authResult.Success) {
+    Write-Host "[-] Azure authentication or subscription selection failed: $($authResult.Message)" -ForegroundColor Red
+    Write-Host "Script execution aborted.`n" -ForegroundColor Gray
+    return
 }
 
-#endregion
+# Use the authenticated context and subscription details
+$subName = $authResult.SubscriptionName
+$subId = $authResult.SubscriptionId
 
-#region Subscription Selection
-Write-Host "[*] Subscription Selection" -ForegroundColor Cyan
-
-$subs = @()
-$subs += Get-AzSubscription
-if ($subs.Count -eq 0) {
-    Write-Host "[-] No subscription found. Exiting..." -ForegroundColor Red
-    exit 1
-}
-
-# Use provided subscription or prompt user
-if ($SubscriptionId) {
-    $selectedSub = $subs | Where-Object { $_.Id -eq $SubscriptionId }
-    if (-not $selectedSub) {
-        Write-Host "[-] Subscription ID '$SubscriptionId' not found. Please check and try again." -ForegroundColor Red
-        exit 1
-    }
-    $subName = $selectedSub.Name
-    $subId = $selectedSub.Id
-    Write-Host "[+] Using provided subscription: $subName" -ForegroundColor Green
-} else {
-    # Display available subscriptions
-    Write-Host ""
-    Write-Host "[*] Available subscription(s):" -ForegroundColor Green
-    for ($i = 0; $i -lt $subs.Count; $i++) {
-        Write-Host "[$($i+1)] $($subs[$i].Name)" -ForegroundColor White
-    }
-    Write-Host ""
-    
-    $defaultSub = 1
-    do {
-        $subRank = Read-Host "Select a subscription (default: $defaultSub)"
-        if ([string]::IsNullOrWhiteSpace($subRank)) { 
-            $subRank = $defaultSub 
-        } else {
-            # Try to convert to integer
-            try {
-                $subRank = [int]$subRank
-            } catch {
-                Write-Host "[-] Please enter a valid number." -ForegroundColor Yellow
-                $subRank = 0  # Force retry
-                continue
-            }
-        }
-        
-        if ($subRank -lt 1 -or $subRank -gt $subs.Count) {
-            Write-Host "[-] Enter a valid number between 1 and $($subs.Count)" -ForegroundColor Yellow
-        }
-    } while ($subRank -lt 1 -or $subRank -gt $subs.Count)
-
-    $selectedSub = $subs[$subRank - 1]
-    $subName = $selectedSub.Name
-    $subId = $selectedSub.Id
-}
-
-Set-AzContext -SubscriptionId $subId | Out-Null
 #endregion
 
 #region Operation Mode Selection

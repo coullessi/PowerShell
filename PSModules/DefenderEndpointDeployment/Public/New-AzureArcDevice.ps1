@@ -451,8 +451,7 @@ Service Principal Details:
 Application ID: $($ServicePrincipal.AppId)
 Object ID: $($ServicePrincipal.Id)
 Display Name: $($ServicePrincipal.DisplayName)
-Tenant ID: $TenantId
-Subscription ID: $subId
+Subscription: $($authResult.SubscriptionName)
 Resource Group: $resourceGroup
 Scope: $scope
 Creation Date: $($date.ToString('yyyy-MM-dd HH:mm:ss'))
