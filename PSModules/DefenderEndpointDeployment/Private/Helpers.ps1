@@ -302,84 +302,29 @@ function Confirm-AzureAuthentication {
     .DESCRIPTION
         Checks for existing Azure context and prompts for login if needed.
         This function is designed to be called before any Azure operations.
+        
+        Note: This function is maintained for backward compatibility. 
+        New code should use Initialize-AzureAuthenticationAndSubscription instead.
     
     .OUTPUTS
         Boolean indicating if authentication is successful.
     #>
     Write-Step "Ensuring Azure authentication"
     
-    # Suppress warnings globally for Azure operations
-    $OriginalWarningPreference = $WarningPreference
-    $WarningPreference = 'SilentlyContinue'
-    
     try {
-        # Check if Az module is available
-        $azModule = Get-Module -ListAvailable -Name Az
-        if (-not $azModule) {
-            Write-Host "    Az module not found. Attempting installation..." -ForegroundColor Yellow
-            $installSuccess = Install-AzModule
-            if (-not $installSuccess) {
-                Write-Host "    ❌ Cannot proceed without Az module" -ForegroundColor Red
-                return $false
-            }
-            # Re-check after installation
-            $azModule = Get-Module -ListAvailable -Name Az
-        }
-        
-        Write-Host "    ✅ Az module is available" -ForegroundColor Green
-        
-        # Import required modules
-        try {
-            Import-Module Az.Accounts -Force -ErrorAction Stop
-            Import-Module Az.Resources -Force -ErrorAction Stop
-        }
-        catch {
-            Write-Host "    ⚠️ Warning: Could not import all Az modules: $($_.Exception.Message)" -ForegroundColor Yellow
-        }
-        
-        # Check current Azure context
-        try {
-            $context = Get-AzContext -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
-            if ($context) {
-                Write-Host "    ✅ Already logged in to Azure as $($context.Account.Id)" -ForegroundColor Green
-                Write-Host "    📋 Subscription: $($context.Subscription.Name)" -ForegroundColor Gray
-                return $true
-            } else {
-                Write-Host "    🔑 Not logged in to Azure. Initiating login..." -ForegroundColor Yellow
-                
-                # Suppress all Azure PowerShell output streams during login
-                $originalVerbosePreference = $VerbosePreference
-                $originalInformationPreference = $InformationPreference
-                $VerbosePreference = 'SilentlyContinue'
-                $InformationPreference = 'SilentlyContinue'
-                
-                try {
-                    # Attempt Azure login with all output suppressed
-                    $loginResult = Connect-AzAccount -ErrorAction SilentlyContinue -WarningAction SilentlyContinue -InformationAction SilentlyContinue -Verbose:$false
-                } finally {
-                    # Restore original preferences
-                    $VerbosePreference = $originalVerbosePreference
-                    $InformationPreference = $originalInformationPreference
-                }
-                
-                if ($loginResult) {
-                    $newContext = Get-AzContext -WarningAction SilentlyContinue
-                    Write-Host "    ✅ Successfully logged in to Azure as $($newContext.Account.Id)" -ForegroundColor Green
-                    Write-Host "    📋 Subscription: $($newContext.Subscription.Name)" -ForegroundColor Gray
-                    return $true
-                } else {
-                    Write-Host "    ❌ Azure login failed" -ForegroundColor Red
-                    return $false
-                }
-            }
-        } catch {
-            Write-Host "    ❌ Error during Azure authentication: $($_.Exception.Message)" -ForegroundColor Red
+        # Use the new standardized authentication function
+        $authResult = Initialize-AzureAuthenticationAndSubscription
+        if ($authResult.Success) {
+            Write-Host "    ✅ Azure authentication successful" -ForegroundColor Green
+            return $true
+        } else {
+            Write-Host "    ❌ Azure authentication failed: $($authResult.Message)" -ForegroundColor Red
             return $false
         }
     }
-    finally {
-        # Restore original warning preference
-        $WarningPreference = $OriginalWarningPreference
+    catch {
+        Write-Host "    ❌ Error during Azure authentication: $($_.Exception.Message)" -ForegroundColor Red
+        return $false
     }
 }
 
@@ -426,4 +371,182 @@ function Remove-PathQuotes {
     }
     
     return $trimmedPath
+}
+
+function Initialize-AzureAuthenticationAndSubscription {
+    <#
+    .SYNOPSIS
+        Standardized Azure authentication and subscription selection for the DefenderEndpointDeployment module.
+    
+    .DESCRIPTION
+        This function provides consistent Azure authentication and subscription selection across all functions
+        in the DefenderEndpointDeployment module. It ensures users are authenticated, retrieves all available
+        subscriptions, and allows subscription selection to set the appropriate context.
+    
+    .PARAMETER SubscriptionId
+        Optional. Azure subscription ID to use. If provided, the function will validate and use this subscription.
+        If not provided or invalid, user will be prompted to select from available subscriptions.
+    
+    .OUTPUTS
+        Hashtable containing:
+        - Success: Boolean indicating if authentication and subscription selection was successful
+        - Context: The Azure context object
+        - SubscriptionId: The selected subscription ID
+        - SubscriptionName: The selected subscription name
+        - Message: Any relevant message or error information
+    
+    .EXAMPLE
+        $authResult = Initialize-AzureAuthenticationAndSubscription
+        if ($authResult.Success) {
+            Write-Host "Using subscription: $($authResult.SubscriptionName)"
+        }
+    
+    .EXAMPLE
+        $authResult = Initialize-AzureAuthenticationAndSubscription -SubscriptionId "12345678-1234-1234-1234-123456789012"
+        if ($authResult.Success) {
+            Write-Host "Using provided subscription: $($authResult.SubscriptionName)"
+        }
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$false)]
+        [string]$SubscriptionId
+    )
+
+    $result = @{
+        Success = $false
+        Context = $null
+        SubscriptionId = $null
+        SubscriptionName = $null
+        Message = ""
+    }
+
+    try {
+        #region Authentication
+        Write-Host "[*] Azure Authentication & Setup" -ForegroundColor Cyan
+
+        # Check if user is authenticated, if not, authenticate
+        try {
+            $context = Get-AzContext -ErrorAction Stop
+            if (-not $context -or -not $context.Account) {
+                Write-Host "[*] No Azure authentication found. Authenticating..." -ForegroundColor Yellow
+                Connect-AzAccount -ErrorAction Stop | Out-Null
+                $context = Get-AzContext
+            }
+            Write-Host "[+] Authenticated as: $($context.Account.Id)" -ForegroundColor Green
+        }
+        catch {
+            Write-Host "[-] Authentication failed. Please try again." -ForegroundColor Red
+            Connect-AzAccount -ErrorAction Stop | Out-Null
+            $context = Get-AzContext
+            Write-Host "[+] Authenticated as: $($context.Account.Id)" -ForegroundColor Green
+        }
+        #endregion
+
+        #region Subscription Selection
+        Write-Host "[*] Subscription Selection" -ForegroundColor Cyan
+
+        $subs = @()
+        $subs += Get-AzSubscription
+        if ($subs.Count -eq 0) {
+            $result.Message = "No subscription found."
+            Write-Host "[-] No subscription found. Exiting..." -ForegroundColor Red
+            return $result
+        }
+
+        # Use provided subscription or prompt user
+        if ($SubscriptionId) {
+            $selectedSub = $subs | Where-Object { $_.Id -eq $SubscriptionId }
+            if (-not $selectedSub) {
+                Write-Host "[-] Subscription ID '$SubscriptionId' not found. Available subscriptions:" -ForegroundColor Red
+                Write-Host ""
+                for ($i = 0; $i -lt $subs.Count; $i++) {
+                    Write-Host "[$($i+1)] $($subs[$i].Name) ($($subs[$i].Id))" -ForegroundColor Yellow
+                }
+                Write-Host ""
+                
+                # Prompt user to select from available subscriptions
+                $defaultSub = 1
+                do {
+                    $subRank = Read-Host "Select a subscription (default: $defaultSub)"
+                    if ([string]::IsNullOrWhiteSpace($subRank)) { 
+                        $subRank = $defaultSub 
+                    } else {
+                        # Try to convert to integer
+                        try {
+                            $subRank = [int]$subRank
+                        } catch {
+                            Write-Host "[-] Please enter a valid number." -ForegroundColor Yellow
+                            $subRank = 0  # Force retry
+                            continue
+                        }
+                    }
+                    
+                    if ($subRank -lt 1 -or $subRank -gt $subs.Count) {
+                        Write-Host "[-] Enter a valid number between 1 and $($subs.Count)" -ForegroundColor Yellow
+                    }
+                } while ($subRank -lt 1 -or $subRank -gt $subs.Count)
+
+                $selectedSub = $subs[$subRank - 1]
+            }
+            $subName = $selectedSub.Name
+            $subId = $selectedSub.Id
+            Write-Host "[+] Using subscription: $subName" -ForegroundColor Green
+        } else {
+            # Display available subscriptions and prompt user
+            Write-Host ""
+            Write-Host "[*] Available subscription(s):" -ForegroundColor Green
+            for ($i = 0; $i -lt $subs.Count; $i++) {
+                Write-Host "[$($i+1)] $($subs[$i].Name)" -ForegroundColor White
+            }
+            Write-Host ""
+            
+            $defaultSub = 1
+            do {
+                $subRank = Read-Host "Select a subscription (default: $defaultSub)"
+                if ([string]::IsNullOrWhiteSpace($subRank)) { 
+                    $subRank = $defaultSub 
+                } else {
+                    # Try to convert to integer
+                    try {
+                        $subRank = [int]$subRank
+                    } catch {
+                        Write-Host "[-] Please enter a valid number." -ForegroundColor Yellow
+                        $subRank = 0  # Force retry
+                        continue
+                    }
+                }
+                
+                if ($subRank -lt 1 -or $subRank -gt $subs.Count) {
+                    Write-Host "[-] Enter a valid number between 1 and $($subs.Count)" -ForegroundColor Yellow
+                }
+            } while ($subRank -lt 1 -or $subRank -gt $subs.Count)
+
+            $selectedSub = $subs[$subRank - 1]
+            $subName = $selectedSub.Name
+            $subId = $selectedSub.Id
+        }
+
+        # Set the Azure context to the selected subscription
+        Set-AzContext -SubscriptionId $subId | Out-Null
+        $context = Get-AzContext
+        #endregion
+
+        # Populate successful result
+        $result.Success = $true
+        $result.Context = $context
+        $result.SubscriptionId = $subId
+        $result.SubscriptionName = $subName
+        $result.Message = "Successfully authenticated and set subscription context"
+        
+        Write-Host "[+] Azure context set to subscription: $subName" -ForegroundColor Green
+        Write-Host ""
+
+        return $result
+    }
+    catch {
+        $result.Message = "Error during Azure authentication: $($_.Exception.Message)"
+        Write-Host "[-] $($result.Message)" -ForegroundColor Red
+        return $result
+    }
 }

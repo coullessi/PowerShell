@@ -16,6 +16,9 @@ function New-AzureArcDevice {
         - Creates service principals with appropriate permissions
         - Deploys and links Group Policy objects to specified organizational units
 
+    .PARAMETER SubscriptionId
+        Optional Azure subscription ID to use. If not provided, user will be prompted to select.
+
     .PARAMETER ResourceGroupName
         Optional name for the Azure resource group. If not provided, user will be prompted.
 
@@ -34,7 +37,7 @@ function New-AzureArcDevice {
         Interactively creates Azure Arc device configuration with user prompts for all parameters.
 
     .EXAMPLE
-        New-AzureArcDevice -ResourceGroupName "rg-azurearc-prod" -Location "eastus" -Force
+        New-AzureArcDevice -SubscriptionId "12345678-1234-1234-1234-123456789012" -ResourceGroupName "rg-azurearc-prod" -Location "eastus" -Force
         
         Creates Azure Arc configuration with specified parameters and minimal prompting.
 
@@ -53,6 +56,9 @@ function New-AzureArcDevice {
 
     [CmdletBinding()]
     param(
+        [Parameter(Mandatory = $false)]
+        [string]$SubscriptionId,
+        
         [Parameter(Mandatory = $false)]
         [string]$ResourceGroupName,
         
@@ -81,35 +87,16 @@ function New-AzureArcDevice {
     Write-Host " Initializing Azure Arc Device Deployment..." -ForegroundColor Cyan
     Write-Host ""
 
-    # Prerequisites validation should be completed before running this script
-    # Run Test-AzureArcPrerequisites.ps1 first to ensure all requirements are met
-    
-    # Verify Azure context is available (from prerequisites script)
-    try {
-        $context = Get-AzContext
-        if (-not $context) {
-            Write-Host "❌ No Azure context found. Attempting to authenticate..." -ForegroundColor Red
-            
-            # Try to authenticate
-            $authSuccess = Confirm-AzureAuthentication
-            if (-not $authSuccess) {
-                Write-Host "❌ Azure authentication failed. Please run Test-AzureArcPrerequisites first." -ForegroundColor Red
-                return
-            }
-            
-            # Get context again after authentication
-            $context = Get-AzContext
-        }
-        
-        Write-Host "✅ Using Azure context: $($context.Account.Id)" -ForegroundColor Green
-        $subId = $context.Subscription.Id
-        $TenantId = $context.Tenant.Id
-    }
-    catch {
-        Write-Host "❌ Azure PowerShell context not available. Please run Test-AzureArcPrerequisites first." -ForegroundColor Red
-        Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
+    # Azure Authentication and Subscription Selection
+    $authResult = Initialize-AzureAuthenticationAndSubscription -SubscriptionId $SubscriptionId
+    if (-not $authResult.Success) {
+        Write-Host "❌ Azure authentication or subscription selection failed: $($authResult.Message)" -ForegroundColor Red
         return
     }
+    
+    Write-Host "✅ Using Azure context: $($authResult.Context.Account.Id)" -ForegroundColor Green
+    $subId = $authResult.SubscriptionId
+    $TenantId = $authResult.Context.Tenant.Id
 
     # 1. Get resource group and location information
     Write-Host "`n📋 Azure Resource Configuration" -ForegroundColor Cyan

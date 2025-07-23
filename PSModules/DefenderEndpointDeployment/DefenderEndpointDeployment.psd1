@@ -12,7 +12,7 @@
 RootModule = 'DefenderEndpointDeployment.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.2.0'
+ModuleVersion = '1.1.0'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Desktop', 'Core')
@@ -30,7 +30,7 @@ CompanyName = 'Less-IT (AI and CyberSecurity)'
 Copyright = '(c) 2025 Lessi Coulibaly. All rights reserved.'
 
 # Description of the functionality provided by this module
-Description = 'Comprehensive PowerShell module for Azure Arc onboarding and Microsoft Defender for Endpoint (MDE) integration through Defender for Servers. Features enterprise-grade prerequisites validation covering OS compatibility, system requirements, PowerShell environment, network connectivity, Windows services, security configuration, and MDE readiness. Includes automated remediation script generation, detailed reporting, multi-device batch processing for enterprise environments, and comprehensive Azure Arc diagnostic tools for troubleshooting and support.'
+Description = 'Comprehensive PowerShell module for Azure Arc onboarding and Microsoft Defender for Endpoint (MDE) integration through Defender for Servers. Features enterprise-grade prerequisites validation covering OS compatibility, system requirements, PowerShell environment, network connectivity, Windows services, security configuration, and MDE readiness. Includes automated remediation script generation, detailed reporting, multi-device batch processing for enterprise environments, comprehensive Azure Arc diagnostic tools for troubleshooting and support, and post-deployment Defender for Servers pricing configuration at the resource level.'
 
 # Minimum version of the PowerShell engine required by this module
 PowerShellVersion = '5.1'
@@ -76,7 +76,8 @@ FunctionsToExport = @(
     'New-AzureArcDevice',
     'Test-AzureArcPrerequisite',
     'Deploy-DefenderForServers',
-    'Get-AzureArcDiagnostic'
+    'Get-AzureArcDiagnostic',
+    'Set-AzureArcResourcePricing'
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
@@ -103,7 +104,7 @@ PrivateData = @{
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.
-        Tags = @('Azure', 'AzureArc', 'Defender', 'MicrosoftDefender', 'Endpoint', 'Security', 'Management', 'Deployment', 'Prerequisites', 'MDE', 'Enterprise', 'PowerShell', 'Automation', 'Diagnostics', 'Troubleshooting', 'Logging')
+        Tags = @('Azure', 'AzureArc', 'Defender', 'MicrosoftDefender', 'Endpoint', 'Security', 'Management', 'Deployment', 'Prerequisites', 'MDE', 'Enterprise', 'PowerShell', 'Automation', 'Diagnostics', 'Troubleshooting', 'Logging', 'Pricing', 'Configuration', 'PostDeployment')
 
         # A URL to the license for this module.
         LicenseUri = 'https://github.com/LessIT/DefenderEndpointDeployment/blob/main/LICENSE'
@@ -116,21 +117,23 @@ PrivateData = @{
 
         # ReleaseNotes of this module
         ReleaseNotes = @'
-## Version 1.2.0 Release Notes
+## Version 1.1.0 Release Notes
 
-### � New Features
-- **Azure Arc Diagnostics Tool**: Comprehensive diagnostic collection with Get-AzureArcDiagnostic function
-- **Enhanced Troubleshooting**: Automated execution of azcmagent commands with detailed logging
-- **Professional Diagnostic Reports**: Timestamped logs with recommendations and remediation guidance
+### 🆕 New Features
+- **Post-Deployment Pricing Configuration**: New Set-AzureArcResourcePricing function for managing Defender for Servers pricing at resource level
+- **Resource-Level Security Management**: Configure pricing for Virtual Machines, Virtual Machine Scale Sets, and Azure Arc-enabled machines
+- **Flexible Resource Targeting**: Support for both Resource Group and Tag-based resource selection
+- **Comprehensive Pricing Operations**: Read, configure (Free/Standard P1), and delete pricing configurations
 
-### �🎯 Enterprise-Grade Azure Arc Deployment Module
-Complete PowerShell solution for Azure Arc onboarding and Microsoft Defender integration.
+### 🎯 Enhanced Azure Arc Deployment Module
+Complete PowerShell solution for Azure Arc onboarding, Microsoft Defender integration, and post-deployment configuration.
 
 ### ⚡ Key Features
 - **Interactive Menu System**: Professional interface with ASCII art and color-coded output
 - **Comprehensive Prerequisites Testing**: System validation, network connectivity, and PowerShell environment checks
 - **Azure Arc Device Management**: Automated device creation with Group Policy integration
 - **Advanced Diagnostics**: Troubleshooting tools with log collection and analysis
+- **Post-Deployment Configuration**: Automated Defender for Servers pricing management
 - **Multi-Device Support**: Enterprise-scale batch processing capabilities
 
 ### 🔧 Core Functions
@@ -138,12 +141,20 @@ Complete PowerShell solution for Azure Arc onboarding and Microsoft Defender int
 2. **New-AzureArcDevice** - Azure Arc device creation and configuration
 3. **Deploy-DefenderForServers** - Interactive menu for all operations
 4. **Get-AzureArcDiagnostic** - Comprehensive Azure Arc agent diagnostics and log collection
+5. **Set-AzureArcResourcePricing** - Post-deployment Defender for Servers pricing configuration
 
 ### 🎮 User Experience
 - Professional menu-driven interface
 - Color-coded status indicators
 - Built-in help and guidance system
 - Automated error handling and recovery
+- Token management with automatic refresh
+
+### 🔒 Security Features
+- Azure authentication with token management
+- Resource-level security configuration
+- Comprehensive access validation
+- Secure credential handling
 
 For documentation and support: https://lessit.net
 '@

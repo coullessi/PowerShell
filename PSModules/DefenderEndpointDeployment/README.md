@@ -13,7 +13,7 @@ The **DefenderEndpointDeployment** module provides a comprehensive, enterprise-g
 
 ##  Core Functions
 
-The module provides four main functions accessible through an interactive menu:
+The module provides five main functions accessible through an interactive menu:
 
 #### 1️⃣ Test-AzureArcPrerequisite
 - Comprehensive system validation for Azure Arc onboarding
@@ -27,7 +27,18 @@ The module provides four main functions accessible through an interactive menu:
 - Group Policy deployment for enterprise environments
 - Agent installation and setup
 
-#### 4️⃣ Deploy-DefenderForServers
+#### 3️⃣ Get-AzureArcDiagnostic
+- Comprehensive Azure Arc agent diagnostics
+- Log collection and troubleshooting
+- Health validation and connectivity testing
+
+#### 4️⃣ Set-AzureArcResourcePricing
+- Post-deployment Defender for Servers pricing configuration
+- Resource-level pricing management for VMs, VMSS, and Arc machines
+- Resource Group and Tag-based targeting
+- Support for Free, Standard P1, and configuration removal
+
+#### 5️⃣ Deploy-DefenderForServers
 - Interactive menu system for all functions
 - Built-in help and guidance system
 - User-friendly navigation and operation flow
@@ -43,7 +54,7 @@ Deploy-DefenderForServers
 ```
 
 The interactive interface provides a professional menu system with:
-- 🎯 **Numbered Commands** (1-3) for all major operations
+- 🎯 **Numbered Commands** (1-4) for all major operations
 - 📖 **Built-in Help System** (H) with detailed documentation
 - ✅ **Confirmation Prompts** for all operations
 - 🔄 **User-Controlled Navigation** with "Press any key to continue"
@@ -99,6 +110,8 @@ Deploy-DefenderForServers
 |---------|----------|-------------|
 | **1** | Test-AzureArcPrerequisite | • Validates system requirements and network connectivity<br>• Checks PowerShell environment and Azure modules<br>• Multi-device validation support |
 | **2** | New-AzureArcDevice | • Creates and configures Azure Arc devices<br>• Service principal management and Group Policy deployment<br>• Enterprise-scale automated deployment |
+| **3** | Get-AzureArcDiagnostic | • Comprehensive Azure Arc agent diagnostics<br>• Log collection and troubleshooting capabilities<br>• Health validation and connectivity testing |
+| **4** | Set-AzureArcResourcePricing | • Post-deployment Defender for Servers pricing configuration<br>• Resource-level pricing management (Free/Standard P1)<br>• Resource Group and Tag-based targeting |
 | **H** | Show Help Documentation | Display detailed help and documentation |
 | **Q** | Exit | Exit the interactive menu |
 
@@ -110,6 +123,15 @@ Test-AzureArcPrerequisite -DeviceListPath "C:\devices.txt"
 
 # Create Azure Arc device with Group Policy
 New-AzureArcDevice -ResourceGroupName "rg-azurearc" -Location "eastus"
+
+# Run Azure Arc diagnostics
+Get-AzureArcDiagnostic -LogPath "C:\AzureArcDiagnostics"
+
+# Configure Defender pricing for resources in a Resource Group
+Set-AzureArcResourcePricing -Mode "RG" -ResourceGroupName "rg-production" -Action "standard"
+
+# Configure Defender pricing for resources with specific tags
+Set-AzureArcResourcePricing -Mode "TAG" -TagName "Environment" -TagValue "Production" -Action "read"
 ```
 
 ## 📊 Requirements
@@ -157,14 +179,18 @@ Test-AzureArcPrerequisite -NetworkTestMode Comprehensive
 | ✅ **Enhanced Prerequisites Testing** | Comprehensive Azure Arc prerequisites validation |
 | 🔧 **Azure Arc Device Creation** | Streamlined device onboarding with Group Policy support |
 | 🔍 **Comprehensive Diagnostics** | Advanced troubleshooting and log collection |
-| 🎮 **Interactive Menu System** | Selection of a function to run |
+| 💰 **Post-Deployment Pricing Configuration** | Resource-level Defender for Servers pricing management |
+| 🎮 **Interactive Menu System** | User-friendly selection of functions to run |
 | 🔐 **Automated Authentication** | Seamless Azure authentication handling |
 
 ## 🔄 Version History
 
 ### v1.1.0 (Current)
 - ✅ **Enhanced Prerequisites Testing** - Comprehensive system and network validation
-- ✅ **Azure Arc Device Creation** - Automated device onboarding with Group Policy support  
+- ✅ **Azure Arc Device Creation** - Automated device onboarding with Group Policy support
+- ✅ **Azure Arc Diagnostics** - Professional diagnostic and troubleshooting capabilities  
+- ✅ **Defender Pricing Configuration** - Post-deployment resource-level pricing management
+- ✅ **Interactive Menu System** - Professional user interface with help system  
 - ✅ **Advanced Diagnostics** - Professional troubleshooting and log collection
 - ✅ **Multi-Device Support** - Enterprise-scale batch processing capabilities
 
