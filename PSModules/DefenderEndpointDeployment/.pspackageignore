@@ -10,6 +10,12 @@ spec/
 Demo-*.ps1
 Extended-Test.ps1
 Quick-Test.ps1
+test_fixes.ps1
+
+# Sample and pilot files
+Pilot Devices.txt
+*sample*.txt
+*pilot*.txt
 
 # Log files and temporary data
 *.log
@@ -20,6 +26,9 @@ sample-*.txt
 # Development documentation
 TEST-RESULTS.md
 TESTING-SUMMARY.md
+PUBLISHING-CHECKLIST.md
+README-UPDATE-SUMMARY.md
+VERSION-*-UPDATE-SUMMARY.md
 notes.txt
 draft*.md
 TODO.txt

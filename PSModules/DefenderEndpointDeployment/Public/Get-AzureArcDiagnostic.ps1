@@ -8,16 +8,7 @@ function Get-AzureArcDiagnostic {
         troubleshooting and analysis. It systematically executes a series of diagnostic commands to assess
         the health, configuration, and operational status of the Azure Arc agent on the local machine.
 
-        The function performs the following diagnostic operati            # Display final summary
-            if (-not $Quiet) {
-                Write-Host ""
-                Write-Host "=================================================================="
-                Write-Host "                    DIAGNOSTIC SUMMARY                       "
-                Write-Host "=================================================================="
-                
-                foreach ($result in $diagnosticResults) {
-                    $status = if ($result.Success) { "SUCCESS" } else { "FAILED" }
-                    Write-Host "  Command: $($result.Command) - Status: $status"ence:
+        The function performs the following diagnostic operations:
 
         AZURE ARC AGENT STATUS ANALYSIS:
         - Retrieves comprehensive agent configuration and status information
@@ -133,7 +124,6 @@ function Get-AzureArcDiagnostic {
         - Sufficient disk space for log file generation (minimum 100MB recommended)
 
         SUPPORTED PLATFORMS:
-        - Windows 10 version 1709 and later
         - Windows Server 2012 R2 and later
         - PowerShell 5.1 or later
 

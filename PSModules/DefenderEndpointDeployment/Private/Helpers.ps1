@@ -141,7 +141,7 @@ function Get-RemediationGuidance {
             return "Configure firewall to allow outbound HTTPS (443) to Azure endpoints. Verify DNS resolution and proxy settings. Check Service Tags: AzureActiveDirectory, AzureResourceManager, AzureArcInfrastructure, Storage."
         }
         "Windows Version" {
-            return "Upgrade to supported Windows version: Windows 10 1709+, Windows 11, or Windows Server 2012 R2+. Current version is not compatible with Azure Arc."
+            return "Upgrade to supported Windows version: Windows Server 2012 R2 or later. Current version is not compatible with Azure Arc."
         }
         "PowerShell Version" {
             return "Install PowerShell 5.1+ or PowerShell 7+. Download from: https://docs.microsoft.com/powershell/scripting/install/installing-powershell"
@@ -247,14 +247,6 @@ function Get-DeviceOSVersion {
         if ($osVersion -match "Microsoft Windows Server (\d{4})") {
             $year = $matches[1]
             $shortVersion = "Windows Server $year"
-        }
-        # Handle Windows 11 client versions - preserve "Windows 11"
-        elseif ($osVersion -match "Microsoft Windows 11") {
-            $shortVersion = "Windows 11"
-        }
-        # Handle Windows 10 client versions - preserve "Windows 10"
-        elseif ($osVersion -match "Microsoft Windows 10") {
-            $shortVersion = "Windows 10"
         }
         # Handle other Windows versions - remove Microsoft prefix but keep Windows
         else {

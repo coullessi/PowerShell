@@ -237,8 +237,8 @@ function Test-DeviceCheck {
         } else {
             Test-Prerequisites $DeviceName "Windows Version" "Error" "$($osCompatibility.Version) - $($osCompatibility.Reason)"
             Add-RemediationStep "# Windows version $($osCompatibility.Version) is not supported"
-            Add-RemediationStep "# Minimum requirement: Windows 10 1709+ or Windows Server 2012 R2+"
-            Add-RemediationStep "# Consider upgrading to a supported Windows version"
+            Add-RemediationStep "# Minimum requirement: Windows Server 2012 R2 or later"
+            Add-RemediationStep "# Consider upgrading to a supported Windows Server version"
         }
         
         # Architecture Check
@@ -685,10 +685,8 @@ function Test-WindowsVersionCompatibility {
             }
         }
         
-        # Define supported versions
+        # Define supported versions (server only)
         $supportedVersions = @{
-            "Windows 10" = @{ MinBuild = 16299 }  # Fall Creators Update (1709)
-            "Windows 11" = @{ MinBuild = 22000 }
             "Windows Server 2012 R2" = @{ MinBuild = 9600 }
             "Windows Server 2016" = @{ MinBuild = 14393 }
             "Windows Server 2019" = @{ MinBuild = 17763 }
