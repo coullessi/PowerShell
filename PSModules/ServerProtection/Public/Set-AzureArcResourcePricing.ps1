@@ -1,4 +1,4 @@
-function Set-AzureArcResourcePricing {
+﻿function Set-AzureArcResourcePricing {
 <#
 .SYNOPSIS
     Configure Azure Defender for Cloud pricing at resource level for Virtual Machines, Virtual Machine Scale Sets, and ARC machines.
@@ -52,7 +52,7 @@ function Set-AzureArcResourcePricing {
     Author: Microsoft / Lessi Coulibaly
     Version: 2.0
     Last Updated: July 2025
-    Module: DefenderEndpointDeployment
+    Module: ServerProtection
     
     Requirements:
     - Azure PowerShell module (Az)
@@ -105,14 +105,14 @@ $vmssResponseMachines = @()
 $arcResponseMachines = @()
 
 #region Authentication and Setup
-Write-Host "[*] Azure Authentication & Setup" -ForegroundColor Cyan
+Write-Host "`[*`] Azure Authentication `& Setup" -ForegroundColor Cyan
 
 Clear-Host
 
 # Use standardized authentication and subscription selection
 $authResult = Initialize-AzureAuthenticationAndSubscription -SubscriptionId $SubscriptionId
 if (-not $authResult.Success) {
-    Write-Host "[-] Azure authentication or subscription selection failed: $($authResult.Message)" -ForegroundColor Red
+    Write-Host "`[-`] Azure authentication or subscription selection failed: $($authResult.Message)" -ForegroundColor Red
     Write-Host "Script execution aborted.`n" -ForegroundColor Gray
     return
 }
@@ -124,16 +124,16 @@ $subId = $authResult.SubscriptionId
 #endregion
 
 #region Operation Mode Selection
-Write-Host "[*] Operation Mode Selection" -ForegroundColor Cyan
+Write-Host "`[*`] Operation Mode Selection" -ForegroundColor Cyan
 
 # Use provided mode or prompt user
 if ($Mode) {
-    Write-Host "[+] Using provided mode: $Mode" -ForegroundColor Green
+    Write-Host "`[+`] Using provided mode: $Mode" -ForegroundColor Green
     $mode = $Mode
 } else {
     $choices = @("RG", "TAG")
     Write-Host ""
-    Write-Host "[*] Operation Mode:" -ForegroundColor Green
+    Write-Host "`[*`] Operation Mode:" -ForegroundColor Green
     Write-Host "1. RG: `t`tSet pricing for all resources under a Resource Group"
     Write-Host "2. TAG: `tSet pricing for all resources with a specific tag"
     $defaultChoice = 1
@@ -150,7 +150,7 @@ if ($Mode) {
 #endregion
 
 #region Resource Group/Tag Configuration
-Write-Host "[*] Resource Configuration" -ForegroundColor Cyan
+Write-Host "`[*`] Resource Configuration" -ForegroundColor Cyan
 
 # Only show resource groups if RG mode is selected
 if ($mode.ToLower() -eq "rg") {
@@ -159,7 +159,7 @@ if ($mode.ToLower() -eq "rg") {
 
     if (-not $ResourceGroupName) {
         Write-Host ""
-        Write-Host "[*] Resource groups in '$subName' subscription:" -ForegroundColor Green
+        Write-Host "`[*`] Resource groups in '$subName' subscription:" -ForegroundColor Green
         $rgNumbers = @()
         for ($i = 0; $i -lt $azRGs.Count; $i++) {
             "$($i+1). $($azRGs[$i])"
@@ -172,23 +172,23 @@ if ($mode.ToLower() -eq "rg") {
             $resourceGroupName = Read-Host "Enter the name of the resource group"
             
             if ($resourceGroupName.ToLower() -eq 'exit') {
-                Write-Host "[*] Exiting script as requested." -ForegroundColor Yellow
+                Write-Host "`[*`] Exiting script as requested." -ForegroundColor Yellow
                 exit 0
             }
             
             if ([string]::IsNullOrWhiteSpace($resourceGroupName)) {
-                Write-Host "[-] Resource group name cannot be empty. Please enter a valid name or 'exit' to quit." -ForegroundColor Red
+                Write-Host "`[-`] Resource group name cannot be empty. Please enter a valid name or 'exit' to quit." -ForegroundColor Red
                 continue
             }
             
             # Verify the resource group exists
             try {
                 $rg = Get-AzResourceGroup -Name $resourceGroupName -ErrorAction Stop
-                Write-Host "[+] Found resource group: $($rg.ResourceGroupName) in location: $($rg.Location)" -ForegroundColor Green
+                Write-Host "`[+`] Found resource group: $($rg.ResourceGroupName) in location: $($rg.Location)" -ForegroundColor Green
                 break
             }
             catch {
-                Write-Host "[-] Resource group '$resourceGroupName' not found in subscription '$subName'." -ForegroundColor Red
+                Write-Host "`[-`] Resource group '$resourceGroupName' not found in subscription '$subName'." -ForegroundColor Red
                 Write-Host "Please verify the resource group name, enter a valid name, or type 'exit' to quit." -ForegroundColor Yellow
             }
         } while ($true)
@@ -196,11 +196,11 @@ if ($mode.ToLower() -eq "rg") {
         # Verify provided resource group exists
         try {
             $rg = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction Stop
-            Write-Host "[+] Using provided resource group: $($rg.ResourceGroupName) in location: $($rg.Location)" -ForegroundColor Green
+            Write-Host "`[+`] Using provided resource group: $($rg.ResourceGroupName) in location: $($rg.Location)" -ForegroundColor Green
             $resourceGroupName = $ResourceGroupName
         }
         catch {
-            Write-Host "[-] Resource group '$ResourceGroupName' not found in subscription '$subName'." -ForegroundColor Red
+            Write-Host "`[-`] Resource group '$ResourceGroupName' not found in subscription '$subName'." -ForegroundColor Red
             exit 1
         }
     }
@@ -220,7 +220,7 @@ function Get-FreshAccessToken {
         # Get tenant name instead of ID
         $tenant = Get-AzTenant -TenantId $context.Tenant.Id -ErrorAction SilentlyContinue
         $tenantName = if ($tenant -and $tenant.Name) { $tenant.Name } else { "Unknown Tenant" }
-        Write-Host "[*] Getting token for tenant: $tenantName" -ForegroundColor Cyan
+        Write-Host "`[*`] Getting token for tenant: $tenantName" -ForegroundColor Cyan
         
         # Get token specifically for Azure Resource Manager with explicit tenant
         $tokenInfo = Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id -ErrorAction Stop
@@ -234,7 +234,7 @@ function Get-FreshAccessToken {
             [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
         }
         
-        Write-Host "[+] Token obtained successfully" -ForegroundColor Green
+        Write-Host "`[+`] Token obtained successfully" -ForegroundColor Green
         
         return @{
             Token = $tokenValue
@@ -242,7 +242,7 @@ function Get-FreshAccessToken {
         }
     }
     catch {
-        Write-Host "[-] Failed to get access token: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "`[-`] Failed to get access token: $($_.Exception.Message)" -ForegroundColor Red
         Write-Host "Please ensure you are logged in to Azure with 'Connect-AzAccount'" -ForegroundColor Yellow
         throw $_
     }
@@ -259,15 +259,15 @@ function Update-TokenIfNeeded {
     $bufferMinutes = 5  # Refresh token 5 minutes before expiry
     
     if ($currentTime.AddMinutes($bufferMinutes) -ge $ExpiresOn.Value) {
-        Write-Host "[*] Token is about to expire, refreshing..." -ForegroundColor Yellow
+        Write-Host "`[*`] Token is about to expire, refreshing..." -ForegroundColor Yellow
         try {
             $tokenInfo = Get-FreshAccessToken
             $AccessToken.Value = $tokenInfo.Token
             $ExpiresOn.Value = $tokenInfo.ExpiresOn
-            Write-Host "[+] Token refreshed successfully. New expiry: $($ExpiresOn.Value)" -ForegroundColor Green
+            Write-Host "`[+`] Token refreshed successfully. New expiry: $($ExpiresOn.Value)" -ForegroundColor Green
         }
         catch {
-            Write-Host "[-] Failed to refresh token: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "`[-`] Failed to refresh token: $($_.Exception.Message)" -ForegroundColor Red
             throw $_
         }
     }
@@ -282,7 +282,7 @@ function Format-PricingConfiguration {
         [string]$ResourceName
     )
     
-    Write-Host "[*] Pricing Configuration for: $ResourceName" -ForegroundColor Cyan
+    Write-Host "`[*`] Pricing Configuration for: $ResourceName" -ForegroundColor Cyan
     
     if ($PricingResponse -and $PricingResponse.properties) {
         $props = $PricingResponse.properties
@@ -345,7 +345,7 @@ function Format-PricingConfiguration {
         }
     }
     else {
-        Write-Host "[!] No pricing configuration data available" -ForegroundColor Yellow
+        Write-Host "`[!`] No pricing configuration data available" -ForegroundColor Yellow
     }
     
     # Display resource metadata
@@ -359,18 +359,18 @@ function Format-PricingConfiguration {
 }
 
 #region Token Acquisition
-Write-Host "[*] Token Acquisition" -ForegroundColor Cyan
+Write-Host "`[*`] Token Acquisition" -ForegroundColor Cyan
 
 # Get initial token
 try {
-    Write-Host "[*] Obtaining access token..." -ForegroundColor Yellow
+    Write-Host "`[*`] Obtaining access token..." -ForegroundColor Yellow
     $tokenInfo = Get-FreshAccessToken
     $accessToken = $tokenInfo.Token
     $expireson = $tokenInfo.ExpiresOn
-    Write-Host "[+] Token obtained successfully. Expires: $expireson" -ForegroundColor Green
+    Write-Host "`[+`] Token obtained successfully. Expires: $expireson" -ForegroundColor Green
 }
 catch {
-    Write-Host "[-] Failed to obtain access token: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "`[-`] Failed to obtain access token: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "Please run 'Connect-AzAccount' and try again." -ForegroundColor Yellow
     exit 1
 }
@@ -381,12 +381,12 @@ $SubscriptionId = $subId
 #endregion
 
 #region Resource Discovery
-Write-Host "[*] Resource Discovery" -ForegroundColor Cyan
+Write-Host "`[*`] Resource Discovery" -ForegroundColor Cyan
 
 if ($mode.ToLower() -eq "rg") {
     # Fetch resources under a given Resource Group
     try {
-        Write-Host "[*] Fetching resources from Resource Group '$resourceGroupName'..." -ForegroundColor Yellow
+        Write-Host "`[*`] Fetching resources from Resource Group '$resourceGroupName'..." -ForegroundColor Yellow
         
         # Check if token needs refresh before API calls
         Update-TokenIfNeeded -AccessToken ([ref]$accessToken) -ExpiresOn ([ref]$expireson)
@@ -399,7 +399,7 @@ if ($mode.ToLower() -eq "rg") {
             $vmResponseMachines += $vmResponse.value 
             $vmUrl = $vmResponse.nextLink
         } while (![string]::IsNullOrEmpty($vmUrl))
-        Write-Host "[+] Found $($vmResponseMachines.Count) VMs" -ForegroundColor Green
+        Write-Host "`[+`] Found $($vmResponseMachines.Count) VMs" -ForegroundColor Green
 
         $vmssUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resourceGroups/$resourceGroupName/providers/Microsoft.Compute/virtualMachineScaleSets?api-version=2021-04-01"
         do{
@@ -407,7 +407,7 @@ if ($mode.ToLower() -eq "rg") {
             $vmssResponseMachines += $vmssResponse.value
             $vmssUrl = $vmssResponse.nextLink
         } while (![string]::IsNullOrEmpty($vmssUrl))
-        Write-Host "[+] Found $($vmssResponseMachines.Count) VMSSs" -ForegroundColor Green
+        Write-Host "`[+`] Found $($vmssResponseMachines.Count) VMSSs" -ForegroundColor Green
         
         $arcUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resourceGroups/$resourceGroupName/providers/Microsoft.HybridCompute/machines?api-version=2022-12-27"
         do{
@@ -415,10 +415,10 @@ if ($mode.ToLower() -eq "rg") {
             $arcResponseMachines += $arcResponse.value
             $arcUrl = $arcResponse.nextLink
         } while (![string]::IsNullOrEmpty($arcUrl))
-        Write-Host "[+] Found $($arcResponseMachines.Count) ARC machines" -ForegroundColor Green
+        Write-Host "`[+`] Found $($arcResponseMachines.Count) ARC machines" -ForegroundColor Green
     }
     catch {
-        Write-Host "[-] Failed to get resources!" -ForegroundColor Red
+        Write-Host "`[-`] Failed to get resources!" -ForegroundColor Red
         if ($_.Exception.Response.StatusCode.value__ -eq 401) {
             Write-Host "Authentication failed. Token may be invalid or expired." -ForegroundColor Red
             Write-Host "Please try running 'Connect-AzAccount' and run the script again." -ForegroundColor Yellow
@@ -436,7 +436,7 @@ if ($mode.ToLower() -eq "rg") {
         if ([string]::IsNullOrWhiteSpace($tagName)) { $tagName = $defaultTagName }
     } else {
         $tagName = $TagName
-        Write-Host "[+] Using provided tag name: $tagName" -ForegroundColor Green
+        Write-Host "`[+`] Using provided tag name: $tagName" -ForegroundColor Green
     }
     
     if (-not $TagValue) {
@@ -445,42 +445,42 @@ if ($mode.ToLower() -eq "rg") {
         if ([string]::IsNullOrWhiteSpace($tagValue)) { $tagValue = $defaultTagValue }
     } else {
         $tagValue = $TagValue
-        Write-Host "[+] Using provided tag value: $tagValue" -ForegroundColor Green
+        Write-Host "`[+`] Using provided tag value: $tagValue" -ForegroundColor Green
     }
     
     try {
-        Write-Host "[*] Fetching resources by tag '$tagName=$tagValue'..." -ForegroundColor Yellow
+        Write-Host "`[*`] Fetching resources by tag '$tagName=$tagValue'..." -ForegroundColor Yellow
         
         # Check if token needs refresh before API calls
         Update-TokenIfNeeded -AccessToken ([ref]$accessToken) -ExpiresOn ([ref]$expireson)
         
         # Get all virtual machines, VMSSs, and ARC machines based on the given tag
-        $vmUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resources?`$filter=resourceType eq 'Microsoft.Compute/virtualMachines'&api-version=2021-04-01"
+        $vmUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resources?`$filter=resourceType eq 'Microsoft.Compute/virtualMachines'`&api-version=2021-04-01"
         do{
             $vmResponse = Invoke-RestMethod -Method Get -Uri $vmUrl -Headers @{Authorization = "Bearer $accessToken"} -TimeoutSec 120
             $vmResponseMachines += $vmResponse.value | Where-Object {$_.tags.$tagName -eq $tagValue}
             $vmUrl = $vmResponse.nextLink
         } while (![string]::IsNullOrEmpty($vmUrl))
-        Write-Host "[+] Found $($vmResponseMachines.Count) VMs with tag '$tagName=$tagValue'" -ForegroundColor Green
+        Write-Host "`[+`] Found $($vmResponseMachines.Count) VMs with tag '$tagName=$tagValue'" -ForegroundColor Green
         
-        $vmssUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resources?`$filter=resourceType eq 'Microsoft.Compute/virtualMachineScaleSets'&api-version=2021-04-01"
+        $vmssUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resources?`$filter=resourceType eq 'Microsoft.Compute/virtualMachineScaleSets'`&api-version=2021-04-01"
         do{
             $vmssResponse = Invoke-RestMethod -Method Get -Uri $vmssUrl -Headers @{Authorization = "Bearer $accessToken"} -TimeoutSec 120
             $vmssResponseMachines += $vmssResponse.value | Where-Object {$_.tags.$tagName -eq $tagValue}
             $vmssUrl = $vmssResponse.nextLink
         } while (![string]::IsNullOrEmpty($vmssUrl))
-        Write-Host "[+] Found $($vmssResponseMachines.Count) VMSSs with tag '$tagName=$tagValue'" -ForegroundColor Green
+        Write-Host "`[+`] Found $($vmssResponseMachines.Count) VMSSs with tag '$tagName=$tagValue'" -ForegroundColor Green
         
-        $arcUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resources?`$filter=resourceType eq 'Microsoft.HybridCompute/machines'&api-version=2023-07-01"
+        $arcUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resources?`$filter=resourceType eq 'Microsoft.HybridCompute/machines'`&api-version=2023-07-01"
         do{
             $arcResponse = Invoke-RestMethod -Method Get -Uri $arcUrl -Headers @{Authorization = "Bearer $accessToken"} -TimeoutSec 120
             $arcResponseMachines += $arcResponse.value | Where-Object {$_.tags.$tagName -eq $tagValue}
             $arcUrl = $arcResponse.nextLink
         } while (![string]::IsNullOrEmpty($arcUrl))
-        Write-Host "[+] Found $($arcResponseMachines.Count) ARC machines with tag '$tagName=$tagValue'" -ForegroundColor Green
+        Write-Host "`[+`] Found $($arcResponseMachines.Count) ARC machines with tag '$tagName=$tagValue'" -ForegroundColor Green
     }
     catch {
-        Write-Host "[-] Failed to get resources!" -ForegroundColor Red
+        Write-Host "`[-`] Failed to get resources!" -ForegroundColor Red
         if ($_.Exception.Response.StatusCode.value__ -eq 401) {
             Write-Host "Authentication failed. Token may be invalid or expired." -ForegroundColor Red
             Write-Host "Please try running 'Connect-AzAccount' and run the script again." -ForegroundColor Yellow
@@ -491,17 +491,17 @@ if ($mode.ToLower() -eq "rg") {
         exit 1
     }
 } else {
-    Write-Host "[-] Entered invalid mode. Exiting script." -ForegroundColor Red
+    Write-Host "`[-`] Entered invalid mode. Exiting script." -ForegroundColor Red
     exit 1;
 }
 
 #endregion
 
 #region Resource Summary
-Write-Host "[*] Resource Summary" -ForegroundColor Cyan
+Write-Host "`[*`] Resource Summary" -ForegroundColor Cyan
 
 # Display found resources
-Write-Host "[*] Found the following resources:" -ForegroundColor Green
+Write-Host "`[*`] Found the following resources:" -ForegroundColor Green
 
 Write-Host "`n[*] Virtual Machines ($($vmResponseMachines.Count)):" -ForegroundColor Cyan
 if ($vmResponseMachines.Count -gt 0) {
@@ -542,15 +542,15 @@ if ($arcResponseMachines.Count -gt 0) {
 #endregion
 
 #region Action Selection
-Write-Host "[*] Action Selection" -ForegroundColor Cyan
+Write-Host "`[*`] Action Selection" -ForegroundColor Cyan
 
 # Use provided action or prompt user
 if ($Action) {
-    Write-Host "[+] Using provided action: $($Action.ToUpper())" -ForegroundColor Green
+    Write-Host "`[+`] Using provided action: $($Action.ToUpper())" -ForegroundColor Green
     $PricingTier = $Action.ToLower()
 } else {
     Write-Host ""
-    Write-Host "[*] Choose your action:" -ForegroundColor Green
+    Write-Host "`[*`] Choose your action:" -ForegroundColor Green
     Write-Host "1. READ: `tRead the current configuration"
     Write-Host "2. FREE: `tRemove the Defender protection"
     Write-Host "3. STANDARD: `tEnable 'P1'"
@@ -572,11 +572,11 @@ if ($Action) {
 #endregion
 
 #region Resource Processing
-Write-Host "[*] Resource Processing" -ForegroundColor Cyan
+Write-Host "`[*`] Resource Processing" -ForegroundColor Cyan
 
 # Process Virtual Machines
 if ($vmResponseMachines.Count -gt 0) {
-    Write-Host "[*] Processing Virtual Machines:" -ForegroundColor Cyan
+    Write-Host "`[*`] Processing Virtual Machines:" -ForegroundColor Cyan
     Write-Host ""
     foreach ($machine in $vmResponseMachines) {
         # Check if token needs refresh, refresh only if needed
@@ -598,29 +598,29 @@ if ($vmResponseMachines.Count -gt 0) {
                 }
             }
         }
-        Write-Host "[*] Processing pricing configuration for '$($machine.name)':"
+        Write-Host "`[*`] Processing pricing configuration for '$($machine.name)':"
         try {
             if($PricingTier.ToLower() -eq "delete") {
                 $pricingResponse = Invoke-RestMethod -Method Delete -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -ContentType "application/json" -TimeoutSec 120
-                Write-Host "[+] Successfully deleted pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully deleted pricing configuration for $($machine.name)" -ForegroundColor Green
                 $successCount++
                 $vmSuccessCount++
             } elseif ($PricingTier.ToLower() -eq "read") {
                 $pricingResponse = Invoke-RestMethod -Method Get -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -ContentType "application/json" -TimeoutSec 120
-                Write-Host "[+] Successfully read pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully read pricing configuration for $($machine.name)" -ForegroundColor Green
                 Format-PricingConfiguration -PricingResponse $pricingResponse -ResourceName $machine.name
                 $successCount++
                 $vmSuccessCount++
             } else {
                 $pricingResponse = Invoke-RestMethod -Method Put -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -Body ($pricingBody | ConvertTo-Json) -ContentType "application/json" -TimeoutSec 120
-                Write-Host "[+] Successfully updated pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully updated pricing configuration for $($machine.name)" -ForegroundColor Green
                 $successCount++
                 $vmSuccessCount++
             }
         }
         catch {
             $failureCount++
-            Write-Host "[-] Failed to update pricing configuration for $($machine.name)" -ForegroundColor Red
+            Write-Host "`[-`] Failed to update pricing configuration for $($machine.name)" -ForegroundColor Red
             Write-Host "Response StatusCode:" $_.Exception.Response.StatusCode.value__  -ForegroundColor Red
             Write-Host "Response StatusDescription:" $_.Exception.Response.StatusDescription -ForegroundColor Red
             Write-Host "Error from response:" $_.ErrorDetails -ForegroundColor Red
@@ -633,7 +633,7 @@ if ($vmResponseMachines.Count -gt 0) {
 
 # Process Virtual Machine Scale Sets
 if ($vmssResponseMachines.Count -gt 0) {
-    Write-Host "[*] Processing Virtual Machine Scale Sets:" -ForegroundColor Cyan
+    Write-Host "`[*`] Processing Virtual Machine Scale Sets:" -ForegroundColor Cyan
     Write-Host ""
     foreach ($machine in $vmssResponseMachines) {
         # Check if token needs refresh, refresh only if needed
@@ -655,29 +655,29 @@ if ($vmssResponseMachines.Count -gt 0) {
                 }
             }
         }
-        Write-Host "[*] Processing pricing configuration for '$($machine.name)':"
+        Write-Host "`[*`] Processing pricing configuration for '$($machine.name)':"
         try {
             if($PricingTier.ToLower() -eq "delete") {
                 $pricingResponse = Invoke-RestMethod -Method Delete -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -ContentType "application/json" -TimeoutSec 120
-                Write-Host "[+] Successfully deleted pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully deleted pricing configuration for $($machine.name)" -ForegroundColor Green
                 $successCount++
                 $vmssSuccessCount++
             } elseif ($PricingTier.ToLower() -eq "read") {
                 $pricingResponse = Invoke-RestMethod -Method Get -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -ContentType "application/json" -TimeoutSec 120
-                Write-Host "[+] Successfully read pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully read pricing configuration for $($machine.name)" -ForegroundColor Green
                 Format-PricingConfiguration -PricingResponse $pricingResponse -ResourceName $machine.name
                 $successCount++
                 $vmssSuccessCount++
             } else {
                 $pricingResponse = Invoke-RestMethod -Method Put -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -Body ($pricingBody | ConvertTo-Json) -ContentType "application/json" -TimeoutSec 120
-                Write-Host "[+] Successfully updated pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully updated pricing configuration for $($machine.name)" -ForegroundColor Green
                 $successCount++
                 $vmssSuccessCount++
             }
         }
         catch {
             $failureCount++
-            Write-Host "[-] Failed to update pricing configuration for $($machine.name)" -ForegroundColor Red
+            Write-Host "`[-`] Failed to update pricing configuration for $($machine.name)" -ForegroundColor Red
             Write-Host "Response StatusCode:" $_.Exception.Response.StatusCode.value__  -ForegroundColor Red
             Write-Host "Response StatusDescription:" $_.Exception.Response.StatusDescription -ForegroundColor Red
             Write-Host "Error from response:" $_.ErrorDetails -ForegroundColor Red
@@ -690,7 +690,7 @@ if ($vmssResponseMachines.Count -gt 0) {
 
 # Process ARC Machines
 if ($arcResponseMachines.Count -gt 0) {
-    Write-Host "[*] Processing ARC Machines:" -ForegroundColor Cyan
+    Write-Host "`[*`] Processing ARC Machines:" -ForegroundColor Cyan
     Write-Host ""
     foreach ($machine in $arcResponseMachines) {
         # Check if token needs refresh, refresh only if needed
@@ -712,29 +712,29 @@ if ($arcResponseMachines.Count -gt 0) {
                 }
             }
         }
-        Write-Host "[*] Processing pricing configuration for '$($machine.name)':" -ForegroundColor Cyan
+        Write-Host "`[*`] Processing pricing configuration for '$($machine.name)':" -ForegroundColor Cyan
         try {
             if($PricingTier.ToLower() -eq "delete") {
                 $pricingResponse = Invoke-RestMethod -Method Delete -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -ContentType "application/json" -TimeoutSec 120
-                Write-Host "[+] Successfully deleted pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully deleted pricing configuration for $($machine.name)" -ForegroundColor Green
                 $successCount++
                 $arcSuccessCount++
             } elseif ($PricingTier.ToLower() -eq "read") {
                 $pricingResponse = Invoke-RestMethod -Method Get -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -ContentType "application/json" -TimeoutSec 120
-                Write-Host "[+] Successfully read pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully read pricing configuration for $($machine.name)" -ForegroundColor Green
                 Format-PricingConfiguration -PricingResponse $pricingResponse -ResourceName $machine.name
                 $successCount++
                 $arcSuccessCount++
             } else {
                 $pricingResponse = Invoke-RestMethod -Method Put -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -Body ($pricingBody | ConvertTo-Json) -ContentType "application/json" -TimeoutSec 120
-                Write-Host "[+] Successfully updated pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully updated pricing configuration for $($machine.name)" -ForegroundColor Green
                 $successCount++
                 $arcSuccessCount++
             }
         }
         catch {
             $failureCount++
-            Write-Host "[-] Failed to update pricing configuration for $($machine.name)" -ForegroundColor Red
+            Write-Host "`[-`] Failed to update pricing configuration for $($machine.name)" -ForegroundColor Red
             Write-Host "Response StatusCode:" $_.Exception.Response.StatusCode.value__  -ForegroundColor Red
             Write-Host "Response StatusDescription:" $_.Exception.Response.StatusDescription -ForegroundColor Red
             Write-Host "Error from response:" $_.ErrorDetails -ForegroundColor Red
@@ -747,30 +747,30 @@ if ($arcResponseMachines.Count -gt 0) {
 #endregion
 
 #region Final Summary
-Write-Host "[*] Final Summary" -ForegroundColor Cyan
+Write-Host "`[*`] Final Summary" -ForegroundColor Cyan
 
-Write-Host "[*] Summary of Pricing API Results:" -ForegroundColor Green
+Write-Host "`[*`] Summary of Pricing API Results:" -ForegroundColor Green
 
 Write-Host ""
-Write-Host "[*] Virtual Machines:" -ForegroundColor Cyan
+Write-Host "`[*`] Virtual Machines:" -ForegroundColor Cyan
 Write-Host "   Found: $vmCount" -ForegroundColor White
 Write-Host "   [+] Successful: $vmSuccessCount" -ForegroundColor Green
 Write-Host "   [-] Failed: $($vmCount - $vmSuccessCount)" -ForegroundColor $(if ($($vmCount - $vmSuccessCount) -gt 0) {'Red'} else {'Green'})
 
 Write-Host ""
-Write-Host "[*] Virtual Machine Scale Sets:" -ForegroundColor Cyan
+Write-Host "`[*`] Virtual Machine Scale Sets:" -ForegroundColor Cyan
 Write-Host "   Found: $vmssCount" -ForegroundColor White
 Write-Host "   [+] Successful: $vmssSuccessCount" -ForegroundColor Green
 Write-Host "   [-] Failed: $($vmssCount - $vmssSuccessCount)" -ForegroundColor $(if ($($vmssCount - $vmssSuccessCount) -gt 0) {'Red'} else {'Green'})
 
 Write-Host ""
-Write-Host "[*] ARC Machines:" -ForegroundColor Cyan
+Write-Host "`[*`] ARC Machines:" -ForegroundColor Cyan
 Write-Host "   Found: $arcCount" -ForegroundColor White
 Write-Host "   [+] Successful: $arcSuccessCount" -ForegroundColor Green
 Write-Host "   [-] Failed: $($arcCount - $arcSuccessCount)" -ForegroundColor $(if ($($arcCount - $arcSuccessCount) -gt 0) {'Red'} else {'Green'})
 
 Write-Host ""
-Write-Host "[*] Overall Results:" -ForegroundColor Magenta
+Write-Host "`[*`] Overall Results:" -ForegroundColor Magenta
 Write-Host "   [+] Total Successful: $successCount" -ForegroundColor Green
 Write-Host "   [-] Total Failures: $failureCount" -ForegroundColor $(if ($failureCount -gt 0) {'Red'} else {'Green'})
 
@@ -779,3 +779,4 @@ Write-Host "Function execution completed!`n" -ForegroundColor Green
 #endregion
 
 }
+

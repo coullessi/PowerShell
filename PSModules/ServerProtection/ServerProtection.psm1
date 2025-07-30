@@ -2,12 +2,12 @@
 
 <#
 .SYNOPSIS
-    DefenderEndpointDeployment PowerShell Module
+    ServerProtection PowerShell Module
 
 .DESCRIPTION
-    This module provides comprehensive tools for Azure Arc device deployment and 
-    Microsoft Defender for Endpoint management. It includes functions for prerequisites 
-    checking, Azure Arc deployment, and MDE integration across multiple devices.
+    This module provides comprehensive tools for server protection through Azure Arc device 
+    deployment and Microsoft Defender for Endpoint management. It includes functions for 
+    prerequisites checking, Azure Arc deployment, and MDE integration across multiple devices.
 
 .AUTHOR
     Lessi Coulibaly
@@ -19,7 +19,7 @@
     https://lessit.net
 
 .VERSION
-    1.1.0
+    1.0.0
 #>
 
 # Get the path to the module
@@ -57,5 +57,5 @@ if ($PublicFunctions) {
 }
 
 # Module initialization
-Write-Verbose "DefenderEndpointDeployment module loaded successfully"
+Write-Verbose "ServerProtection module loaded successfully"
 Write-Verbose "Author: Lessi Coulibaly | Organization: Less-IT | Website: https://lessit.net"
