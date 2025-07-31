@@ -1,4 +1,4 @@
-# PowerShell Repository for Microsoft Defender XDR and SIEM
+# PowerShell Repository for Microsoft Defender
 
 Welcome to the PowerShell repository dedicated to Microsoft Defender XDR (Extended Detection and Response) and SIEM (Security Information and Event Management) automation. This repository contains a collection of PowerShell scripts and modules designed to enhance security operations, automate threat hunting, and streamline incident response workflows.
 
