@@ -35,19 +35,18 @@
         
         # ASCII Art Header
         Write-Host ""
-        Write-Host "        ██╗    ██╗██╗███╗   ██╗██████╗  ██████╗ ██╗    ██╗███████╗      ███████╗███████╗██████╗ ██╗   ██╗███████╗██████╗ " -ForegroundColor Cyan
-        Write-Host "        ██║    ██║██║████╗  ██║██╔══██╗██╔═══██╗██║    ██║██╔════╝      ██╔════╝██╔════╝██╔══██╗██║   ██║██╔════╝██╔══██╗" -ForegroundColor Cyan
-        Write-Host "        ██║ █╗ ██║██║██╔██╗ ██║██║  ██║██║   ██║██║ █╗ ██║███████╗█████╗███████╗█████╗  ██████╔╝██║   ██║█████╗  ██████╔╝" -ForegroundColor Cyan
-        Write-Host "        ██║███╗██║██║██║╚██╗██║██║  ██║██║   ██║██║███╗██║╚════██║╚════╝╚════██║██╔══╝  ██╔══██╗╚██╗ ██╔╝██╔══╝  ██╔══██╗" -ForegroundColor Cyan
-        Write-Host "        ╚███╔███╔╝██║██║ ╚████║██████╔╝╚██████╔╝╚███╔███╔╝███████║      ███████║███████╗██║  ██║ ╚████╔╝ ███████╗██║  ██║" -ForegroundColor Cyan
-        Write-Host "         ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝╚═════╝  ╚═════╝  ╚══╝╚══╝ ╚══════╝      ╚══════╝╚══════╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝" -ForegroundColor Cyan
-        Write-Host "                        ██████╗ ██████╗  ██████╗ ████████╗███████╗ ██████╗████████╗██╗ ██████╗ ███╗   ██╗" -ForegroundColor Cyan
-        Write-Host "                        ██╔══██╗██╔══██╗██╔═══██╗╚══██╔══╝██╔════╝██╔════╝╚══██╔══╝██║██╔═══██╗████╗  ██║" -ForegroundColor Cyan
-        Write-Host "                        ██████╔╝██████╔╝██║   ██║   ██║   █████╗  ██║        ██║   ██║██║   ██║██╔██╗ ██║" -ForegroundColor Cyan
-        Write-Host "                        ██╔═══╝ ██╔══██╗██║   ██║   ██║   ██╔══╝  ██║        ██║   ██║██║   ██║██║╚██╗██║" -ForegroundColor Cyan
-        Write-Host "                        ██║     ██║  ██║╚██████╔╝   ██║   ███████╗╚██████╗   ██║   ██║╚██████╔╝██║ ╚████║" -ForegroundColor Cyan
-        Write-Host "                        ╚═╝     ╚═╝  ╚═╝ ╚═════╝    ╚═╝   ╚══════╝ ╚═════╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝" -ForegroundColor Cyan
-        Write-Host ""
+        Write-Host "  ██╗    ██╗██╗███╗   ██╗      ███████╗███████╗██████╗ ██╗   ██╗███████╗██████╗ " -ForegroundColor Cyan
+        Write-Host "  ██║    ██║██║████╗  ██║      ██╔════╝██╔════╝██╔══██╗██║   ██║██╔════╝██╔══██╗" -ForegroundColor Cyan
+        Write-Host "  ██║ █╗ ██║██║██╔██╗ ██║█████╗███████╗█████╗  ██████╔╝██║   ██║█████╗  ██████╔╝" -ForegroundColor Cyan
+        Write-Host "  ██║███╗██║██║██║╚██╗██║╚════╝╚════██║██╔══╝  ██╔══██╗╚██╗ ██╔╝██╔══╝  ██╔══██╗" -ForegroundColor Cyan
+        Write-Host "  ╚███╔███╔╝██║██║ ╚████║      ███████║███████╗██║  ██║ ╚████╔╝ ███████╗██║  ██║" -ForegroundColor Cyan
+        Write-Host "   ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝      ╚══════╝╚══════╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝" -ForegroundColor Cyan
+        Write-Host " ██████╗ ██████╗  ██████╗ ████████╗███████╗ ██████╗████████╗██╗ ██████╗ ███╗   ██╗" -ForegroundColor Cyan
+        Write-Host " ██╔══██╗██╔══██╗██╔═══██╗╚══██╔══╝██╔════╝██╔════╝╚══██╔══╝██║██╔═══██╗████╗  ██║" -ForegroundColor Cyan
+        Write-Host " ██████╔╝██████╔╝██║   ██║   ██║   █████╗  ██║        ██║   ██║██║   ██║██╔██╗ ██║" -ForegroundColor Cyan
+        Write-Host " ██╔═══╝ ██╔══██╗██║   ██║   ██║   ██╔══╝  ██║        ██║   ██║██║   ██║██║╚██╗██║" -ForegroundColor Cyan
+        Write-Host " ██║     ██║  ██║╚██████╔╝   ██║   ███████╗╚██████╗   ██║   ██║╚██████╔╝██║ ╚████║" -ForegroundColor Cyan
+        Write-Host " ╚═╝     ╚═╝  ╚═╝ ╚═════╝    ╚═╝   ╚══════╝ ╚═════╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝" -ForegroundColor Cyan
         Write-Host ""
         Write-Host " MODULE OVERVIEW:" -ForegroundColor Green
         Write-Host "   Comprehensive PowerShell module for Azure Arc onboarding and Microsoft Defender" -ForegroundColor White
