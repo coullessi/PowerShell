@@ -42,12 +42,10 @@ $RECYCLE.BIN/
 *.ps1xml
 *.psc1
 
-# Test files and results
-Test-*.ps1
+# Test results
 TestResults/
 *.trx
 *.coverage
-*Test*.txt
 
 # Build outputs
 bin/
