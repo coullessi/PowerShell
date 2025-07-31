@@ -2,7 +2,9 @@
 # Files and folders to exclude from PowerShell Gallery packages
 
 # Development and testing files
+# Exclude test files but allow Test-AzureArcPrerequisite.ps1 (it's a production function)
 Test-*.ps1
+!Public/Test-AzureArcPrerequisite.ps1
 *.Tests.ps1
 test/
 tests/

@@ -9,7 +9,9 @@ WebProject/
 sample-*.txt
 
 # Development and testing files
+# Exclude test files but allow Test-AzureArcPrerequisite.ps1 (it's a production function)
 Test-*.ps1
+!PSModules/ServerProtection/Public/Test-AzureArcPrerequisite.ps1
 *.Tests.ps1
 test/
 tests/
