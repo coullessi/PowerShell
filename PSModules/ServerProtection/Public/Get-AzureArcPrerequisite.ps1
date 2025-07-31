@@ -1,4 +1,4 @@
-function Test-AzureArcPrerequisite {
+function Get-AzureArcPrerequisite {
     <#
     .SYNOPSIS
         Tests Azure Arc prerequisites and automatically registers resource providers.
@@ -33,12 +33,12 @@ function Test-AzureArcPrerequisite {
         Custom path for network test log files.
 
     .EXAMPLE
-        Test-AzureArcPrerequisite
+        Get-AzureArcPrerequisite
         
         Runs basic prerequisites testing for the local machine.
 
     .EXAMPLE
-        Test-AzureArcPrerequisite -Force -NetworkTestMode Comprehensive
+        Get-AzureArcPrerequisite -Force -NetworkTestMode Comprehensive
         
         Runs comprehensive prerequisites testing without prompts.
 

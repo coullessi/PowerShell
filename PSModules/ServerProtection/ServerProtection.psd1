@@ -70,7 +70,7 @@ RequiredModules = @(@{ModuleName = 'Az.Accounts'; ModuleVersion = '2.12.1'; },
 # NestedModules = @()
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-FunctionsToExport = 'New-AzureArcDevice', 'Test-AzureArcPrerequisite', 
+FunctionsToExport = 'New-AzureArcDevice', 'Get-AzureArcPrerequisite', 
                'Start-ServerProtection', 'Get-AzureArcDiagnostic', 
                'Set-AzureArcResourcePricing'
 

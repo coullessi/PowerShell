@@ -53,7 +53,7 @@ jobs:
         # Check exported functions
         $expectedFunctions = @(
           'Start-ServerProtection',
-          'Test-AzureArcPrerequisite', 
+          'Get-AzureArcPrerequisite', 
           'New-AzureArcDevice',
           'Get-AzureArcDiagnostic',
           'Set-AzureArcResourcePricing'

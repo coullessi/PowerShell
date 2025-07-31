@@ -31,7 +31,7 @@
 
     # Module initialization check
     $requiredFunctions = @(
-        'Test-AzureArcPrerequisite',
+        'Get-AzureArcPrerequisite',
         'New-AzureArcDevice', 
         'Get-AzureArcDiagnostic',
         'Set-AzureArcResourcePricing'
@@ -162,14 +162,14 @@
                 Write-Host "" -ForegroundColor Cyan
                 $confirm = Read-Host "Do you want to proceed with prerequisites testing? [Y/N] (default: Y)"
                 if ([string]::IsNullOrWhiteSpace($confirm) -or $confirm.ToUpper() -eq "Y") {
-                    Write-Host "`n Running Test-AzureArcPrerequisite..." -ForegroundColor Green
+                    Write-Host "`n Running Get-AzureArcPrerequisite..." -ForegroundColor Green
                     try {
                         # Check if the function is available
-                        if (-not (Get-Command Test-AzureArcPrerequisite -ErrorAction SilentlyContinue)) {
-                            throw "Test-AzureArcPrerequisite function not found. Please ensure the ServerProtection module is properly imported."
+                        if (-not (Get-Command Get-AzureArcPrerequisite -ErrorAction SilentlyContinue)) {
+                            throw "Get-AzureArcPrerequisite function not found. Please ensure the ServerProtection module is properly imported."
                         }
                         
-                        Test-AzureArcPrerequisite -Force
+                        Get-AzureArcPrerequisite -Force
                         Write-Host "`n Prerequisites testing completed successfully." -ForegroundColor Green
                     }
                     catch {
@@ -381,7 +381,7 @@
                     Write-Host "" -ForegroundColor Cyan
                     Write-Host ""
                     Write-Host " Available commands for detailed help:" -ForegroundColor Yellow
-                    Write-Host "[1] Test-AzureArcPrerequisite" -ForegroundColor White
+                    Write-Host "[1] Get-AzureArcPrerequisite" -ForegroundColor White
                     Write-Host "[2] New-AzureArcDevice" -ForegroundColor White
                     Write-Host "[3] Get-AzureArcDiagnostic" -ForegroundColor White
                     Write-Host "[4] Set-AzureArcResourcePricing" -ForegroundColor White
@@ -394,14 +394,14 @@
                         "1" {
                             Clear-Host
                             Write-Host "" -ForegroundColor Cyan
-                            Write-Host "                         Test-AzureArcPrerequisite Help                         " -ForegroundColor Cyan
+                            Write-Host "                         Get-AzureArcPrerequisite Help                         " -ForegroundColor Cyan
                             Write-Host "" -ForegroundColor Cyan
                             Write-Host ""
                             Write-Host "SYNOPSIS" -ForegroundColor Yellow
                             Write-Host "    Tests Azure Arc prerequisites and automatically registers resource providers" -ForegroundColor White
                             Write-Host ""
                             Write-Host "SYNTAX" -ForegroundColor Yellow
-                            Write-Host "    Test-AzureArcPrerequisite [[-SubscriptionId] <String>] [[-DeviceListPath] <String>] [-Force]" -ForegroundColor White
+                            Write-Host "    Get-AzureArcPrerequisite [[-SubscriptionId] <String>] [[-DeviceListPath] <String>] [-Force]" -ForegroundColor White
                             Write-Host "        [-NetworkTestMode <String>] [-IncludeOptionalEndpoints] [-TestTLSVersion]" -ForegroundColor White
                             Write-Host "        [-ShowDetailedNetworkResults] [[-NetworkLogPath] <String>]" -ForegroundColor White
                             Write-Host ""
@@ -418,8 +418,8 @@
                             Write-Host "     Enhanced security and system requirements validation" -ForegroundColor White
                             Write-Host ""
                             Write-Host "EXAMPLES" -ForegroundColor Yellow
-                            Write-Host "    Test-AzureArcPrerequisite" -ForegroundColor Cyan
-                            Write-Host "    Test-AzureArcPrerequisite -Force -NetworkTestMode Comprehensive" -ForegroundColor Cyan
+                            Write-Host "    Get-AzureArcPrerequisite" -ForegroundColor Cyan
+                            Write-Host "    Get-AzureArcPrerequisite -Force -NetworkTestMode Comprehensive" -ForegroundColor Cyan
                             Write-Host ""
                             Write-Host "Press any key to return to help menu..." -ForegroundColor Yellow
                             $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")

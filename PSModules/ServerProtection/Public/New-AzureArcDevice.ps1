@@ -54,7 +54,7 @@
         - Valid Azure subscription with appropriate permissions
         - Active Directory environment with Group Policy management capabilities
         - Network access to Azure endpoints
-        - Run Test-AzureArcPrerequisites first to ensure all requirements are met
+        - Run Get-AzureArcPrerequisites first to ensure all requirements are met
     #>
 
     [CmdletBinding()]

@@ -40,7 +40,7 @@ Add any other context or screenshots about the feature request here.
 ## Related Functions
 Which existing functions would this feature relate to or enhance?
 - [ ] Start-ServerProtection
-- [ ] Test-AzureArcPrerequisite
+- [ ] Get-AzureArcPrerequisite
 - [ ] New-AzureArcDevice
 - [ ] Get-AzureArcDiagnostic
 - [ ] Set-AzureArcResourcePricing

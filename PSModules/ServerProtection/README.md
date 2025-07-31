@@ -76,20 +76,20 @@ Launch the menu-driven interface that provides guided access to all module funct
 Start-ServerProtection
 ```
 
-### Test-AzureArcPrerequisite
+### Get-AzureArcPrerequisite
 **Comprehensive Azure Arc Prerequisites Validation**
 
 Validates system requirements, network connectivity, TLS configuration, and Azure authentication. Supports multi-device batch processing and generates detailed reports with remediation guidance.
 
 ```powershell
 # Basic prerequisites check
-Test-AzureArcPrerequisite
+Get-AzureArcPrerequisite
 
 # Comprehensive validation with TLS testing
-Test-AzureArcPrerequisite -TestTLSVersion -NetworkTestMode Comprehensive
+Get-AzureArcPrerequisite -TestTLSVersion -NetworkTestMode Comprehensive
 
 # Generate remediation scripts for identified issues
-Test-AzureArcPrerequisite -UseStandardizedDirectory -GenerateRemediationScript
+Get-AzureArcPrerequisite -UseStandardizedDirectory -GenerateRemediationScript
 ```
 
 ### New-AzureArcDevice

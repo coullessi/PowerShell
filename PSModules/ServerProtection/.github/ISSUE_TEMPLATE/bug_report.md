@@ -37,7 +37,7 @@ Add any other context about the problem here.
 
 ## Function/Module Used
 - [ ] Start-ServerProtection
-- [ ] Test-AzureArcPrerequisite
+- [ ] Get-AzureArcPrerequisite
 - [ ] New-AzureArcDevice
 - [ ] Get-AzureArcDiagnostic
 - [ ] Set-AzureArcResourcePricing

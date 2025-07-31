@@ -69,7 +69,7 @@ catch {
 Write-Host "`nTesting module functions..." -ForegroundColor Yellow
 $ExpectedFunctions = @(
     'Start-ServerProtection',
-    'Test-AzureArcPrerequisite', 
+    'Get-AzureArcPrerequisite', 
     'New-AzureArcDevice',
     'Get-AzureArcDiagnostic',
     'Set-AzureArcResourcePricing'
