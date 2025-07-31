@@ -29,6 +29,37 @@
     [CmdletBinding()]
     param()
 
+    # Module initialization check
+    $requiredFunctions = @(
+        'Test-AzureArcPrerequisite',
+        'New-AzureArcDevice', 
+        'Get-AzureArcDiagnostic',
+        'Set-AzureArcResourcePricing'
+    )
+    
+    $missingFunctions = @()
+    foreach ($function in $requiredFunctions) {
+        if (-not (Get-Command $function -ErrorAction SilentlyContinue)) {
+            $missingFunctions += $function
+        }
+    }
+    
+    if ($missingFunctions.Count -gt 0) {
+        Write-Host ""
+        Write-Host " ERROR: Missing required functions" -ForegroundColor Red
+        Write-Host " The following functions are not available:" -ForegroundColor Yellow
+        foreach ($func in $missingFunctions) {
+            Write-Host "   - $func" -ForegroundColor Gray
+        }
+        Write-Host ""
+        Write-Host " SOLUTION:" -ForegroundColor Cyan
+        Write-Host "   1. Ensure you are running this from the correct module context" -ForegroundColor White
+        Write-Host "   2. Try importing the module: Import-Module ServerProtection -Force" -ForegroundColor White
+        Write-Host "   3. Verify the module files are complete and not corrupted" -ForegroundColor White
+        Write-Host ""
+        return
+    }
+
     # Function to display module interface
     function Write-ModuleInterface {
         Write-Host ""
@@ -133,12 +164,18 @@
                 if ([string]::IsNullOrWhiteSpace($confirm) -or $confirm.ToUpper() -eq "Y") {
                     Write-Host "`n Running Test-AzureArcPrerequisite..." -ForegroundColor Green
                     try {
+                        # Check if the function is available
+                        if (-not (Get-Command Test-AzureArcPrerequisite -ErrorAction SilentlyContinue)) {
+                            throw "Test-AzureArcPrerequisite function not found. Please ensure the ServerProtection module is properly imported."
+                        }
+                        
                         Test-AzureArcPrerequisite -Force
                         Write-Host "`n Prerequisites testing completed successfully." -ForegroundColor Green
                     }
                     catch {
                         Write-Host "`n Error during prerequisites testing: $($_.Exception.Message)" -ForegroundColor Red
-                        Write-Host "Please ensure all required modules are installed and try again." -ForegroundColor Yellow
+                        Write-Host "Please ensure the ServerProtection module is properly imported and try again." -ForegroundColor Yellow
+                        Write-Host "Try running: Import-Module ServerProtection -Force" -ForegroundColor Gray
                     }
                     Write-Host "`nPress any key to return to the main menu..." -ForegroundColor Yellow
                     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
@@ -181,12 +218,18 @@
                 if ([string]::IsNullOrWhiteSpace($confirm) -or $confirm.ToUpper() -eq "Y") {
                     Write-Host "`n Running New-AzureArcDevice..." -ForegroundColor Green
                     try {
+                        # Check if the function is available
+                        if (-not (Get-Command New-AzureArcDevice -ErrorAction SilentlyContinue)) {
+                            throw "New-AzureArcDevice function not found. Please ensure the ServerProtection module is properly imported."
+                        }
+                        
                         New-AzureArcDevice -Force
                         Write-Host "`n Azure Arc deployment completed successfully." -ForegroundColor Green
                     }
                     catch {
                         Write-Host "`n Error during Azure Arc deployment: $($_.Exception.Message)" -ForegroundColor Red
                         Write-Host "Please check the error details and try again." -ForegroundColor Yellow
+                        Write-Host "Try running: Import-Module ServerProtection -Force" -ForegroundColor Gray
                     }
                     Write-Host "`nPress any key to return to the main menu..." -ForegroundColor Yellow
                     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
@@ -241,6 +284,11 @@
                 if ([string]::IsNullOrWhiteSpace($confirm) -or $confirm.ToUpper() -eq "Y") {
                     Write-Host "`n Running Get-AzureArcDiagnostic..." -ForegroundColor Green
                     try {
+                        # Check if the function is available
+                        if (-not (Get-Command Get-AzureArcDiagnostic -ErrorAction SilentlyContinue)) {
+                            throw "Get-AzureArcDiagnostic function not found. Please ensure the ServerProtection module is properly imported."
+                        }
+                        
                         $result = Get-AzureArcDiagnostic
                         if ($result) {
                             Write-Host "`n Azure Arc diagnostics completed successfully." -ForegroundColor Green
@@ -251,6 +299,7 @@
                     catch {
                         Write-Host "`n Error during Azure Arc diagnostics: $($_.Exception.Message)" -ForegroundColor Red
                         Write-Host "Please check the error details and try again." -ForegroundColor Yellow
+                        Write-Host "Try running: Import-Module ServerProtection -Force" -ForegroundColor Gray
                     }
                     Write-Host "`nPress any key to return to the main menu..." -ForegroundColor Yellow
                     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
@@ -304,12 +353,18 @@
                 if ([string]::IsNullOrWhiteSpace($confirm) -or $confirm.ToUpper() -eq "Y") {
                     Write-Host "`n Running Set-AzureArcResourcePricing..." -ForegroundColor Green
                     try {
+                        # Check if the function is available
+                        if (-not (Get-Command Set-AzureArcResourcePricing -ErrorAction SilentlyContinue)) {
+                            throw "Set-AzureArcResourcePricing function not found. Please ensure the ServerProtection module is properly imported."
+                        }
+                        
                         Set-AzureArcResourcePricing
                         Write-Host "`n Defender pricing configuration completed successfully." -ForegroundColor Green
                     }
                     catch {
                         Write-Host "`n Error during pricing configuration: $($_.Exception.Message)" -ForegroundColor Red
                         Write-Host "Please check your Azure permissions and network connectivity." -ForegroundColor Yellow
+                        Write-Host "Try running: Import-Module ServerProtection -Force" -ForegroundColor Gray
                     }
                     Write-Host "`nPress any key to return to the main menu..." -ForegroundColor Yellow
                     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
