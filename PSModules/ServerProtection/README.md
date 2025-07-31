@@ -43,7 +43,7 @@ Import-Module ServerProtection
 
 ### GitHub
 ```powershell
-git clone https://github.com/LessIT/ServerProtection.git
+git clone https://github.com/coullessi/ServerProtection.git
 cd ServerProtection
 Import-Module .\ServerProtection.psd1
 ```
