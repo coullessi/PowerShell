@@ -736,7 +736,7 @@ function Initialize-AzureAuthenticationAndSubscription {
         
         # Final validation
         if ($context.Subscription.Id -eq $subId) {
-            Write-Host "`[+`]  Azure authentication and subscription setup completed successfully!" -ForegroundColor Green
+            Write-Host "`[+`] Azure authentication and subscription setup completed successfully!" -ForegroundColor Green
             Write-Host "`[+`] Current subscription: $($context.Subscription.Name)" -ForegroundColor Green
             Write-Host "`[+`] Account: $($context.Account.Id)" -ForegroundColor Green
         } else {

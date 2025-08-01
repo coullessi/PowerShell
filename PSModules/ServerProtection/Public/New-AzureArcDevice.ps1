@@ -158,15 +158,29 @@
     # 2. Create a resource group
     Write-Host "`n  Creating Azure Resource Group" -ForegroundColor Cyan
     Write-Host "" -ForegroundColor Cyan
-    Write-Host "Creating resource group '$resourceGroup' in '$location'..." -ForegroundColor Yellow
-    try {
-        New-AzResourceGroup -Name $resourceGroup -Location $location | Out-Null
-        Write-Host " Resource group created successfully!" -ForegroundColor Green
-    }
-    catch {
-        if ($_.Exception.Message -match "already exists") {
-            Write-Host "  Resource group already exists - continuing..." -ForegroundColor Yellow
+    
+    # Check if resource group already exists
+    $existingRG = Get-AzResourceGroup -Name $resourceGroup -ErrorAction SilentlyContinue
+    
+    if ($existingRG) {
+        if ($existingRG.Location -eq $location) {
+            # Same location - resource group already exists, just continue
+            Write-Host " Resource group '$resourceGroup' already exists in '$location' - continuing..." -ForegroundColor Yellow
         } else {
+            # Different location - not allowed by Azure, show clear error
+            Write-Host " ERROR: Resource group '$resourceGroup' already exists in '$($existingRG.Location)'" -ForegroundColor Red
+            Write-Host " Azure does not allow resource groups with the same name in different locations within the same subscription." -ForegroundColor Yellow
+            Write-Host " Please choose a different resource group name or use the existing location '$($existingRG.Location)'." -ForegroundColor Yellow
+            throw "Resource group name conflict: '$resourceGroup' already exists in '$($existingRG.Location)'"
+        }
+    } else {
+        # Resource group doesn't exist - create it
+        Write-Host "Creating resource group '$resourceGroup' in '$location'..." -ForegroundColor Yellow
+        try {
+            New-AzResourceGroup -Name $resourceGroup -Location $location | Out-Null
+            Write-Host " Resource group created successfully!" -ForegroundColor Green
+        }
+        catch {
             Write-Host " Failed to create resource group: $($_.Exception.Message)" -ForegroundColor Red
             throw
         }
@@ -606,162 +620,370 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
     # Prompt user for OU configuration
     Write-Host "`n Organizational Units Configuration" -ForegroundColor Cyan
     Write-Host "" -ForegroundColor Cyan
-    Write-Host " You need to specify which Organizational Units (OUs) should have the Azure Arc GPO applied." -ForegroundColor Yellow
+    Write-Host " You can create a file containing the list of Organizational Units (OUs)" -ForegroundColor Yellow
+    Write-Host " for future GPO linking. This file will be stored in the remote share folder." -ForegroundColor Yellow
     
     $defaultOUFile = "AzureArc_OUs.txt"
-    $ouFile = Read-Host "Provide the filename for the list of Organizational Units [default: $defaultOUFile]"
     
-    # Remove quotes if user entered them
-    $ouFile = Remove-PathQuotes -Path $ouFile
+    # Store OU file in the remote share folder
+    $ouFileFullPath = Join-Path $path $defaultOUFile
     
-    # Use default if user pressed Enter without input
-    if ([string]::IsNullOrWhiteSpace($ouFile)) {
-        $ouFile = $defaultOUFile
-        Write-Host " Using default OU file: $ouFile" -ForegroundColor Green
+    Write-Host "`nChoose OU configuration method:" -ForegroundColor Yellow
+    Write-Host " 1. Create/edit OU file: $defaultOUFile" -ForegroundColor Gray
+    Write-Host " 2. Create OU file with custom name" -ForegroundColor Gray
+    Write-Host " 3. Skip OU file creation (link GPO manually later)" -ForegroundColor Gray
+    
+    if (-not $Force) {
+        $defaultChoice = "1"
+        $configChoice = Read-Host "Select option [1/2/3] (default: 1)"
+        
+        # Use default if user pressed Enter without input
+        if ([string]::IsNullOrWhiteSpace($configChoice)) {
+            $configChoice = $defaultChoice
+            Write-Host " Using default choice: Create/edit default OU file" -ForegroundColor Green
+        }
     } else {
-        Write-Host " Using specified OU file: $ouFile" -ForegroundColor Green
+        $configChoice = "1"
     }
     
-    # Check if file exists, create if it doesn't
-    if (-not (Test-Path $ouFile)) {
-        Write-Host "  OU file '$ouFile' does not exist. Creating with default OUs..." -ForegroundColor Yellow
+    $createOUFile = $true
+    
+    switch ($configChoice) {
+        "2" {
+            $customOUFile = Read-Host "Provide the filename for the list of Organizational Units"
+            $customOUFile = Remove-PathQuotes -Path $customOUFile
+            if (-not [string]::IsNullOrWhiteSpace($customOUFile)) {
+                # Ensure .txt extension
+                if (-not $customOUFile.EndsWith(".txt")) {
+                    $customOUFile = "$customOUFile.txt"
+                }
+                $ouFileFullPath = Join-Path $path $customOUFile
+                Write-Host " Using custom OU file: $customOUFile" -ForegroundColor Green
+            } else {
+                Write-Host " Invalid filename, using default: $defaultOUFile" -ForegroundColor Yellow
+            }
+        }
+        "3" {
+            $createOUFile = $false
+            Write-Host " Skipping OU file creation. You can link the GPO manually later." -ForegroundColor Yellow
+        }
+        default {
+            Write-Host " Using default OU file: $defaultOUFile" -ForegroundColor Green
+        }
+    }
+    
+    if ($createOUFile) {
+        # Get domain information for better examples
+        try {
+            $domainInfo = Get-ADDomain
+            $domainDN = $domainInfo.DistinguishedName
+            $domainNetBIOS = $domainInfo.NetBIOSName
+            Write-Host " Domain: $($domainInfo.DNSRoot) ($domainNetBIOS)" -ForegroundColor Gray
+        }
+        catch {
+            Write-Host " Could not retrieve domain information" -ForegroundColor Yellow
+            $domainDN = "DC=domain,DC=com"
+        }
         
-        # Create default OU file with common Arc deployment targets
-        $defaultOUs = @(
-            "# Azure Arc Organizational Units Configuration",
-            "# Add one OU name per line (without quotes)",
-            "# Lines starting with # are comments and will be ignored",
-            "# Examples:",
-            "#   Servers",
-            "#   Production Servers", 
-            "#   Arc Enabled Devices",
-            "",
-            "Computers"
-        )
-        
-        $defaultOUs | Out-File -FilePath $ouFile -Encoding UTF8
-        Write-Host " Created default OU file: $ouFile" -ForegroundColor Green
-        Write-Host " Please review and modify the OU file as needed, then run the script again." -ForegroundColor Yellow
-        Write-Host " Current default OU: Computers" -ForegroundColor Gray
-        
-        # Ask user if they want to continue with defaults or edit the file
-        if (-not $Force) {
-            $defaultChoice = "C"
-            $choice = Read-Host "`nDo you want to (C)ontinue with default OUs or (E)dit the file first? [C/E] (default: C)"
+        # Check if file already exists
+        if (Test-Path $ouFileFullPath) {
+            Write-Host " OU file '$(Split-Path $ouFileFullPath -Leaf)' already exists." -ForegroundColor Green
+            Write-Host "  File location: $ouFileFullPath" -ForegroundColor Gray
             
-            # Use default if user pressed Enter without input
-            if ([string]::IsNullOrWhiteSpace($choice)) {
-                $choice = $defaultChoice
-                Write-Host " Using default choice: Continue with defaults" -ForegroundColor Green
-            }
-            if ($choice.ToUpper() -eq 'E') {
-                Write-Host " Opening file for editing. Please save and close when done." -ForegroundColor Yellow
-                try {
-                    Start-Process notepad.exe -ArgumentList $ouFile -Wait
+            if (-not $Force) {
+                $editChoice = Read-Host "Do you want to (E)dit the existing file or (C)reate a new one? [E/C] (default: E)"
+                if ([string]::IsNullOrWhiteSpace($editChoice)) {
+                    $editChoice = "E"
                 }
-                catch {
-                    Write-Host "  Could not open notepad. Please edit the file manually: $ouFile" -ForegroundColor Yellow
-                }
-            }
-        }
-    }
-    
-    # Read OU names from file
-    Write-Host "`n Reading OU configuration from '$ouFile'..." -ForegroundColor Yellow
-    try {
-        $ouNames = Get-Content $ouFile | Where-Object { 
-            $_.Trim() -ne "" -and -not $_.Trim().StartsWith("#") 
-        } | ForEach-Object { $_.Trim() }
-        
-        if ($ouNames.Count -eq 0) {
-            Write-Host " No valid OU names found in '$ouFile'. Please add OU names to the file." -ForegroundColor Red
-            return
-        }
-        
-        Write-Host " Found $($ouNames.Count) OU(s) in configuration file:" -ForegroundColor Green
-        $ouNames | ForEach-Object { Write-Host "   $_" -ForegroundColor Gray }
-        
-        # Get actual OU distinguished names
-        Write-Host "`n Looking up OU distinguished names..." -ForegroundColor Yellow
-        $OUs = @()
-        $notFoundOUs = @()
-        
-        foreach ($ouName in $ouNames) {
-            try {
-                $ou = Get-ADOrganizationalUnit -Filter "Name -eq '$ouName'" -ErrorAction Stop
-                if ($ou) {
-                    if ($ou -is [array]) {
-                        # Multiple OUs with same name found
-                        Write-Host "  Multiple OUs found with name '$ouName':" -ForegroundColor Yellow
-                        $ou | ForEach-Object { Write-Host "     - $($_.DistinguishedName)" -ForegroundColor Gray }
-                        $OUs += $ou[0].DistinguishedName  # Use first one
-                        Write-Host " Using first match: $($ou[0].DistinguishedName)" -ForegroundColor Green
-                    } else {
-                        $OUs += $ou.DistinguishedName
-                        Write-Host " Found OU: $($ou.DistinguishedName)" -ForegroundColor Green
-                    }
+                
+                if ($editChoice.ToUpper() -eq "C") {
+                    Write-Host " Creating new OU file (overwriting existing)..." -ForegroundColor Yellow
+                    $createNewFile = $true
                 } else {
-                    $notFoundOUs += $ouName
+                    Write-Host " Will edit existing file" -ForegroundColor Green
+                    $createNewFile = $false
+                }
+            } else {
+                $createNewFile = $false
+            }
+        } else {
+            Write-Host " OU file '$(Split-Path $ouFileFullPath -Leaf)' does not exist." -ForegroundColor Yellow
+            Write-Host " Creating new OU file..." -ForegroundColor Yellow
+            $createNewFile = $true
+        }
+        
+        # Create new file if needed
+        if ($createNewFile) {
+            # Get available OUs for better examples
+            try {
+                $availableOUs = Get-ADOrganizationalUnit -Filter * | Select-Object -First 10 Name | Sort-Object Name
+                $ouExamples = @()
+                if ($availableOUs.Count -gt 0) {
+                    $ouExamples = $availableOUs | Select-Object -First 5 | ForEach-Object { "#   $($_.Name)" }
+                } else {
+                    $ouExamples = @("#   Servers", "#   Workstations", "#   Production")
                 }
             }
             catch {
-                Write-Host " Error finding OU '$ouName': $($_.Exception.Message)" -ForegroundColor Red
-                $notFoundOUs += $ouName
+                $ouExamples = @("#   Servers", "#   Workstations", "#   Production")
             }
-        }
-        
-        if ($notFoundOUs.Count -gt 0) {
-            Write-Host "`n  The following OUs were not found:" -ForegroundColor Yellow
-            $notFoundOUs | ForEach-Object { Write-Host "   $_" -ForegroundColor Red }
             
-            if (-not $Force) {
-                $continueChoice = Read-Host "`nDo you want to continue with the found OUs? [Y/n] (default: Y)"
-                if ([string]::IsNullOrWhiteSpace($continueChoice)) {
-                    $continueChoice = 'Y'
-                }
-                if ($continueChoice.ToUpper() -ne 'Y') {
-                    Write-Host " Deployment cancelled by user" -ForegroundColor Red
-                    return
-                }
-            }
+            # Create comprehensive OU file template
+            $ouFileContent = @(
+                "# Azure Arc Organizational Units Configuration",
+                "# Add one OU name per line (simple names, not full distinguished names)",
+                "# Lines starting with # are comments and will be ignored",
+                "# ",
+                "# INSTRUCTIONS:",
+                "# 1. Add the names of OUs where you want to apply the Azure Arc GPO",
+                "# 2. Use simple OU names (e.g., 'Servers', 'Workstations')",
+                "# 3. Use special keyword 'DOMAIN' to apply to the entire domain",
+                "# 4. Save this file and close Notepad to continue",
+                "# ",
+                "# IMPORTANT: GPOs can only be linked to Organizational Units (OUs) and domains,",
+                "# NOT to built-in containers like Computers, Users, etc.",
+                "# ",
+                "# Available OUs in your domain:"
+            ) + $ouExamples + @(
+                "# ",
+                "# Examples of VALID entries:",
+                "#   DOMAIN",
+                "#   Servers",
+                "#   Workstations", 
+                "#   Production Servers",
+                "# ",
+                "# Examples of INVALID entries (containers - will be ignored):",
+                "#   Computers",
+                "#   Users",
+                "#   Builtin",
+                "# ",
+                "# Default example (remove # to use):",
+                "# DOMAIN",
+                "",
+                "# Add your OU names below (one per line):",
+                ""
+            )
+            
+            $ouFileContent | Out-File -FilePath $ouFileFullPath -Encoding UTF8
+            Write-Host " Created OU file template: $(Split-Path $ouFileFullPath -Leaf)" -ForegroundColor Green
         }
         
-        if ($OUs.Count -eq 0) {
-            Write-Host " No valid OUs found. Cannot proceed with GPO linking." -ForegroundColor Red
-            return
-        }
+        # Always open file for editing (mandatory user interaction)
+        Write-Host "`n Opening OU file for editing..." -ForegroundColor Cyan
+        Write-Host " File location: $ouFileFullPath" -ForegroundColor Gray
+        Write-Host "" -ForegroundColor Yellow
+        Write-Host " INSTRUCTIONS:" -ForegroundColor Yellow
+        Write-Host "  1. Add the names of OUs where you want to link the Azure Arc GPO" -ForegroundColor White
+        Write-Host "  2. Use simple OU names (e.g., 'Servers', 'Workstations')" -ForegroundColor White
+        Write-Host "  3. Use 'DOMAIN' to apply to the entire domain" -ForegroundColor White
+        Write-Host "  4. Save the file and close Notepad to continue" -ForegroundColor White
+        Write-Host "" -ForegroundColor Yellow
         
-    }
-    catch {
-        Write-Host " Error reading OU file '$ouFile': $($_.Exception.Message)" -ForegroundColor Red
-        return
-    }
-
-    Write-Host "`n Linking GPO to Organizational Units" -ForegroundColor Cyan
-    Write-Host "" -ForegroundColor Cyan
-    Write-Host "`nLinking the GPO '$GPOName' to the selected organizational units..." -ForegroundColor Yellow
-    foreach ($OU in $OUs) {
         try {
-            New-GPLink -Name $GPOName -Target $OU -ErrorAction Stop | Out-Null
-            Write-Host " Linked GPO to: $OU" -ForegroundColor Green
+            Write-Host " Opening Notepad..." -ForegroundColor Yellow
+            Start-Process notepad.exe -ArgumentList $ouFileFullPath -Wait
+            Write-Host " Notepad closed. Continuing with deployment..." -ForegroundColor Green
         }
         catch {
-            if ($_.Exception.Message -match "already linked") {
-                Write-Host "  GPO already linked to: $OU" -ForegroundColor Yellow
-            } else {
-                Write-Host " Failed to link GPO to $OU`: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host " Could not open Notepad automatically." -ForegroundColor Red
+            Write-Host " Please edit the file manually: $ouFileFullPath" -ForegroundColor Yellow
+            if (-not $Force) {
+                Read-Host "Press Enter when you have finished editing the file"
             }
         }
+        
+        # Verify file exists and show summary
+        if (Test-Path $ouFileFullPath) {
+            Write-Host " OU file ready: $(Split-Path $ouFileFullPath -Leaf)" -ForegroundColor Green
+            
+            # Show file contents for confirmation and prepare for linking
+            try {
+                $ouNames = Get-Content $ouFileFullPath | Where-Object { 
+                    $_.Trim() -ne "" -and -not $_.Trim().StartsWith("#") 
+                } | ForEach-Object { 
+                    # Remove quotes and trim all whitespace (including spaces, tabs, etc.)
+                    $cleaned = Remove-PathQuotes -Path $_.Trim()
+                    $cleaned.Trim()
+                } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+                
+                if ($ouNames.Count -gt 0) {
+                    Write-Host " OU file contains $($ouNames.Count) target(s):" -ForegroundColor Gray
+                    $ouNames | ForEach-Object { Write-Host "   '$_'" -ForegroundColor Gray }
+                    
+                    # Ask user if they want to link the GPO now
+                    if (-not $Force) {
+                        $linkChoice = Read-Host "`nDo you want to link the GPO '$GPOName' to these OUs now? [Y/N] (default: Y)"
+                        if ([string]::IsNullOrWhiteSpace($linkChoice)) {
+                            $linkChoice = "Y"
+                        }
+                    } else {
+                        $linkChoice = "Y"
+                    }
+                    
+                    if ($linkChoice.ToUpper() -eq "Y") {
+                        Write-Host "`n Linking GPO to Organizational Units" -ForegroundColor Cyan
+                        Write-Host "" -ForegroundColor Cyan
+                        
+                        # Get domain information for better OU resolution
+                        try {
+                            $domainInfo = Get-ADDomain
+                            $domainDN = $domainInfo.DistinguishedName
+                            Write-Host " Domain DN: $domainDN" -ForegroundColor Gray
+                        }
+                        catch {
+                            Write-Host " Could not retrieve domain information" -ForegroundColor Red
+                            $domainDN = $null
+                        }
+                        
+                        $validTargets = @()
+                        $skippedTargets = @()
+                        
+                        foreach ($ouName in $ouNames) {
+                            # Ensure no leading/trailing spaces
+                            $cleanOUName = $ouName.Trim()
+                            Write-Host " Processing OU: '$cleanOUName'" -ForegroundColor Yellow
+                            
+                            try {
+                                # Handle special keyword 'DOMAIN' for domain root
+                                if ($cleanOUName.ToUpper() -eq "DOMAIN") {
+                                    if ($domainDN) {
+                                        $validTargets += $domainDN
+                                        Write-Host "   Resolved to domain root: $domainDN" -ForegroundColor Green
+                                    } else {
+                                        Write-Host "   ERROR: Could not determine domain DN" -ForegroundColor Red
+                                        $skippedTargets += @{Name = $cleanOUName; Reason = "Could not determine domain DN"}
+                                    }
+                                }
+                                # Skip known container names that can't have GPOs linked
+                                elseif (@("Computers", "Users", "Builtin") -contains $cleanOUName) {
+                                    Write-Host "   SKIPPED: '$cleanOUName' is a container, not an OU" -ForegroundColor Red
+                                    Write-Host "   REASON: GPOs cannot be linked to built-in containers" -ForegroundColor Yellow
+                                    $skippedTargets += @{Name = $cleanOUName; Reason = "Built-in container - GPOs cannot be linked to containers"}
+                                }
+                                # Look up actual OU by name
+                                else {
+                                    Write-Host "   Searching for OU name: '$cleanOUName'" -ForegroundColor Gray
+                                    
+                                    # Search for OU by name across the entire domain
+                                    $ou = Get-ADOrganizationalUnit -Filter "Name -eq '$cleanOUName'" -ErrorAction SilentlyContinue
+                                    if ($ou) {
+                                        if ($ou -is [array]) {
+                                            # Multiple OUs with same name found
+                                            Write-Host "   WARNING: Multiple OUs found with name '$cleanOUName':" -ForegroundColor Yellow
+                                            $ou | ForEach-Object { Write-Host "      - $($_.DistinguishedName)" -ForegroundColor Gray }
+                                            $selectedOU = $ou[0].DistinguishedName  # Use first one
+                                            Write-Host "   Using first match: $selectedOU" -ForegroundColor Green
+                                            $validTargets += $selectedOU
+                                        } else {
+                                            Write-Host "   Found OU: $($ou.DistinguishedName)" -ForegroundColor Green
+                                            $validTargets += $ou.DistinguishedName
+                                        }
+                                    } else {
+                                        Write-Host "   ERROR: OU '$cleanOUName' not found in domain" -ForegroundColor Red
+                                        $skippedTargets += @{Name = $cleanOUName; Reason = "OU not found in domain"}
+                                        
+                                        # Show available OUs as suggestion
+                                        try {
+                                            $availableOUs = Get-ADOrganizationalUnit -Filter * | Select-Object -First 10 Name | Sort-Object Name
+                                            if ($availableOUs.Count -gt 0) {
+                                                Write-Host "   Available OUs (first 10):" -ForegroundColor Gray
+                                                $availableOUs | ForEach-Object { Write-Host "      $($_.Name)" -ForegroundColor Gray }
+                                            }
+                                        }
+                                        catch {
+                                            Write-Host "   Could not retrieve available OUs" -ForegroundColor Gray
+                                        }
+                                    }
+                                }
+                            }
+                            catch {
+                                Write-Host "   ERROR: Failed to process OU '$cleanOUName': $($_.Exception.Message)" -ForegroundColor Red
+                                $skippedTargets += @{Name = $cleanOUName; Reason = "Processing error: $($_.Exception.Message)"}
+                            }
+                        }
+                        
+                        # Show summary of targets
+                        if ($validTargets.Count -gt 0) {
+                            Write-Host "`n Valid targets for GPO linking ($($validTargets.Count)):" -ForegroundColor Green
+                            $validTargets | ForEach-Object { Write-Host "   $_" -ForegroundColor Gray }
+                        }
+                        
+                        if ($skippedTargets.Count -gt 0) {
+                            Write-Host "`n Skipped targets ($($skippedTargets.Count)):" -ForegroundColor Yellow
+                            $skippedTargets | ForEach-Object { 
+                                Write-Host "   $($_.Name): $($_.Reason)" -ForegroundColor Red 
+                            }
+                        }
+                        
+                        # Proceed with linking if we have valid targets
+                        if ($validTargets.Count -gt 0) {
+                            Write-Host "`n Proceeding with GPO linking..." -ForegroundColor Cyan
+                            $successCount = 0
+                            $failureCount = 0
+                            
+                            foreach ($target in $validTargets) {
+                                try {
+                                    Write-Host " Linking GPO '$GPOName' to: $target" -ForegroundColor Yellow
+                                    New-GPLink -Name $GPOName -Target $target -ErrorAction Stop | Out-Null
+                                    Write-Host "   SUCCESS: GPO linked successfully" -ForegroundColor Green
+                                    $successCount++
+                                }
+                                catch {
+                                    if ($_.Exception.Message -match "already linked") {
+                                        Write-Host "   INFO: GPO already linked to this target" -ForegroundColor Yellow
+                                        $successCount++  # Count as success since it's already linked
+                                    } else {
+                                        Write-Host "   ERROR: Failed to link GPO" -ForegroundColor Red
+                                        Write-Host "   REASON: $($_.Exception.Message)" -ForegroundColor Red
+                                        $failureCount++
+                                    }
+                                }
+                            }
+                            
+                            # Show final linking summary
+                            Write-Host "`n GPO Linking Summary:" -ForegroundColor Cyan
+                            Write-Host "   Successful links: $successCount" -ForegroundColor Green
+                            Write-Host "   Failed links: $failureCount" -ForegroundColor $(if ($failureCount -gt 0) { "Red" } else { "Gray" })
+                            Write-Host "   Skipped targets: $($skippedTargets.Count)" -ForegroundColor $(if ($skippedTargets.Count -gt 0) { "Yellow" } else { "Gray" })
+                            
+                        } else {
+                            Write-Host "`n No valid targets found for GPO linking." -ForegroundColor Red
+                            Write-Host " Please review the OU names in the file and ensure they exist in your domain." -ForegroundColor Yellow
+                        }
+                    } else {
+                        Write-Host " GPO linking skipped by user choice." -ForegroundColor Yellow
+                    }
+                } else {
+                    Write-Host " OU file is empty (no targets specified)" -ForegroundColor Yellow
+                    Write-Host " You can manually link the GPO '$GPOName' later using Group Policy Management Console" -ForegroundColor Gray
+                }
+            }
+            catch {
+                Write-Host " Could not read OU file contents: $($_.Exception.Message)" -ForegroundColor Red
+            }
+        } else {
+            Write-Host " Warning: OU file was not created successfully" -ForegroundColor Red
+        }
     }
+    
     
     Write-Host "`n Azure Arc deployment completed successfully!" -ForegroundColor Green
     Write-Host " Service principal details saved to: $($ArcServerOnboardingDetail.FullName)" -ForegroundColor Gray
     Write-Host "  Note: Service principal secret was not saved to file for security reasons." -ForegroundColor Yellow
     Write-Host " Remote share created: \\$env:COMPUTERNAME\$RemoteShare" -ForegroundColor Gray
-    Write-Host " GPO '$GPOName' linked to $($OUs.Count) organizational unit(s)" -ForegroundColor Gray
+    Write-Host " GPO '$GPOName' created and ready" -ForegroundColor Gray
+    
+    if ($createOUFile -and (Test-Path $ouFileFullPath)) {
+        Write-Host " OU configuration file: $(Split-Path $ouFileFullPath -Leaf)" -ForegroundColor Gray
+        Write-Host "  File location: $ouFileFullPath" -ForegroundColor Gray
+    }
+    
     Write-Host
     Write-Host " Next Steps:" -ForegroundColor Cyan
-    Write-Host "  1. Verify GPO settings in Group Policy Management Console" -ForegroundColor White
+    Write-Host "  1. Verify GPO settings and linking in Group Policy Management Console" -ForegroundColor White
+    if ($createOUFile) {
+        Write-Host "     - Check if GPO '$GPOName' is properly linked to your desired OUs" -ForegroundColor White
+    }
     Write-Host "  2. Run 'gpupdate /force' on target devices or wait for automatic refresh" -ForegroundColor White
     Write-Host "  3. Monitor Azure Arc onboarding in Azure portal" -ForegroundColor White
     Write-Host "  4. Check device compliance in Microsoft Defender for Cloud" -ForegroundColor White
