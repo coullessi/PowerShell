@@ -68,6 +68,17 @@
         If not specified, the function will prompt the user interactively.
         The default suggestion is the current working directory.
 
+    .PARAMETER DeviceListPath
+        Path to a text file containing a list of device names to diagnose (one per line).
+        Supports multiple path formats including:
+        - Relative paths: .\DeviceList.txt, ..\Devices.txt
+        - Absolute paths: C:\DeviceList.txt, D:\Temp\Devices.txt
+        - Quoted paths: "C:\Device List.txt", 'C:\Azure Arc Devices.txt'
+        
+        If not specified, the function will prompt the user interactively.
+        Lines starting with # are treated as comments and ignored.
+        Empty lines are also ignored.
+
     .PARAMETER Force
         When specified, skips interactive prompts and proceeds with diagnostics
         using either the provided LogPath or the current directory as default.
@@ -79,30 +90,33 @@
     .EXAMPLE
         Get-AzureArcDiagnostic
         
-        # Interactive mode - prompts user for log directory selection
-        # Uses current directory as default suggestion
+        # Interactive mode - prompts user for log directory and device list selection
+        # Uses current directory as default suggestion for logs
+        # Creates default device list with sample entries for editing
         # Displays comprehensive progress and status information
 
     .EXAMPLE
         Get-AzureArcDiagnostic -LogPath "C:\AzureArcDiagnostics"
         
         # Specifies custom directory for diagnostic output
+        # Prompts for device list interactively
         # Creates directory if it doesn't exist
         # Stores all logs and ZIP files in specified location
 
     .EXAMPLE
-        Get-AzureArcDiagnostic -LogPath ".\Logs" -Force
+        Get-AzureArcDiagnostic -DeviceListPath "C:\DeviceList.txt" -LogPath ".\Logs"
         
-        # Uses relative path for log storage
-        # Skips interactive prompts with Force parameter
-        # Proceeds directly with diagnostic collection
+        # Uses existing device list file and relative path for log storage
+        # Processes all devices listed in the file
+        # Creates separate diagnostic logs for each device
 
     .EXAMPLE
-        Get-AzureArcDiagnostic -LogPath '"C:\Azure Arc Diagnostics"' -Quiet
+        Get-AzureArcDiagnostic -DeviceListPath ".\Devices.txt" -Force -Quiet
         
-        # Uses quoted path with spaces
+        # Uses relative path for device list
+        # Skips interactive prompts with Force parameter
         # Suppresses detailed output with Quiet parameter
-        # Displays only essential information
+        # Proceeds directly with diagnostic collection for all listed devices
 
     .INPUTS
         None. This function does not accept pipeline input.
@@ -153,6 +167,9 @@
         [ValidateNotNullOrEmpty()]
         [string]$LogPath,
 
+        [Parameter(Mandatory = $false, HelpMessage = "Path to a text file containing a list of device names to diagnose (one per line)")]
+        [string]$DeviceListPath,
+
         [Parameter(Mandatory = $false, HelpMessage = "Skip interactive prompts")]
         [switch]$Force,
 
@@ -164,38 +181,347 @@
     )
 
     begin {
-        # Initialize function
-        if (-not $Quiet) {
-            Write-Host ""
-            Write-Host "Azure Arc Diagnostic Collection Tool"
-            Write-Host "====================================="
-            Write-Host "Comprehensive Agent Health and Connectivity Analysis"
-            Write-Host ""
+        # Function to clean and validate paths (same as Get-AzureArcPrerequisite)
+        function Get-CleanPath {
+            param([string]$InputPath, [bool]$IsDirectory = $true)
+            
+            if ([string]::IsNullOrWhiteSpace($InputPath)) {
+                return $null
+            }
+            
+            # Clean up the path - remove surrounding quotes and trim whitespace
+            $cleanedPath = $InputPath.Trim()
+            
+            # Remove surrounding quotes (single or double) only if they match and the string is long enough
+            if ($cleanedPath.Length -ge 2) {
+                if (($cleanedPath.StartsWith('"') -and $cleanedPath.EndsWith('"')) -or 
+                    ($cleanedPath.StartsWith("'") -and $cleanedPath.EndsWith("'"))) {
+                    $cleanedPath = $cleanedPath.Substring(1, $cleanedPath.Length - 2)
+                }
+            }
+            
+            # Validate that it's a valid path format
+            try {
+                $cleanedPath = [System.IO.Path]::GetFullPath($cleanedPath)
+                return $cleanedPath
+            } catch {
+                return $null
+            }
         }
 
-        # Validate Azure Arc agent availability
+        # Initialize script-level variables
+        $script:allResults = @{}
+        $script:deviceResults = @{}
+        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+        $defaultLocation = $env:USERPROFILE + "\Desktop"
+
+        # Check if Azure Arc agent is available (but don't fail immediately - wait until actual diagnostic execution)
+        $script:azcmagentAvailable = $false
         try {
             $azcmagentPath = Get-Command "azcmagent" -ErrorAction Stop
+            $script:azcmagentAvailable = $true
             if (-not $Quiet) {
-                Write-Host "Azure Connected Machine Agent found: $($azcmagentPath.Source)"
+                Write-Host "Azure Connected Machine Agent found: $($azcmagentPath.Source)" -ForegroundColor Green
             }
         }
         catch {
-            Write-Error "Azure Connected Machine Agent (azcmagent) not found in PATH. Please ensure Azure Arc agent is installed."
-            Write-Error "Download from: https://aka.ms/AzureConnectedMachineAgent"
-            return $false
+            # Don't fail here - we'll handle this during actual diagnostic execution
+            if (-not $Quiet) {
+                Write-Host "Azure Connected Machine Agent (azcmagent) not found in PATH" -ForegroundColor Yellow
+                Write-Host "Note: Agent installation will be required for diagnostic execution" -ForegroundColor Gray
+            }
         }
-
-        # Generate timestamp for file naming
-        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-        
-        # Initialize success tracking
-        $overallSuccess = $true
-        $diagnosticResults = @()
     }
 
     process {
+        # Set up device list handling with simplified logic (same as Get-AzureArcPrerequisite)
+        if (-not $Quiet) {
+            Write-Host ""
+            Write-Host " DEVICE LIST SETUP" -ForegroundColor Yellow
+            Write-Host ""
+        }
+        
+        if ([string]::IsNullOrWhiteSpace($DeviceListPath)) {
+            if (-not $Force) {
+                Write-Host "   Supported formats: D:\Path\DeviceList.txt, 'D:\Path\file.csv', `"D:\Path\Device List.txt`"" -ForegroundColor Gray
+                Write-Host ""
+                
+                $deviceFileInput = Read-Host "   Enter device list file path (or press Enter for local machine only)"
+                
+                if ([string]::IsNullOrWhiteSpace($deviceFileInput)) {
+                    # No device list - use local machine only
+                    if (-not $Quiet) {
+                        Write-Host "   Using local machine only: $env:COMPUTERNAME" -ForegroundColor White
+                    }
+                } else {
+                    # User provided a device file path
+                    $cleanedFilePath = Get-CleanPath -InputPath $deviceFileInput -IsDirectory $false
+                    
+                    if (-not $cleanedFilePath) {
+                        Write-Host "   [WARN] Invalid file path format. Using local machine only..." -ForegroundColor Yellow
+                    } elseif (Test-Path $cleanedFilePath) {
+                        # Existing file found
+                        $DeviceListPath = $cleanedFilePath
+                        if (-not $Quiet) {
+                            Write-Host "   [OK] Found existing device list: $DeviceListPath" -ForegroundColor Green
+                        }
+                        
+                        $editChoice = Read-Host "   Edit the device list before proceeding? [Y/N] (default: N)"
+                        if ($editChoice -eq "Y" -or $editChoice -eq "y") {
+                            if (-not $Quiet) {
+                                Write-Host ""
+                                Write-Host "   Opening device list in Notepad for editing..." -ForegroundColor Cyan
+                                Write-Host "   Close Notepad when done to continue the script." -ForegroundColor White
+                                Write-Host ""
+                            }
+                            
+                            try {
+                                $notepadProcess = Start-Process -FilePath "notepad.exe" -ArgumentList $DeviceListPath -PassThru
+                                $notepadProcess.WaitForExit()
+                                if (-not $Quiet) {
+                                    Write-Host "   [OK] Device list editing completed" -ForegroundColor Green
+                                }
+                            } catch {
+                                if (-not $Quiet) {
+                                    Write-Host "   [WARN] Could not open Notepad: $($_.Exception.Message)" -ForegroundColor Yellow
+                                    Write-Host "   Continuing with existing device list..." -ForegroundColor White
+                                }
+                            }
+                        } else {
+                            if (-not $Quiet) {
+                                Write-Host "   [OK] Using device list as-is" -ForegroundColor Green
+                            }
+                        }
+                    } else {
+                        # File doesn't exist - create default device list
+                        $fileInfo = [System.IO.FileInfo]$cleanedFilePath
+                        $directory = $fileInfo.DirectoryName
+                        $baseName = [System.IO.Path]::GetFileNameWithoutExtension($fileInfo.Name)
+                        $extension = $fileInfo.Extension
+                        
+                        if ([string]::IsNullOrEmpty($extension)) {
+                            $extension = ".txt"
+                        }
+                        
+                        $timestampedFileName = "${baseName}_${timestamp}${extension}"
+                        $script:deviceListFile = Join-Path $directory $timestampedFileName
+                        
+                        # Ensure directory exists
+                        if (-not (Test-Path $directory)) {
+                            try {
+                                New-Item -Path $directory -ItemType Directory -Force | Out-Null
+                                if (-not $Quiet) {
+                                    Write-Host "   [OK] Created directory: $directory" -ForegroundColor Green
+                                }
+                            } catch {
+                                Write-Host "   [FAIL] Failed to create directory: $($_.Exception.Message)" -ForegroundColor Red
+                                Write-Host "   Using default location instead..." -ForegroundColor Yellow
+                                $script:deviceListFile = Join-Path $defaultLocation "DeviceList_$timestamp.txt"
+                            }
+                        }
+                        
+                        # Create default device list content
+                        $defaultContent = @"
+# Azure Arc Device List for Diagnostics
+# Enter one device name per line
+# Lines starting with # are comments and will be ignored
+#
+# Examples:
+# SERVER01
+# SERVER02
+#
+# Add your device names below:
+$env:COMPUTERNAME
+"@
+                        
+                        try {
+                            $defaultContent | Out-File -FilePath $script:deviceListFile -Encoding UTF8
+                            if (-not $Quiet) {
+                                Write-Host "   [OK] Default device list created: $script:deviceListFile" -ForegroundColor Green
+                            }
+                            $DeviceListPath = $script:deviceListFile
+                            
+                            if (-not $Quiet) {
+                                Write-Host ""
+                                Write-Host "   Opening device list in Notepad for editing..." -ForegroundColor Cyan
+                                Write-Host "   Review/edit your device names and save the file." -ForegroundColor White
+                                Write-Host "   Close Notepad when done to continue the script." -ForegroundColor White
+                                Write-Host ""
+                            }
+                            
+                            try {
+                                $notepadProcess = Start-Process -FilePath "notepad.exe" -ArgumentList $script:deviceListFile -PassThru
+                                $notepadProcess.WaitForExit()
+                                if (-not $Quiet) {
+                                    Write-Host "   [OK] Device list editing completed" -ForegroundColor Green
+                                }
+                            } catch {
+                                if (-not $Quiet) {
+                                    Write-Host "   [WARN] Could not open Notepad: $($_.Exception.Message)" -ForegroundColor Yellow
+                                    Write-Host "   Continuing with default device list..." -ForegroundColor White
+                                }
+                            }
+                            
+                        } catch {
+                            Write-Host "   [FAIL] Failed to create device list file: $($_.Exception.Message)" -ForegroundColor Red
+                            Write-Host "   Using local machine only..." -ForegroundColor Yellow
+                            $DeviceListPath = $null
+                        }
+                    }
+                }
+            } else {
+                # Force mode - use local machine only
+                if (-not $Quiet) {
+                    Write-Host "   Force mode: Using local machine only: $env:COMPUTERNAME" -ForegroundColor White
+                }
+            }
+        } else {
+            # DeviceListPath was provided as parameter - validate and clean it
+            if (-not $Quiet) {
+                Write-Host "   Using provided device list parameter: $DeviceListPath" -ForegroundColor White
+            }
+            
+            $cleanedDeviceListPath = Get-CleanPath -InputPath $DeviceListPath -IsDirectory $false
+            
+            if (-not $cleanedDeviceListPath) {
+                Write-Host "   [WARN] Invalid device list path format provided" -ForegroundColor Yellow
+                Write-Host "   Using local machine only..." -ForegroundColor Yellow
+                $DeviceListPath = $null
+            } elseif (-not (Test-Path $cleanedDeviceListPath)) {
+                Write-Host "   [WARN] Provided device list file not found: $cleanedDeviceListPath" -ForegroundColor Yellow
+                Write-Host "   Using local machine only..." -ForegroundColor Yellow
+                $DeviceListPath = $null
+            } else {
+                $DeviceListPath = $cleanedDeviceListPath
+                if (-not $Quiet) {
+                    Write-Host "   [OK] Device list file verified" -ForegroundColor Green
+                }
+            }
+        }
+        
+        # Set up log file path (use same directory as device list or default) - Same as Get-AzureArcPrerequisite
+        if ($DeviceListPath) {
+            $logDirectory = [System.IO.Path]::GetDirectoryName($DeviceListPath)
+            $script:globalLogFile = Join-Path $logDirectory "AzureArc_Diagnostics_$timestamp.log"
+        } else {
+            $script:globalLogFile = Join-Path $defaultLocation "AzureArc_Diagnostics_$timestamp.log"
+        }
+
         try {
+            Clear-Host
+            Write-Host ""
+            Write-Host " ██████╗ ██╗ █████╗  ██████╗ ███╗   ██╗ ██████╗ ███████╗████████╗██╗ ██████╗███████╗" -ForegroundColor Cyan
+            Write-Host " ██╔══██╗██║██╔══██╗██╔════╝ ████╗  ██║██╔═══██╗██╔════╝╚══██╔══╝██║██╔════╝██╔════╝" -ForegroundColor Cyan
+            Write-Host " ██║  ██║██║███████║██║  ███╗██╔██╗ ██║██║   ██║███████╗   ██║   ██║██║     ███████╗" -ForegroundColor Cyan
+            Write-Host " ██║  ██║██║██╔══██║██║   ██║██║╚██╗██║██║   ██║╚════██║   ██║   ██║██║     ╚════██║" -ForegroundColor Cyan
+            Write-Host " ██████╔╝██║██║  ██║╚██████╔╝██║ ╚████║╚██████╔╝███████║   ██║   ██║╚██████╗███████║" -ForegroundColor Cyan
+            Write-Host " ╚═════╝ ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═╝ ╚═════╝╚══════╝" -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host " AZURE ARC DIAGNOSTIC COLLECTION" -ForegroundColor Green
+            Write-Host " Comprehensive Agent Health and Connectivity Analysis" -ForegroundColor Gray
+            Write-Host ""
+
+            # Log session start
+            ("=" * 100) | Out-File -FilePath $script:globalLogFile
+            "AZURE ARC DIAGNOSTIC COLLECTION SESSION" | Out-File -FilePath $script:globalLogFile -Append
+            ("=" * 100) | Out-File -FilePath $script:globalLogFile -Append
+            "Started: $(Get-Date)" | Out-File -FilePath $script:globalLogFile -Append
+            "Parameters: Force=$Force, Quiet=$Quiet, UseStandardizedDirectory=$UseStandardizedDirectory" | Out-File -FilePath $script:globalLogFile -Append
+            if ($DeviceListPath) {
+                "Device List File: $DeviceListPath" | Out-File -FilePath $script:globalLogFile -Append
+            }
+            "Log File Directory: $([System.IO.Path]::GetDirectoryName($script:globalLogFile))" | Out-File -FilePath $script:globalLogFile -Append
+            "" | Out-File -FilePath $script:globalLogFile -Append
+
+            # Initialize device testing variables
+            $deviceResults = @{}
+            $overallRecommendations = @()
+            $devicesToDiagnose = @()
+            
+            # Determine devices to diagnose
+            if ($DeviceListPath -and (Test-Path $DeviceListPath)) {
+                Write-Host " LOADING DEVICE LIST" -ForegroundColor Yellow
+                Write-Host ""
+                Write-Host "   Reading device list from: $DeviceListPath" -ForegroundColor White
+                
+                try {
+                    $deviceListContent = Get-Content $DeviceListPath -ErrorAction Stop
+                    $devicesToDiagnose = $deviceListContent | Where-Object { 
+                        $_.Trim() -ne "" -and -not $_.Trim().StartsWith("#") 
+                    } | ForEach-Object { $_.Trim() }
+                    
+                    if ($devicesToDiagnose.Count -eq 0) {
+                        Write-Host "   [WARN] No valid device names found in device list" -ForegroundColor Yellow
+                        Write-Host "   Using local machine only..." -ForegroundColor White
+                        $devicesToDiagnose = @($env:COMPUTERNAME)
+                    } else {
+                        if (-not $Quiet) {
+                            Write-Host "   [OK] Found $($devicesToDiagnose.Count) device(s) to diagnose" -ForegroundColor Green
+                            $devicesToDiagnose | ForEach-Object { Write-Host "     - $_" -ForegroundColor Gray }
+                        }
+                    }
+                    
+                    # Log device list
+                    "DEVICE LIST PROCESSING" | Out-File -FilePath $script:globalLogFile -Append
+                    ("-" * 50) | Out-File -FilePath $script:globalLogFile -Append
+                    "Total devices found: $($devicesToDiagnose.Count)" | Out-File -FilePath $script:globalLogFile -Append
+                    $devicesToDiagnose | ForEach-Object { "  - $_" | Out-File -FilePath $script:globalLogFile -Append }
+                    "" | Out-File -FilePath $script:globalLogFile -Append
+                    
+                } catch {
+                    Write-Host "   [FAIL] Failed to read device list: $($_.Exception.Message)" -ForegroundColor Red
+                    Write-Host "   Using local machine only..." -ForegroundColor White
+                    $devicesToDiagnose = @($env:COMPUTERNAME)
+                    
+                    "ERROR: Failed to read device list - $($_.Exception.Message)" | Out-File -FilePath $script:globalLogFile -Append
+                    "Defaulting to local machine: $env:COMPUTERNAME" | Out-File -FilePath $script:globalLogFile -Append
+                    "" | Out-File -FilePath $script:globalLogFile -Append
+                }
+            } else {
+                Write-Host "   No device list provided, using local machine only" -ForegroundColor White
+                $devicesToDiagnose = @($env:COMPUTERNAME)
+                
+                "DEVICE LIST: Not provided - using local machine only" | Out-File -FilePath $script:globalLogFile -Append
+                "Device: $env:COMPUTERNAME" | Out-File -FilePath $script:globalLogFile -Append
+                "" | Out-File -FilePath $script:globalLogFile -Append
+            }
+
+            Write-Host ""
+            Write-Host " RUNNING DIAGNOSTICS ON $($devicesToDiagnose.Count) DEVICE(S)" -ForegroundColor Green
+            Write-Host ""
+
+            # Validate Azure Arc agent is available before proceeding with diagnostics
+            if (-not $script:azcmagentAvailable) {
+                Write-Host ""
+                Write-Host " AZURE ARC AGENT REQUIRED" -ForegroundColor Red
+                Write-Host ""
+                Write-Host "   The Azure Connected Machine Agent (azcmagent) is required for diagnostic collection." -ForegroundColor White
+                Write-Host "   Please install the agent before running diagnostics." -ForegroundColor White
+                Write-Host ""
+                Write-Host "   Download from: https://aka.ms/AzureConnectedMachineAgent" -ForegroundColor Cyan
+                Write-Host ""
+                
+                # Log the requirement
+                "AZURE ARC AGENT REQUIREMENT CHECK" | Out-File -FilePath $script:globalLogFile -Append
+                ("-" * 50) | Out-File -FilePath $script:globalLogFile -Append
+                "FAILED: Azure Connected Machine Agent (azcmagent) not found in PATH" | Out-File -FilePath $script:globalLogFile -Append
+                "RESOLUTION: Install Azure Arc agent from https://aka.ms/AzureConnectedMachineAgent" | Out-File -FilePath $script:globalLogFile -Append
+                "Diagnostic collection cannot proceed without the agent" | Out-File -FilePath $script:globalLogFile -Append
+                "" | Out-File -FilePath $script:globalLogFile -Append
+                
+                if (-not $Force) {
+                    $continueChoice = Read-Host "   Continue anyway (diagnostics will fail)? [y/N]"
+                    if ($continueChoice -ne "y" -and $continueChoice -ne "Y") {
+                        Write-Host "   Diagnostic collection cancelled by user." -ForegroundColor Yellow
+                        return $false
+                    }
+                    Write-Host "   Proceeding with diagnostic collection (expect failures)..." -ForegroundColor Yellow
+                } else {
+                    Write-Host "   Force mode: Proceeding with diagnostic collection (expect failures)..." -ForegroundColor Yellow
+                }
+                Write-Host ""
+            }
+
             # Handle log path selection with standardized directory support
             if ($UseStandardizedDirectory) {
                 # Use standardized directory system
@@ -301,325 +627,412 @@
                 return $false
             }
 
-            # Initialize log file
-            $logFile = Join-Path $LogPath "AzureArc_Diagnostic_$timestamp.log"
-            $logContent = @()
-            
-            # Log header
-            $logContent += "AZURE ARC DIAGNOSTIC COLLECTION REPORT"
-            $logContent += "======================================="
-            $logContent += "Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-            $logContent += "Computer: $env:COMPUTERNAME"
-            $logContent += "User: $env:USERNAME"
-            $logContent += "PowerShell Version: $($PSVersionTable.PSVersion)"
-            $logContent += "---------------------------------------"
-            $logContent += ""
-
             if (-not $Quiet) {
                 Write-Host ""
-                Write-Host "Starting Azure Arc Diagnostic Collection..."
-                Write-Host "Log file: $logFile"
+                Write-Host "Starting Azure Arc Diagnostic Collection for $($devicesToDiagnose.Count) device(s)..."
+                Write-Host "Output Directory: $LogPath"
                 Write-Host ""
             }
 
-            # Define diagnostic commands
-            $diagnosticCommands = @(
-                @{
-                    Name = "Agent Status and Configuration"
-                    Command = "azcmagent show"
-                    Description = "Retrieves comprehensive agent configuration, connection status, and metadata"
-                    Step = 1
-                },
-                @{
-                    Name = "Connectivity and Health Check"
-                    Command = "azcmagent check"
-                    Description = "Performs comprehensive connectivity tests and health validation"
-                    Step = 2
-                },
-                @{
-                    Name = "Complete Log Collection"
-                    Command = "azcmagent logs --full"
-                    Description = "Generates complete diagnostic log archive with all available data"
-                    Step = 3
+            # Process each device
+            $overallSuccess = $true
+            foreach ($deviceName in $devicesToDiagnose) {
+                $isLocalMachine = ($deviceName -eq $env:COMPUTERNAME -or $deviceName -eq "localhost" -or $deviceName -eq ".")
+                
+                Write-Host " DEVICE: $deviceName" -ForegroundColor Cyan
+                Write-Host " $("=" * ($deviceName.Length + 8))" -ForegroundColor Cyan
+                Write-Host ""
+                
+                # Initialize device result
+                $deviceResult = @{
+                    DeviceName = $deviceName
+                    IsLocalMachine = $isLocalMachine
+                    DiagnosticResults = @()
+                    OverallSuccess = $true
+                    Warnings = @()
+                    Errors = @()
+                    TestDateTime = Get-Date
+                    ZipFiles = @()
                 }
-            )
+                
+                # Log device section start
+                ("=" * 100) | Out-File -FilePath $script:globalLogFile -Append
+                "DEVICE: $deviceName" | Out-File -FilePath $script:globalLogFile -Append
+                ("=" * 100) | Out-File -FilePath $script:globalLogFile -Append
+                "Diagnostic Started: $(Get-Date)" | Out-File -FilePath $script:globalLogFile -Append
+                "Local Machine: $isLocalMachine" | Out-File -FilePath $script:globalLogFile -Append
+                "" | Out-File -FilePath $script:globalLogFile -Append
 
-            $totalSteps = $diagnosticCommands.Count
-
-            # Execute diagnostic commands
-            foreach ($diagnostic in $diagnosticCommands) {
-                if (-not $Quiet) {
-                    Write-Step -Message "Step $($diagnostic.Step)/$totalSteps`: $($diagnostic.Name)"
-                    Write-Progress -Activity "Azure Arc Diagnostics" -Status $diagnostic.Name -PercentComplete (($diagnostic.Step / $totalSteps) * 100)
-                }
-
-                $logContent += "[$($diagnostic.Step)/$totalSteps] $($diagnostic.Name.ToUpper())"
-                $logContent += "Command: $($diagnostic.Command)"
-                $logContent += "Description: $($diagnostic.Description)"
-                $logContent += "Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-                $logContent += "------------------------------------------------------------"
-
-                try {
-                    if (-not $Quiet) {
-                        Write-Host "   Executing: $($diagnostic.Command)"
-                    }
-
-                    # Execute command and capture output
-                    $startTime = Get-Date
+                # Check if this is a remote device (not implemented for remote execution yet)
+                if (-not $isLocalMachine) {
+                    Write-Host "   [WARN] Remote diagnostics not implemented yet for: $deviceName" -ForegroundColor Yellow
+                    Write-Host "   This device will be skipped in this version." -ForegroundColor White
                     
-                    if ($diagnostic.Command -eq "azcmagent logs --full") {
-                        # Special handling for logs command - it generates files
-                        # Set environment variable to remove 'unknown' from filename
-                        $env:COMPUTERNAME_OVERRIDE = $env:COMPUTERNAME
-                        $output = `& cmd.exe /c "cd /d `"$LogPath`" &`& set COMPUTERNAME=$env:COMPUTERNAME &`& $($diagnostic.Command) 2>`&1"
-                        
-                        # Post-process to rename any files with 'unknown' in the name
-                        $zipFiles = Get-ChildItem -Path $LogPath -Filter "*unknown*.zip" -ErrorAction SilentlyContinue
-                        foreach ($zipFile in $zipFiles) {
-                            $newName = $zipFile.Name -replace '-unknown', ''
-                            $newPath = Join-Path $LogPath $newName
-                            try {
-                                Rename-Item -Path $zipFile.FullName -NewName $newName -Force
-                                if (-not $Quiet) {
-                                    Write-Host "   Renamed log archive: $newName"
-                                }
-                            }
-                            catch {
-                                if (-not $Quiet) {
-                                    Write-Host "   Could not rename $($zipFile.Name)"
-                                }
-                            }
-                        }
-                    }
-                    else {
-                        $output = `& cmd.exe /c "$($diagnostic.Command) 2>`&1"
-                    }
+                    "WARNING: Remote diagnostics not implemented" | Out-File -FilePath $script:globalLogFile -Append
+                    "This device was skipped during diagnostic collection" | Out-File -FilePath $script:globalLogFile -Append
+                    "" | Out-File -FilePath $script:globalLogFile -Append
                     
-                    $endTime = Get-Date
-                    $duration = ($endTime - $startTime).TotalSeconds
-
-                    # Process and log output
-                    if ($output) {
-                        $outputString = $output -join "`n"
-                        $logContent += "OUTPUT:"
-                        $logContent += $outputString
-                        
-                        # Display summary for user
-                        if (-not $Quiet) {
-                            $outputLines = $outputString -split "`n"
-                            $displayLines = $outputLines | Select-Object -First 5
-                            foreach ($line in $displayLines) {
-                                if ($line.Trim()) {
-                                    Write-Host "   $line"
-                                }
-                            }
-                            if ($outputLines.Count -gt 5) {
-                                Write-Host "   ... (additional output in log file)"
-                            }
-                        }
-                    }
-                    else {
-                        $logContent += "OUTPUT: (No output or command completed silently)"
-                    }
-
-                    $logContent += ""
-                    $logContent += "EXECUTION DETAILS:"
-                    $logContent += "Duration: $([math]::Round($duration, 2)) seconds"
-                    $logContent += "Exit Code: $LASTEXITCODE"
-                    
-                    # Determine success/failure
-                    $commandSuccess = $LASTEXITCODE -eq 0
-                    if ($commandSuccess) {
-                        $logContent += "Status: SUCCESS"
-                        if (-not $Quiet) {
-                            Write-Host "   Completed successfully ($([math]::Round($duration, 2))s)"
-                        }
-                    }
-                    else {
-                        $logContent += "Status: FAILED"
-                        $overallSuccess = $false
-                        if (-not $Quiet) {
-                            Write-Host "   Command failed (Exit Code: $LASTEXITCODE)"
-                        }
-                    }
-
-                    # Store result for summary
-                    $diagnosticResults += @{
-                        Step = $diagnostic.Step
-                        Name = $diagnostic.Name
-                        Command = $diagnostic.Command
-                        Success = $commandSuccess
-                        Duration = $duration
-                        ExitCode = $LASTEXITCODE
-                    }
-                }
-                catch {
-                    $errorMessage = $_.Exception.Message
-                    $logContent += "ERROR: $errorMessage"
-                    $logContent += "Status: FAILED"
-                    $overallSuccess = $false
-                    
-                    if (-not $Quiet) {
-                        Write-Host "   Error: $errorMessage"
-                    }
-
-                    $diagnosticResults += @{
-                        Step = $diagnostic.Step
-                        Name = $diagnostic.Name
-                        Command = $diagnostic.Command
+                    $deviceResult.OverallSuccess = $false
+                    $deviceResult.Warnings += "Remote diagnostics not implemented yet"
+                    $deviceResult.DiagnosticResults += @{
+                        Step = 1
+                        Name = "Remote Diagnostics"
+                        Command = "N/A"
                         Success = $false
                         Duration = 0
                         ExitCode = -1
-                        Error = $errorMessage
+                        Error = "Remote diagnostics not implemented yet"
                     }
+                    
+                    $deviceResults[$deviceName] = $deviceResult
+                    $overallSuccess = $false
+                    continue
                 }
 
-                $logContent += ""
-                $logContent += "------------------------------------------------------------"
-                $logContent += ""
+                # Define diagnostic commands for local machine
+                $diagnosticCommands = @(
+                    @{
+                        Name = "Agent Status and Configuration"
+                        Command = "azcmagent show"
+                        Description = "Retrieves comprehensive agent configuration, connection status, and metadata"
+                        Step = 1
+                    },
+                    @{
+                        Name = "Connectivity and Health Check"
+                        Command = "azcmagent check"
+                        Description = "Performs comprehensive connectivity tests and health validation"
+                        Step = 2
+                    },
+                    @{
+                        Name = "Complete Log Collection"
+                        Command = "azcmagent logs --full"
+                        Description = "Generates complete diagnostic log archive with all available data"
+                        Step = 3
+                    }
+                )
 
-                if (-not $Quiet) {
+                $totalSteps = $diagnosticCommands.Count
+
+                # Log diagnostic commands section
+                "DIAGNOSTIC COMMANDS EXECUTION" | Out-File -FilePath $script:globalLogFile -Append
+                ("-" * 50) | Out-File -FilePath $script:globalLogFile -Append
+                # Execute diagnostic commands for this device
+                foreach ($diagnostic in $diagnosticCommands) {
+                    Write-Host "   Step $($diagnostic.Step)/$totalSteps`: $($diagnostic.Name)" -ForegroundColor Yellow
+                    Write-Progress -Activity "Azure Arc Diagnostics - $deviceName" -Status $diagnostic.Name -PercentComplete (($diagnostic.Step / $totalSteps) * 100)
+
+                    "[$($diagnostic.Step)/$totalSteps] $($diagnostic.Name.ToUpper())" | Out-File -FilePath $script:globalLogFile -Append
+                    "Command: $($diagnostic.Command)" | Out-File -FilePath $script:globalLogFile -Append
+                    "Description: $($diagnostic.Description)" | Out-File -FilePath $script:globalLogFile -Append
+                    "Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath $script:globalLogFile -Append
+                    "------------------------------------------------------------" | Out-File -FilePath $script:globalLogFile -Append
+
+                    try {
+                        Write-Host "     Executing: $($diagnostic.Command)" -ForegroundColor White
+
+                        # Check if agent is available before execution
+                        if (-not $script:azcmagentAvailable) {
+                            throw "Azure Connected Machine Agent (azcmagent) not found in PATH. Please install the agent before running diagnostics."
+                        }
+
+                        # Execute command and capture output
+                        $startTime = Get-Date
+                        
+                        if ($diagnostic.Command -eq "azcmagent logs --full") {
+                            # Special handling for logs command - it generates files
+                            # Create device-specific subdirectory for log archives in same location as global log
+                            $deviceLogDir = Join-Path ([System.IO.Path]::GetDirectoryName($script:globalLogFile)) $deviceName
+                            if (-not (Test-Path $deviceLogDir)) {
+                                New-Item -Path $deviceLogDir -ItemType Directory -Force | Out-Null
+                            }
+                            
+                            # Set environment variable to remove 'unknown' from filename
+                            $env:COMPUTERNAME_OVERRIDE = $deviceName
+                            $output = & cmd.exe /c "cd /d `"$deviceLogDir`" && set COMPUTERNAME=$deviceName && $($diagnostic.Command) 2>&1"
+                            
+                            # Post-process to rename any files with 'unknown' in the name
+                            $zipFiles = Get-ChildItem -Path $deviceLogDir -Filter "*unknown*.zip" -ErrorAction SilentlyContinue
+                            foreach ($zipFile in $zipFiles) {
+                                $newName = $zipFile.Name -replace '-unknown', ''
+                                try {
+                                    Rename-Item -Path $zipFile.FullName -NewName $newName -Force
+                                    Write-Host "     Renamed log archive: $newName" -ForegroundColor Green
+                                    $deviceResult.ZipFiles += Join-Path $deviceLogDir $newName
+                                }
+                                catch {
+                                    Write-Host "     Could not rename $($zipFile.Name)" -ForegroundColor Yellow
+                                    $deviceResult.ZipFiles += $zipFile.FullName
+                                }
+                            }
+                            
+                            # Also check for any other ZIP files created
+                            $allZipFiles = Get-ChildItem -Path $deviceLogDir -Filter "*.zip" -ErrorAction SilentlyContinue | Where-Object { $_.CreationTime -gt $startTime }
+                            foreach ($zipFile in $allZipFiles) {
+                                if ($zipFile.FullName -notin $deviceResult.ZipFiles) {
+                                    $deviceResult.ZipFiles += $zipFile.FullName
+                                }
+                            }
+                        }
+                        else {
+                            $output = & cmd.exe /c "$($diagnostic.Command) 2>&1"
+                        }
+                        
+                        $endTime = Get-Date
+                        $duration = ($endTime - $startTime).TotalSeconds
+
+                        # Process and log output
+                        if ($output) {
+                            $outputString = $output -join "`n"
+                            "OUTPUT:" | Out-File -FilePath $script:globalLogFile -Append
+                            $outputString | Out-File -FilePath $script:globalLogFile -Append
+                            
+                            # Display summary for user
+                            if (-not $Quiet) {
+                                $outputLines = $outputString -split "`n"
+                                $displayLines = $outputLines | Select-Object -First 5
+                                foreach ($line in $displayLines) {
+                                    if ($line.Trim()) {
+                                        Write-Host "     $line" -ForegroundColor Gray
+                                    }
+                                }
+                                if ($outputLines.Count -gt 5) {
+                                    Write-Host "     ... (additional output in log file)" -ForegroundColor Gray
+                                }
+                            }
+                        }
+                        else {
+                            "OUTPUT: (No output or command completed silently)" | Out-File -FilePath $script:globalLogFile -Append
+                        }
+
+                        "" | Out-File -FilePath $script:globalLogFile -Append
+                        "EXECUTION DETAILS:" | Out-File -FilePath $script:globalLogFile -Append
+                        "Duration: $([math]::Round($duration, 2)) seconds" | Out-File -FilePath $script:globalLogFile -Append
+                        "Exit Code: $LASTEXITCODE" | Out-File -FilePath $script:globalLogFile -Append
+                        
+                        # Determine success/failure
+                        $commandSuccess = $LASTEXITCODE -eq 0
+                        if ($commandSuccess) {
+                            "Status: SUCCESS" | Out-File -FilePath $script:globalLogFile -Append
+                            Write-Host "     Completed successfully ($([math]::Round($duration, 2))s)" -ForegroundColor Green
+                        }
+                        else {
+                            "Status: FAILED" | Out-File -FilePath $script:globalLogFile -Append
+                            $deviceResult.OverallSuccess = $false
+                            $overallSuccess = $false
+                            $deviceResult.Errors += "$($diagnostic.Name) failed with exit code $LASTEXITCODE"
+                            Write-Host "     Command failed (Exit Code: $LASTEXITCODE)" -ForegroundColor Red
+                        }
+
+                        # Store result for summary
+                        $deviceResult.DiagnosticResults += @{
+                            Step = $diagnostic.Step
+                            Name = $diagnostic.Name
+                            Command = $diagnostic.Command
+                            Success = $commandSuccess
+                            Duration = $duration
+                            ExitCode = $LASTEXITCODE
+                        }
+                    }
+                    catch {
+                        $errorMessage = $_.Exception.Message
+                        "ERROR: $errorMessage" | Out-File -FilePath $script:globalLogFile -Append
+                        "Status: FAILED" | Out-File -FilePath $script:globalLogFile -Append
+                        $deviceResult.OverallSuccess = $false
+                        $overallSuccess = $false
+                        $deviceResult.Errors += "$($diagnostic.Name) failed: $errorMessage"
+                        
+                        Write-Host "     Error: $errorMessage" -ForegroundColor Red
+
+                        $deviceResult.DiagnosticResults += @{
+                            Step = $diagnostic.Step
+                            Name = $diagnostic.Name
+                            Command = $diagnostic.Command
+                            Success = $false
+                            Duration = 0
+                            ExitCode = -1
+                            Error = $errorMessage
+                        }
+                    }
+
+                    "" | Out-File -FilePath $script:globalLogFile -Append
+                    "------------------------------------------------------------" | Out-File -FilePath $script:globalLogFile -Append
+                    "" | Out-File -FilePath $script:globalLogFile -Append
+
                     Start-Sleep -Milliseconds 500  # Brief pause for readability
                 }
-            }
 
-            # Generate recommendations
-            $logContent += "DIAGNOSTIC SUMMARY AND RECOMMENDATIONS"
-            $logContent += "======================================"
-            $logContent += ""
-
-            $successCount = ($diagnosticResults | Where-Object { $_.Success }).Count
-            $logContent += "Overall Status: $successCount/$totalSteps commands completed successfully"
-            $logContent += ""
-
-            if ($overallSuccess) {
-                $logContent += "RESULT: All diagnostic commands completed successfully"
-                $logContent += ""
-                $logContent += "RECOMMENDATIONS:"
-                $logContent += "- Review the 'azcmagent show' output to verify agent configuration"
-                $logContent += "- Check the 'azcmagent check' results for any connectivity warnings"
-                $logContent += "- Locate and review the generated ZIP file for detailed diagnostics"
-                $logContent += "- If issues persist, contact Microsoft Support with these diagnostic files"
-            }
-            else {
-                $logContent += "RESULT: Some diagnostic commands encountered issues"
-                $logContent += ""
-                $logContent += "TROUBLESHOOTING RECOMMENDATIONS:"
+                # Generate device summary
+                Write-Host ""
                 
-                $failedCommands = $diagnosticResults | Where-Object { -not $_.Success }
-                foreach ($failed in $failedCommands) {
-                    $logContent += ""
-                    $logContent += "FAILED Command: $($failed.Command)"
+                $successCount = ($deviceResult.DiagnosticResults | Where-Object { $_.Success }).Count
+                
+                # Log device summary
+                "DEVICE DIAGNOSTIC SUMMARY" | Out-File -FilePath $script:globalLogFile -Append
+                ("-" * 50) | Out-File -FilePath $script:globalLogFile -Append
+                "Device Status: $successCount/$totalSteps commands completed successfully" | Out-File -FilePath $script:globalLogFile -Append
+                "Diagnostic Completed: $(Get-Date)" | Out-File -FilePath $script:globalLogFile -Append
+                "" | Out-File -FilePath $script:globalLogFile -Append
+                
+                if ($deviceResult.Errors.Count -gt 0) {
+                    "ERRORS ($($deviceResult.Errors.Count)):" | Out-File -FilePath $script:globalLogFile -Append
+                    $deviceResult.Errors | ForEach-Object { "  [FAIL] $_" | Out-File -FilePath $script:globalLogFile -Append }
+                    "" | Out-File -FilePath $script:globalLogFile -Append
+                }
+                
+                if ($deviceResult.Warnings.Count -gt 0) {
+                    "WARNINGS ($($deviceResult.Warnings.Count)):" | Out-File -FilePath $script:globalLogFile -Append
+                    $deviceResult.Warnings | ForEach-Object { "  [WARN] $_" | Out-File -FilePath $script:globalLogFile -Append }
+                    "" | Out-File -FilePath $script:globalLogFile -Append
+                }
+
+                if ($deviceResult.OverallSuccess) {
+                    Write-Host " DEVICE STATUS: DIAGNOSTICS COMPLETED SUCCESSFULLY" -ForegroundColor Green
+                    "RESULT: All diagnostic commands completed successfully for $deviceName" | Out-File -FilePath $script:globalLogFile -Append
+                } else {
+                    Write-Host " DEVICE STATUS: DIAGNOSTICS COMPLETED WITH ISSUES" -ForegroundColor Yellow
+                    "RESULT: Some diagnostic commands encountered issues on $deviceName" | Out-File -FilePath $script:globalLogFile -Append
+                    $overallRecommendations += "Device '$deviceName' has diagnostic issues that should be reviewed"
+                }
+
+                # Store device result
+                $deviceResults[$deviceName] = $deviceResult
+
+                # Clear progress for this device
+                Write-Progress -Activity "Azure Arc Diagnostics - $deviceName" -Completed
+
+                Write-Host ""
+            } # End of device loop
+            # Generate final consolidated summary
+            Write-Host ""
+            Write-Host "" -ForegroundColor Cyan
+            Write-Host "                     DIAGNOSTIC COLLECTION SUMMARY                       " -ForegroundColor Cyan
+            Write-Host "" -ForegroundColor Cyan
+            
+            # Calculate summary statistics
+            $totalDevices = $deviceResults.Count
+            $successfulDevices = @($deviceResults.Values | Where-Object { $_.OverallSuccess }).Count
+            $failedDevices = $totalDevices - $successfulDevices
+            $totalErrors = ($deviceResults.Values | ForEach-Object { $_.Errors.Count } | Measure-Object -Sum).Sum
+            $totalWarnings = ($deviceResults.Values | ForEach-Object { $_.Warnings.Count } | Measure-Object -Sum).Sum
+            
+            # Log final summary
+            ("=" * 100) | Out-File -FilePath $script:globalLogFile -Append
+            "FINAL DIAGNOSTIC COLLECTION SUMMARY" | Out-File -FilePath $script:globalLogFile -Append
+            ("=" * 100) | Out-File -FilePath $script:globalLogFile -Append
+            "Completed: $(Get-Date)" | Out-File -FilePath $script:globalLogFile -Append
+            "" | Out-File -FilePath $script:globalLogFile -Append
+            "STATISTICS:" | Out-File -FilePath $script:globalLogFile -Append
+            "Total Devices: $totalDevices" | Out-File -FilePath $script:globalLogFile -Append
+            "Successful: $successfulDevices" | Out-File -FilePath $script:globalLogFile -Append
+            "Failed: $failedDevices" | Out-File -FilePath $script:globalLogFile -Append
+            "Total Errors: $totalErrors" | Out-File -FilePath $script:globalLogFile -Append
+            "Total Warnings: $totalWarnings" | Out-File -FilePath $script:globalLogFile -Append
+            "" | Out-File -FilePath $script:globalLogFile -Append
+            
+            # Display to user
+            Write-Host "Total Devices Processed: $totalDevices"
+            Write-Host "Successful Devices: $successfulDevices" -ForegroundColor $(if ($successfulDevices -eq $totalDevices) { "Green" } else { "Yellow" })
+            Write-Host "Failed Devices: $failedDevices" -ForegroundColor $(if ($failedDevices -eq 0) { "Green" } else { "Red" })
+            Write-Host "Total Errors: $totalErrors" -ForegroundColor $(if ($totalErrors -eq 0) { "Green" } else { "Red" })
+            Write-Host "Total Warnings: $totalWarnings" -ForegroundColor $(if ($totalWarnings -eq 0) { "Green" } else { "Yellow" })
+            Write-Host ""
+            
+            # Show detailed results per device
+            "DEVICE RESULTS:" | Out-File -FilePath $script:globalLogFile -Append
+            foreach ($deviceName in $deviceResults.Keys | Sort-Object) {
+                $deviceResult = $deviceResults[$deviceName]
+                $status = if ($deviceResult.OverallSuccess) { "SUCCESS" } else { "FAILED" }
+                $statusColor = if ($deviceResult.OverallSuccess) { "Green" } else { "Red" }
+                
+                Write-Host "  Device: $deviceName - $status" -ForegroundColor $statusColor
+                "  $deviceName - $status" | Out-File -FilePath $script:globalLogFile -Append
+                
+                if ($deviceResult.DiagnosticResults.Count -gt 0) {
+                    $successfulSteps = ($deviceResult.DiagnosticResults | Where-Object { $_.Success }).Count
+                    Write-Host "    Diagnostic Steps: $successfulSteps/$($deviceResult.DiagnosticResults.Count) completed successfully"
+                    "    Steps: $successfulSteps/$($deviceResult.DiagnosticResults.Count)" | Out-File -FilePath $script:globalLogFile -Append
                     
-                    switch ($failed.Command) {
-                        "azcmagent show" {
-                            $logContent += "   Possible causes:"
-                            $logContent += "   - Azure Arc agent not properly installed or registered"
-                            $logContent += "   - Agent service not running"
-                            $logContent += "   - Insufficient permissions"
-                            $logContent += "   Resolution steps:"
-                            $logContent += "   - Verify agent installation: Get-Service -Name himds"
-                            $logContent += "   - Check agent status: sc query himds"
-                            $logContent += "   - Run as administrator if needed"
-                        }
-                        "azcmagent check" {
-                            $logContent += "   Possible causes:"
-                            $logContent += "   - Network connectivity issues to Azure endpoints"
-                            $logContent += "   - Firewall or proxy blocking connections"
-                            $logContent += "   - DNS resolution problems"
-                            $logContent += "   - Certificate validation issues"
-                            $logContent += "   Resolution steps:"
-                            $logContent += "   - Check internet connectivity and DNS resolution"
-                            $logContent += "   - Verify firewall allows Azure Arc endpoints"
-                            $logContent += "   - Configure proxy settings if required"
-                            $logContent += "   - Update system certificates"
-                        }
-                        "azcmagent logs --full" {
-                            $logContent += "   Possible causes:"
-                            $logContent += "   - Insufficient disk space for log generation"
-                            $logContent += "   - Permission issues writing to target directory"
-                            $logContent += "   - Agent service interruption during log collection"
-                            $logContent += "   Resolution steps:"
-                            $logContent += "   - Ensure sufficient disk space (minimum 100MB)"
-                            $logContent += "   - Run with administrator privileges"
-                            $logContent += "   - Try alternative directory with write access"
+                    if ($deviceResult.ZipFiles.Count -gt 0) {
+                        Write-Host "    Log Archives: $($deviceResult.ZipFiles.Count) ZIP file(s) created"
+                        "    ZIP Files: $($deviceResult.ZipFiles.Count)" | Out-File -FilePath $script:globalLogFile -Append
+                        foreach ($zipFile in $deviceResult.ZipFiles) {
+                            "      - $(Split-Path $zipFile -Leaf)" | Out-File -FilePath $script:globalLogFile -Append
                         }
                     }
+                    
+                    if ($deviceResult.Errors.Count -gt 0) {
+                        "    Errors: $($deviceResult.Errors.Count)" | Out-File -FilePath $script:globalLogFile -Append
+                    }
+                    
+                    if ($deviceResult.Warnings.Count -gt 0) {
+                        "    Warnings: $($deviceResult.Warnings.Count)" | Out-File -FilePath $script:globalLogFile -Append
+                    }
                 }
-                
-                $logContent += ""
-                $logContent += "GENERAL RECOMMENDATIONS:"
-                $logContent += "1. Ensure Azure Connected Machine Agent is properly installed"
-                $logContent += "2. Verify network connectivity to Azure endpoints"
-                $logContent += "3. Run diagnostics with administrator privileges"
-                $logContent += "4. Check Windows Event Logs for additional error details"
-                $logContent += "5. Contact Microsoft Support if issues persist"
-            }
-
-            $logContent += ""
-            $logContent += "ADDITIONAL RESOURCES:"
-            $logContent += "- Azure Arc troubleshooting: https://docs.microsoft.com/en-us/azure/azure-arc/servers/troubleshoot-agent-onboard"
-            $logContent += "- Agent installation guide: https://docs.microsoft.com/en-us/azure/azure-arc/servers/agent-overview"
-            $logContent += "- Network requirements: https://docs.microsoft.com/en-us/azure/azure-arc/servers/network-requirements"
-            $logContent += ""
-            $logContent += "Report generated by ServerProtection PowerShell Module"
-            $logContent += "Author: Lessi Coulibaly | Organization: Less-IT | Website: https://lessit.net"
-            $logContent += "================================================================================"
-
-            # Write log file
-            try {
-                $logContent | Out-File -FilePath $logFile -Encoding UTF8 -Force
-                if (-not $Quiet) {
-                    Write-Host "`nDiagnostic log saved: $logFile"
-                }
-            }
-            catch {
-                Write-Error "Failed to save log file: $($_.Exception.Message)"
-                $overallSuccess = $false
-            }
-
-            # Clear progress
-            Write-Progress -Activity "Azure Arc Diagnostics" -Completed
-
-            # Display final summary
-            if (-not $Quiet) {
                 Write-Host ""
-                Write-Host "" -ForegroundColor Cyan
-                Write-Host "                     DIAGNOSTIC SUMMARY                       " -ForegroundColor Cyan
-                Write-Host "" -ForegroundColor Cyan
-                
-                foreach ($result in $diagnosticResults) {
-                    $status = if ($result.Success) { "SUCCESS" } else { "FAILED" }
-                    Write-Host "  $($result.Step). $($result.Name): $status"
-                    if ($result.Duration -gt 0) {
-                        Write-Host "     Duration: $([math]::Round($result.Duration, 2))s"
-                    }
-                }
-                
-                Write-Host ""
-                Write-Host "Output Directory: $LogPath"
-                Write-Host "Diagnostic Log: $(Split-Path $logFile -Leaf)"
-                
-                # Check for ZIP files created by azcmagent logs
-                $zipFiles = Get-ChildItem -Path $LogPath -Filter "*.zip" | Where-Object { $_.CreationTime -gt (Get-Date).AddMinutes(-10) }
-                if ($zipFiles) {
-                    Write-Host " Log Archives:" -ForegroundColor Cyan
-                    foreach ($zip in $zipFiles) {
-                        Write-Host "    $($zip.Name)" -ForegroundColor Gray
-                    }
-                    Write-Host "    The ZIP file(s) contain comprehensive diagnostic data for further analysis" -ForegroundColor Yellow
-                    Write-Host "    Share these files with Microsoft Support when opening support cases" -ForegroundColor Yellow
-                }
-                
-                if ($overallSuccess) {
-                    Write-Host "`nAll diagnostics completed successfully!"
-                }
-                else {
-                    Write-Host "`nSome diagnostics encountered issues. Review the log file for details."
-                }
-                
-                Write-Host "=================================================================="
+                "" | Out-File -FilePath $script:globalLogFile -Append
             }
+            
+            # Show all ZIP files created
+            $allZipFiles = @()
+            foreach ($deviceResult in $deviceResults.Values) {
+                $allZipFiles += $deviceResult.ZipFiles
+            }
+            
+            if ($allZipFiles.Count -gt 0) {
+                Write-Host "Log Archives Created:" -ForegroundColor Cyan
+                "ALL LOG ARCHIVES:" | Out-File -FilePath $script:globalLogFile -Append
+                foreach ($zipFile in $allZipFiles) {
+                    Write-Host "  $(Split-Path $zipFile -Leaf)" -ForegroundColor Gray
+                    "  $(Split-Path $zipFile -Leaf)" | Out-File -FilePath $script:globalLogFile -Append
+                }
+                Write-Host ""
+                Write-Host "  These ZIP files contain comprehensive diagnostic data for analysis" -ForegroundColor Yellow
+                Write-Host "  Share these files with Microsoft Support when opening support cases" -ForegroundColor Yellow
+                Write-Host ""
+                "" | Out-File -FilePath $script:globalLogFile -Append
+                "NOTE: ZIP files contain comprehensive diagnostic data for analysis" | Out-File -FilePath $script:globalLogFile -Append
+                "Share these files with Microsoft Support when opening support cases" | Out-File -FilePath $script:globalLogFile -Append
+                "" | Out-File -FilePath $script:globalLogFile -Append
+            }
+            
+            # Display final recommendations
+            if ($overallRecommendations.Count -gt 0) {
+                Write-Host "Recommendations:" -ForegroundColor Cyan
+                "RECOMMENDATIONS:" | Out-File -FilePath $script:globalLogFile -Append
+                foreach ($recommendation in $overallRecommendations) {
+                    Write-Host "  - $recommendation" -ForegroundColor Yellow
+                    "  - $recommendation" | Out-File -FilePath $script:globalLogFile -Append
+                }
+                Write-Host ""
+                "" | Out-File -FilePath $script:globalLogFile -Append
+            }
+            
+            # Display output directory
+            Write-Host "Output Directory: $([System.IO.Path]::GetDirectoryName($script:globalLogFile))"
+            Write-Host "Consolidated Log: $(Split-Path $script:globalLogFile -Leaf)" -ForegroundColor Green
+            Write-Host ""
+            
+            "OUTPUT DIRECTORY: $([System.IO.Path]::GetDirectoryName($script:globalLogFile))" | Out-File -FilePath $script:globalLogFile -Append
+            "CONSOLIDATED LOG: $(Split-Path $script:globalLogFile -Leaf)" | Out-File -FilePath $script:globalLogFile -Append
+            "" | Out-File -FilePath $script:globalLogFile -Append
+            
+            # Final status message
+            if ($overallSuccess) {
+                Write-Host "All device diagnostics completed successfully!" -ForegroundColor Green
+                "FINAL RESULT: All device diagnostics completed successfully" | Out-File -FilePath $script:globalLogFile -Append
+            } else {
+                Write-Host "Some device diagnostics encountered issues. Review the consolidated log for details." -ForegroundColor Yellow
+                "FINAL RESULT: Some device diagnostics encountered issues" | Out-File -FilePath $script:globalLogFile -Append
+            }
+            
+            Write-Host "=================================================================="
+            
+            # Add session footer to log
+            ("=" * 100) | Out-File -FilePath $script:globalLogFile -Append
+            "DIAGNOSTIC COLLECTION SESSION COMPLETED: $(Get-Date)" | Out-File -FilePath $script:globalLogFile -Append
+            "Report generated by ServerProtection PowerShell Module" | Out-File -FilePath $script:globalLogFile -Append
+            "Author: Lessi Coulibaly | Organization: Less-IT | Website: https://lessit.net" | Out-File -FilePath $script:globalLogFile -Append
+            ("=" * 100) | Out-File -FilePath $script:globalLogFile -Append
 
             return $overallSuccess
         }

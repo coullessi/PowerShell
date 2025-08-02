@@ -94,7 +94,6 @@
     # Function to display interactive menu
     function Write-InteractiveMenu {
         Write-Host " AVAILABLE COMMANDS:" -ForegroundColor Yellow
-        Write-Host ""
         Write-Host "   [1] Test Azure Arc Prerequisites" -ForegroundColor Green
         Write-Host "        Enhanced prerequisites validation" -ForegroundColor Gray
         Write-Host "        Automatic Azure resource provider registration" -ForegroundColor Gray
@@ -117,7 +116,6 @@
         Write-Host ""
         Write-Host "   [H] Help - Detailed command information" -ForegroundColor Cyan
         Write-Host "   [Q] Quit - Exit the module" -ForegroundColor Cyan
-        Write-Host ""
         Write-Host "" -ForegroundColor Cyan
     }
 
@@ -153,11 +151,11 @@
                 Write-Host "    Multi-device support with detailed reporting" -ForegroundColor White
                 Write-Host ""
                 Write-Host "  DISCLAIMER `& LIABILITY:" -ForegroundColor Magenta
-                Write-Host "    This script is provided 'AS IS' without warranty of any kind" -ForegroundColor White
+                Write-Host "    This script is provided 'AS IS' without warranty of any kind." -ForegroundColor White
                 Write-Host "    The author is not liable for any damages, data loss, or other" -ForegroundColor White
-                Write-Host "     consequences that may result from running this script" -ForegroundColor White
+                Write-Host "    consequences that may result from running this script." -ForegroundColor White
                 Write-Host "    You assume full responsibility for testing and validating" -ForegroundColor White
-                Write-Host "     this script in your environment before production use" -ForegroundColor White
+                Write-Host "    this script in your environment before production use." -ForegroundColor White
                 Write-Host ""
                 Write-Host "" -ForegroundColor Cyan
                 $confirm = Read-Host "Do you want to proceed with prerequisites testing? [Y/N] (default: Y)"
@@ -207,11 +205,11 @@
                 Write-Host "    Enterprise-ready Group Policy deployment" -ForegroundColor White
                 Write-Host ""
                 Write-Host "  DISCLAIMER `& LIABILITY:" -ForegroundColor Magenta
-                Write-Host "    This script is provided 'AS IS' without warranty of any kind" -ForegroundColor White
+                Write-Host "    This script is provided 'AS IS' without warranty of any kind." -ForegroundColor White
                 Write-Host "    The author is not liable for any damages, data loss, or other" -ForegroundColor White
-                Write-Host "     consequences that may result from running this script" -ForegroundColor White
+                Write-Host "    consequences that may result from running this script." -ForegroundColor White
                 Write-Host "    You assume full responsibility for testing and validating" -ForegroundColor White
-                Write-Host "     this script in your environment before production use" -ForegroundColor White
+                Write-Host "    this script in your environment before production use." -ForegroundColor White
                 Write-Host ""
                 Write-Host "" -ForegroundColor Cyan
                 $confirm = Read-Host "Do you want to proceed with complete Azure Arc deployment? [Y/N] (default: Y)"
@@ -262,19 +260,19 @@
                 Write-Host "   " -ForegroundColor Gray
                 Write-Host ""
                 Write-Host " OUTPUT `& DELIVERABLES:" -ForegroundColor Green
-                Write-Host "    Detailed diagnostic log with timestamped results and recommendations" -ForegroundColor White
-                Write-Host "    Complete ZIP archive containing comprehensive Azure Arc diagnostic data" -ForegroundColor White
-                Write-Host "    Professional troubleshooting report suitable for Microsoft Support" -ForegroundColor White
+                Write-Host "    Detailed diagnostic log with timestamped results and recommendations." -ForegroundColor White
+                Write-Host "    Complete ZIP archive containing comprehensive Azure Arc diagnostic data." -ForegroundColor White
+                Write-Host "    Professional troubleshooting report suitable for Microsoft Support." -ForegroundColor White
                 Write-Host ""
                 Write-Host "  DISCLAIMER `& LIABILITY:" -ForegroundColor Magenta
-                Write-Host "    This diagnostic tool is provided 'AS IS' without warranty of any kind" -ForegroundColor White
-                Write-Host "    Diagnostic logs may contain sensitive system information" -ForegroundColor White
-                Write-Host "    Review log contents before sharing with external parties" -ForegroundColor White
-                Write-Host "    Store diagnostic files in secure locations with appropriate access controls" -ForegroundColor White
+                Write-Host "    This diagnostic tool is provided 'AS IS' without warranty of any kind." -ForegroundColor White
+                Write-Host "    Diagnostic logs may contain sensitive system information." -ForegroundColor White
+                Write-Host "    Review log contents before sharing with external parties." -ForegroundColor White
+                Write-Host "    Store diagnostic files in secure locations with appropriate access controls." -ForegroundColor White
                 Write-Host "    The author is not liable for any damages, data loss, or other" -ForegroundColor White
-                Write-Host "     consequences that may result from running this script" -ForegroundColor White
+                Write-Host "    consequences that may result from running this script" -ForegroundColor White
                 Write-Host "    You assume full responsibility for testing and validating" -ForegroundColor White
-                Write-Host "     this script in your environment before production use" -ForegroundColor White
+                Write-Host "    this script in your environment before production use." -ForegroundColor White
 
                 Write-Host ""
                 Write-Host "" -ForegroundColor Cyan
@@ -292,8 +290,14 @@
                         $result = Get-AzureArcDiagnostic
                         if ($result) {
                             Write-Host "`n Azure Arc diagnostics completed successfully." -ForegroundColor Green
+                            Write-Host " All diagnostic checks passed. Review the log file for detailed results." -ForegroundColor White
                         } else {
-                            Write-Host "`n Azure Arc diagnostics completed with some issues. Check the log file for details." -ForegroundColor Yellow
+                            Write-Host "`n Azure Arc diagnostics completed with issues." -ForegroundColor Yellow
+                            Write-Host " Common issues:" -ForegroundColor White
+                            Write-Host "   - Azure Arc agent not installed (download from: https://aka.ms/AzureConnectedMachineAgent)" -ForegroundColor Gray
+                            Write-Host "   - Network connectivity problems" -ForegroundColor Gray
+                            Write-Host "   - Insufficient permissions" -ForegroundColor Gray
+                            Write-Host " Check the consolidated log file for detailed error information." -ForegroundColor White
                         }
                     }
                     catch {

@@ -1,4 +1,36 @@
-﻿function Write-Step {
+﻿function Clear-ConsoleCompletely {
+    <#
+    .SYNOPSIS
+        Completely clears the console screen and buffer.
+    
+    .DESCRIPTION
+        This function performs a thorough console clear that removes all previous output,
+        including any Azure CLI subscription selection tables or other unwanted output.
+    #>
+    try {
+        # Multiple methods to ensure complete clearing
+        Clear-Host
+        
+        # Try to clear console buffer (Windows specific)
+        if ($IsWindows -or (-not (Get-Variable -Name IsWindows -ErrorAction SilentlyContinue))) {
+            try {
+                $host.UI.RawUI.CursorPosition = @{X=0; Y=0}
+                $host.UI.RawUI.BufferSize = $host.UI.RawUI.WindowSize
+            } catch {
+                # Ignore if not supported
+            }
+        }
+        
+        # Alternative clear method
+        [System.Console]::Clear()
+    }
+    catch {
+        # Fallback to basic clear if advanced methods fail
+        Clear-Host
+    }
+}
+
+function Write-Step {
     <#
     .SYNOPSIS
         Writes a formatted step message for progress tracking.
@@ -531,69 +563,102 @@ function Initialize-AzureAuthenticationAndSubscription {
 
         # Configure Azure PowerShell to reduce verbose output while allowing interactive authentication
         $originalWarningPreference = $WarningPreference
-        $WarningPreference = 'SilentlyContinue'
+        $originalProgressPreference = $ProgressPreference
+        $originalInformationPreference = $InformationPreference
         
-        # Disable Azure PowerShell context auto-save to reduce noise
+        $WarningPreference = 'SilentlyContinue'
+        $ProgressPreference = 'SilentlyContinue'
+        $InformationPreference = 'SilentlyContinue'
+        
+        # Disable Azure PowerShell context auto-save and configure for minimal output
         try {
             Disable-AzContextAutosave -Scope Process -ErrorAction SilentlyContinue -WarningAction SilentlyContinue | Out-Null
+            # Set Azure CLI environment variables to minimize output
+            $env:AZURE_CORE_NO_COLOR = "true"
+            $env:AZURE_CORE_OUTPUT = "none"
         } catch {
-            # Ignore if the command fails
+            # Ignore if the commands fail
         }
 
         #region Authentication
-        Write-Host "`[*`] Azure Authentication `& Setup" -ForegroundColor Cyan
-
         # Check if user is authenticated, if not, authenticate
         $context = $null
+        $needsAuthentication = $false
         try {
             $context = Get-AzContext -ErrorAction SilentlyContinue
+            if (-not $context -or -not $context.Account) {
+                $needsAuthentication = $true
+            }
         }
         catch {
             # Context not available, need to authenticate
-            $context = $null
+            $needsAuthentication = $true
         }
         
-        if (-not $context -or -not $context.Account) {
-            Write-Host "`[*`] No Azure authentication found. Authenticating..." -ForegroundColor Yellow
-            Write-Host "Please complete authentication in your browser..." -ForegroundColor Cyan
-            
+        if ($needsAuthentication) {
             try {
-                # Use direct Connect-AzAccount instead of jobs for better reliability
-                $authResult = Connect-AzAccount -ErrorAction Stop -WarningAction SilentlyContinue
+                # Completely suppress all console output during authentication
+                $originalOut = [Console]::Out
+                $originalError = [Console]::Error
+                $nullWriter = New-Object System.IO.StringWriter
                 
-                if ($authResult) {
-                    # Clear the screen to remove any sensitive information
-                    Start-Sleep -Milliseconds 500
-                    Clear-Host
+                try {
+                    # Redirect both output and error streams
+                    [Console]::SetOut($nullWriter)
+                    [Console]::SetError($nullWriter)
                     
-                    Write-Host " Azure Arc `& MDE Prerequisites Checker..." -ForegroundColor Cyan
-                    Write-Host " Authentication completed successfully!" -ForegroundColor Green
-                    
-                    $context = Get-AzContext
-                } else {
-                    throw "Authentication failed - no context returned"
+                    # Authenticate with maximum suppression flags
+                    Connect-AzAccount -Force -SkipContextPopulation -ErrorAction Stop -WarningAction SilentlyContinue -InformationAction SilentlyContinue -ProgressAction SilentlyContinue | Out-Null
+                }
+                finally {
+                    # Always restore console streams
+                    [Console]::SetOut($originalOut)
+                    [Console]::SetError($originalError)
+                    $nullWriter.Dispose()
+                }
+                
+                # Clear screen completely to remove any residual output
+                Clear-ConsoleCompletely
+                
+                # Validate authentication
+                $context = Get-AzContext -ErrorAction SilentlyContinue
+                if (-not $context -or -not $context.Account) {
+                    throw "Authentication completed but no valid context available"
                 }
             }
             catch {
-                Write-Host "`[-`] Authentication failed. Please try again..." -ForegroundColor Red
-                Write-Host "`[-`] Error: $($_.Exception.Message)" -ForegroundColor Red
-                
                 try {
-                    # Second attempt with device code authentication
-                    Write-Host "`[*`] Attempting device code authentication..." -ForegroundColor Yellow
-                    $authResult = Connect-AzAccount -UseDeviceAuthentication -ErrorAction Stop -WarningAction SilentlyContinue
+                    # Ultimate fallback: Use Start-Job to isolate authentication completely
+                    Write-Host "`[*`] Authenticating to Azure (please complete authentication in popup)..." -ForegroundColor Yellow
                     
-                    if ($authResult) {
-                        Start-Sleep -Milliseconds 500
-                        Clear-Host
+                    $authJob = Start-Job -ScriptBlock {
+                        Import-Module Az.Accounts -Force -WarningAction SilentlyContinue
+                        $WarningPreference = 'SilentlyContinue'
+                        $ProgressPreference = 'SilentlyContinue'
+                        $InformationPreference = 'SilentlyContinue'
                         
-                        Write-Host " Azure Arc `& MDE Prerequisites Checker..." -ForegroundColor Cyan
-                        Write-Host " Authentication completed successfully!" -ForegroundColor Green
-                        
-                        $context = Get-AzContext
+                        # Authenticate in isolated job context
+                        Connect-AzAccount -Force -SkipContextPopulation -ErrorAction Stop -WarningAction SilentlyContinue
+                    } | Out-Null
+                    
+                    # Wait for authentication job with timeout
+                    $timeout = 300 # 5 minutes
+                    $authJob | Wait-Job -Timeout $timeout | Out-Null
+                    
+                    if ($authJob.State -eq 'Completed') {
+                        # Clear screen and check context
+                        Clear-ConsoleCompletely
+                        $context = Get-AzContext -ErrorAction SilentlyContinue
+                        if (-not $context -or -not $context.Account) {
+                            throw "Job authentication completed but no context available"
+                        }
                     } else {
-                        throw "Device code authentication failed"
+                        $authJob | Stop-Job -ErrorAction SilentlyContinue
+                        throw "Authentication job timed out or failed"
                     }
+                    
+                    # Clean up job
+                    $authJob | Remove-Job -Force -ErrorAction SilentlyContinue
                 }
                 catch {
                     $result.Message = "Failed to authenticate to Azure. Error: $($_.Exception.Message). Please ensure you have proper Azure access and try running 'Connect-AzAccount' manually first."
@@ -601,11 +666,13 @@ function Initialize-AzureAuthenticationAndSubscription {
                     return $result
                 }
             }
+        } else {
+            # User was already authenticated - clear screen for consistent experience
+            Clear-ConsoleCompletely
         }
         
-        if ($context -and $context.Account) {
-            Write-Host "`[+`] Authenticated as: $($context.Account.Id)" -ForegroundColor Green
-        } else {
+        # Validate context but don't show authentication details yet
+        if (-not ($context -and $context.Account)) {
             $result.Message = "Authentication completed but no valid context found. Please try running 'Connect-AzAccount' manually."
             Write-Host "`[-`] $($result.Message)" -ForegroundColor Red
             return $result
@@ -613,13 +680,18 @@ function Initialize-AzureAuthenticationAndSubscription {
         #endregion
 
         #region Subscription Selection
+        # Show authentication success and start subscription selection
+        Write-Host " Authentication completed successfully!" -ForegroundColor Green
+        Write-Host "`[+`] Authenticated as: $($context.Account.Id)" -ForegroundColor Green
         Write-Host "`[*`] Subscription Selection" -ForegroundColor Cyan
 
         $subs = @()
         try {
-            # Get subscriptions with better error handling
+            # Get subscriptions and suppress only the potential verbose output, not errors
             Write-Host "`[*`] Retrieving available subscriptions..." -ForegroundColor Yellow
+            
             $subs += Get-AzSubscription -WarningAction SilentlyContinue -ErrorAction Stop
+            
             Write-Host "`[+`] Found $($subs.Count) subscription(s)" -ForegroundColor Green
         }
         catch {
@@ -700,6 +772,7 @@ function Initialize-AzureAuthenticationAndSubscription {
         Write-Host "`[*`] Setting Azure context to selected subscription..." -ForegroundColor Yellow
         try {
             $setContextResult = Set-AzContext -SubscriptionId $subId -WarningAction SilentlyContinue -ErrorAction Stop
+            
             if ($setContextResult) {
                 $context = Get-AzContext -ErrorAction Stop
                 Write-Host "`[+`] Successfully set context to subscription: $subName" -ForegroundColor Green
@@ -734,12 +807,8 @@ function Initialize-AzureAuthenticationAndSubscription {
         $result.SubscriptionName = $subName
         $result.Message = "Successfully authenticated and set subscription context"
         
-        # Final validation
-        if ($context.Subscription.Id -eq $subId) {
-            Write-Host "`[+`] Azure authentication and subscription setup completed successfully!" -ForegroundColor Green
-            Write-Host "`[+`] Current subscription: $($context.Subscription.Name)" -ForegroundColor Green
-            Write-Host "`[+`] Account: $($context.Account.Id)" -ForegroundColor Green
-        } else {
+        # Final validation (silent)
+        if ($context.Subscription.Id -ne $subId) {
             Write-Host "`[!`] Warning: Context subscription ID doesn't match selected subscription" -ForegroundColor Yellow
         }
         
@@ -747,12 +816,24 @@ function Initialize-AzureAuthenticationAndSubscription {
 
         # Restore original preferences
         $WarningPreference = $originalWarningPreference
+        $ProgressPreference = $originalProgressPreference
+        $InformationPreference = $originalInformationPreference
+        
+        # Clean up environment variables
+        if ($env:AZURE_CORE_NO_COLOR) { Remove-Item -Path "env:AZURE_CORE_NO_COLOR" -ErrorAction SilentlyContinue }
+        if ($env:AZURE_CORE_OUTPUT) { Remove-Item -Path "env:AZURE_CORE_OUTPUT" -ErrorAction SilentlyContinue }
 
         return $result
     }
     catch {
         # Restore original preferences in case of error
         if ($originalWarningPreference) { $WarningPreference = $originalWarningPreference }
+        if ($originalProgressPreference) { $ProgressPreference = $originalProgressPreference }
+        if ($originalInformationPreference) { $InformationPreference = $originalInformationPreference }
+        
+        # Clean up environment variables in case of error
+        if ($env:AZURE_CORE_NO_COLOR) { Remove-Item -Path "env:AZURE_CORE_NO_COLOR" -ErrorAction SilentlyContinue }
+        if ($env:AZURE_CORE_OUTPUT) { Remove-Item -Path "env:AZURE_CORE_OUTPUT" -ErrorAction SilentlyContinue }
         
         $result.Message = "Error during Azure authentication: $($_.Exception.Message)"
         Write-Host "`[-`] $($result.Message)" -ForegroundColor Red
