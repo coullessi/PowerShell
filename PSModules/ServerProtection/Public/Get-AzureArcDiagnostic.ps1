@@ -209,6 +209,20 @@
             }
         }
 
+        # Function to build the proper azcmagent command with full path if needed
+        function Get-AzcmagentCommand {
+            param([string]$Command)
+            
+            if ($script:azcmagentPath -and $script:azcmagentPath -like "*\*") {
+                # We have a full path, replace 'azcmagent' with the full path
+                return $Command -replace '^azcmagent', "`"$script:azcmagentPath`""
+            }
+            else {
+                # Agent is in PATH or we're using the command as-is
+                return $Command
+            }
+        }
+
         # Initialize script-level variables
         $script:allResults = @{}
         $script:deviceResults = @{}
@@ -217,18 +231,34 @@
 
         # Check if Azure Arc agent is available (but don't fail immediately - wait until actual diagnostic execution)
         $script:azcmagentAvailable = $false
+        $script:azcmagentPath = $null
+        
+        # First try to find azcmagent in PATH
         try {
-            $azcmagentPath = Get-Command "azcmagent" -ErrorAction Stop
+            $azcmagentCommand = Get-Command "azcmagent" -ErrorAction Stop
             $script:azcmagentAvailable = $true
+            $script:azcmagentPath = $azcmagentCommand.Source
             if (-not $Quiet) {
-                Write-Host "Azure Connected Machine Agent found: $($azcmagentPath.Source)" -ForegroundColor Green
+                Write-Host "Azure Connected Machine Agent found in PATH: $($azcmagentCommand.Source)" -ForegroundColor Green
             }
         }
         catch {
-            # Don't fail here - we'll handle this during actual diagnostic execution
-            if (-not $Quiet) {
-                Write-Host "Azure Connected Machine Agent (azcmagent) not found in PATH" -ForegroundColor Yellow
-                Write-Host "Note: Agent installation will be required for diagnostic execution" -ForegroundColor Gray
+            # If not in PATH, check the default installation location
+            $defaultAzcmagentPath = "${env:ProgramFiles}\AzureConnectedMachineAgent\azcmagent.exe"
+            if (Test-Path $defaultAzcmagentPath) {
+                $script:azcmagentAvailable = $true
+                $script:azcmagentPath = $defaultAzcmagentPath
+                if (-not $Quiet) {
+                    Write-Host "Azure Connected Machine Agent found in default location: $defaultAzcmagentPath" -ForegroundColor Green
+                    Write-Host "Note: Agent is not in system PATH but will be used directly" -ForegroundColor Yellow
+                }
+            }
+            else {
+                # Agent not found anywhere
+                if (-not $Quiet) {
+                    Write-Host "Azure Connected Machine Agent (azcmagent) not found in PATH or default location" -ForegroundColor Yellow
+                    Write-Host "Note: Agent installation will be required for diagnostic execution" -ForegroundColor Gray
+                }
             }
         }
     }
@@ -728,11 +758,13 @@ $env:COMPUTERNAME
                     "------------------------------------------------------------" | Out-File -FilePath $script:globalLogFile -Append
 
                     try {
-                        Write-Host "     Executing: $($diagnostic.Command)" -ForegroundColor White
+                        # Build the proper command with full path if needed
+                        $actualCommand = Get-AzcmagentCommand -Command $diagnostic.Command
+                        Write-Host "     Executing: $actualCommand" -ForegroundColor White
 
                         # Check if agent is available before execution
                         if (-not $script:azcmagentAvailable) {
-                            throw "Azure Connected Machine Agent (azcmagent) not found in PATH. Please install the agent before running diagnostics."
+                            throw "Azure Connected Machine Agent (azcmagent) not found in PATH or default location. Please install the agent before running diagnostics."
                         }
 
                         # Execute command and capture output
@@ -748,7 +780,58 @@ $env:COMPUTERNAME
                             
                             # Set environment variable to remove 'unknown' from filename
                             $env:COMPUTERNAME_OVERRIDE = $deviceName
-                            $output = & cmd.exe /c "cd /d `"$deviceLogDir`" && set COMPUTERNAME=$deviceName && $($diagnostic.Command) 2>&1"
+                            
+                            # Use Start-Process to have better control over process completion
+                            $processInfo = New-Object System.Diagnostics.ProcessStartInfo
+                            $processInfo.FileName = "cmd.exe"
+                            $processInfo.Arguments = "/c `"cd /d `"$deviceLogDir`" && set COMPUTERNAME=$deviceName && $actualCommand`""
+                            $processInfo.UseShellExecute = $false
+                            $processInfo.RedirectStandardOutput = $true
+                            $processInfo.RedirectStandardError = $true
+                            $processInfo.CreateNoWindow = $true
+                            
+                            $process = New-Object System.Diagnostics.Process
+                            $process.StartInfo = $processInfo
+                            $process.Start() | Out-Null
+                            
+                            # Read output asynchronously
+                            $output = $process.StandardOutput.ReadToEnd()
+                            $errorOutput = $process.StandardError.ReadToEnd()
+                            
+                            # Wait for the process to completely finish
+                            $process.WaitForExit()
+                            
+                            # Combine output and error streams
+                            if ($errorOutput) {
+                                $output = if ($output) { "$output`n$errorOutput" } else { $errorOutput }
+                            }
+                            
+                            $process.Dispose()
+                            
+                            # Wait for any background file operations to complete
+                            # The azcmagent logs command may spawn background processes for file collection
+                            Write-Host "     Waiting for log collection to complete..." -ForegroundColor Gray
+                            Start-Sleep -Seconds 3
+                            
+                            # Wait for any file system operations to settle
+                            $maxWaitTime = 30 # Maximum wait time in seconds
+                            $waitInterval = 1 # Check every second
+                            $elapsedTime = 0
+                            
+                            do {
+                                Start-Sleep -Seconds $waitInterval
+                                $elapsedTime += $waitInterval
+                                
+                                # Check if there are any active file operations
+                                $activeProcesses = Get-Process -Name "azcmagent*" -ErrorAction SilentlyContinue
+                                if (-not $activeProcesses) {
+                                    break
+                                }
+                            } while ($elapsedTime -lt $maxWaitTime)
+                            
+                            if (-not $Quiet) {
+                                Write-Host "     Log collection stabilized after $elapsedTime seconds" -ForegroundColor Gray
+                            }
                             
                             # Post-process to rename any files with 'unknown' in the name
                             $zipFiles = Get-ChildItem -Path $deviceLogDir -Filter "*unknown*.zip" -ErrorAction SilentlyContinue
@@ -774,7 +857,32 @@ $env:COMPUTERNAME
                             }
                         }
                         else {
-                            $output = & cmd.exe /c "$($diagnostic.Command) 2>&1"
+                            # Use Start-Process for better control over process completion
+                            $processInfo = New-Object System.Diagnostics.ProcessStartInfo
+                            $processInfo.FileName = "cmd.exe"
+                            $processInfo.Arguments = "/c `"$actualCommand`""
+                            $processInfo.UseShellExecute = $false
+                            $processInfo.RedirectStandardOutput = $true
+                            $processInfo.RedirectStandardError = $true
+                            $processInfo.CreateNoWindow = $true
+                            
+                            $process = New-Object System.Diagnostics.Process
+                            $process.StartInfo = $processInfo
+                            $process.Start() | Out-Null
+                            
+                            # Read output asynchronously
+                            $output = $process.StandardOutput.ReadToEnd()
+                            $errorOutput = $process.StandardError.ReadToEnd()
+                            
+                            # Wait for the process to completely finish
+                            $process.WaitForExit()
+                            
+                            # Combine output and error streams
+                            if ($errorOutput) {
+                                $output = if ($output) { "$output`n$errorOutput" } else { $errorOutput }
+                            }
+                            
+                            $process.Dispose()
                         }
                         
                         $endTime = Get-Date
@@ -782,7 +890,7 @@ $env:COMPUTERNAME
 
                         # Process and log output
                         if ($output) {
-                            $outputString = $output -join "`n"
+                            $outputString = if ($output -is [array]) { $output -join "`n" } else { $output }
                             "OUTPUT:" | Out-File -FilePath $script:globalLogFile -Append
                             $outputString | Out-File -FilePath $script:globalLogFile -Append
                             
@@ -1043,6 +1151,53 @@ $env:COMPUTERNAME
     }
 
     end {
+        # Clean up any lingering processes and ensure all background operations are complete
+        try {
+            if (-not $Quiet) {
+                Write-Host "`nFinalizing diagnostic collection..." -ForegroundColor Gray
+            }
+            
+            # Wait for any remaining file operations to complete
+            Start-Sleep -Milliseconds 2000
+            
+            # Check for any lingering azcmagent processes that might still be writing files
+            $maxCleanupWait = 10 # Maximum wait time for cleanup
+            $cleanupWait = 0
+            
+            do {
+                $azcmagentProcesses = Get-Process -Name "azcmagent" -ErrorAction SilentlyContinue
+                if (-not $azcmagentProcesses) {
+                    break
+                }
+                
+                Start-Sleep -Seconds 1
+                $cleanupWait++
+                
+                if ($cleanupWait -ge $maxCleanupWait) {
+                    # Force terminate any remaining processes
+                    $azcmagentProcesses | ForEach-Object {
+                        try {
+                            $_.Kill()
+                            if (-not $Quiet) {
+                                Write-Host "Force-terminated lingering azcmagent process (PID: $($_.Id))" -ForegroundColor Yellow
+                            }
+                        }
+                        catch {
+                            # Ignore errors when killing processes
+                        }
+                    }
+                    break
+                }
+            } while ($azcmagentProcesses)
+            
+            # Final wait to ensure all file operations are flushed
+            Start-Sleep -Milliseconds 1000
+            
+        }
+        catch {
+            # Ignore cleanup errors
+        }
+        
         if (-not $Quiet) {
             Write-Host "`nDiagnostic collection completed." -ForegroundColor White
         }

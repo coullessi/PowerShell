@@ -547,7 +547,7 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
             -SubscriptionId $subId `
             -ResourceGroup $resourceGroup `
             -Location $location `
-            -TenantId $TenantId | Out-Null
+            -TenantId $TenantId *>&1 | Out-Null
         
         Write-Host " Group Policy deployment completed" -ForegroundColor Green
     }
