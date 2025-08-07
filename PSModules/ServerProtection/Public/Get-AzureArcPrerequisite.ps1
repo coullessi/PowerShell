@@ -1,4 +1,4 @@
-﻿function Get-AzureArcPrerequisite {
+function Get-AzureArcPrerequisite {
     <#
     .SYNOPSIS
         Tests Azure Arc prerequisites and automatically registers resource providers.
@@ -34,18 +34,18 @@
 
     .EXAMPLE
         Get-AzureArcPrerequisite
-        
+
         Runs basic prerequisites testing for the local machine.
 
     .EXAMPLE
         Get-AzureArcPrerequisite -Force -NetworkTestMode Comprehensive
-        
+
         Runs comprehensive prerequisites testing without prompts.
 
     .NOTES
         Author: Lessi Coulibaly
         Organization: Less-IT (AI and CyberSecurity)
-        Website: https://lessit.net
+        Website: https://github.com/coullessi/PowerShell
         Version: 2.0.0
     #>
 
@@ -85,60 +85,38 @@
     $script:unregisteredProviders = @()
     $script:remediationScriptContent = @()
 
-    # Function to clean and validate paths
-    function Get-CleanPath {
-        param([string]$InputPath, [bool]$IsDirectory = $true)
-        
-        if ([string]::IsNullOrWhiteSpace($InputPath)) {
-            return $null
-        }
-        
-        # Clean up the path - remove surrounding quotes and trim whitespace
-        $cleanedPath = $InputPath.Trim()
-        
-        # Remove surrounding quotes (single or double) only if they match and the string is long enough
-        if ($cleanedPath.Length -ge 2) {
-            if (($cleanedPath.StartsWith('"') -and $cleanedPath.EndsWith('"')) -or 
-                ($cleanedPath.StartsWith("'") -and $cleanedPath.EndsWith("'"))) {
-                $cleanedPath = $cleanedPath.Substring(1, $cleanedPath.Length - 2)
-            }
-        }
-        
-        # Trim again after removing quotes
-        $cleanedPath = $cleanedPath.Trim()
-        
-        # Validate that we still have a valid path after cleaning
-        if ([string]::IsNullOrWhiteSpace($cleanedPath)) {
-            return $null
-        }
-        
-        # Handle relative paths
-        if (-not [System.IO.Path]::IsPathRooted($cleanedPath)) {
-            $cleanedPath = Join-Path (Get-Location) $cleanedPath
-        }
-        
-        return $cleanedPath
+    # Initialize standardized environment
+    $environment = Initialize-StandardizedEnvironment -ScriptName "Get-AzureArcPrerequisite" -RequiredFileTypes @("DeviceList", "PrerequisiteLog")
+
+    # Check if user chose to quit
+    if ($environment.UserQuit) {
+        Write-Host "Returning to main menu..." -ForegroundColor Yellow
+        return
     }
 
-    # Set up file paths with simplified device list handling
-    $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $defaultLocation = $env:USERPROFILE + "\Desktop"
-    
+    # Check if initialization failed
+    if (-not $environment.Success) {
+        Write-Host "Failed to initialize environment. Exiting..." -ForegroundColor Red
+        return
+    }
+
+    # Set up paths from standardized environment
+    $workingFolder = $environment.FolderPath
+    $script:deviceListFile = $environment.FilePaths["DeviceList"]
+    $script:globalLogFile = $environment.FilePaths["PrerequisiteLog"]
+
+
     Write-Host ""
     Write-Host " DEVICE LIST SETUP" -ForegroundColor Yellow
     Write-Host ""
-    
+
     if ([string]::IsNullOrWhiteSpace($DeviceListPath)) {
         Write-Host "   Supported formats: D:\Path\DeviceList.txt, 'D:\Path\file.csv', `"D:\Path\Device List.txt`"" -ForegroundColor Gray
         Write-Host ""
-        
+
         $deviceFileInput = Read-Host "   Enter device list file path (or press Enter for default)"
-        
+
         if ([string]::IsNullOrWhiteSpace($deviceFileInput)) {
-            # Create default device list file
-            $script:deviceListFile = Join-Path $defaultLocation "DeviceList_$timestamp.txt"
-            
-            # Create default device list content
             $defaultContent = @"
 # Azure Arc Device List
 # Enter one device name per line
@@ -153,18 +131,18 @@ vm-wsx
 vm-wsy
 vm-wsz
 "@
-            
+
             try {
                 $defaultContent | Out-File -FilePath $script:deviceListFile -Encoding UTF8
                 Write-Host "   [OK] Default device list created: $script:deviceListFile" -ForegroundColor Green
                 $DeviceListPath = $script:deviceListFile
-                
+
                 Write-Host ""
                 Write-Host "   Opening default device list in Notepad for editing..." -ForegroundColor Cyan
                 Write-Host "   Review/edit your device names and save the file." -ForegroundColor White
                 Write-Host "   Close Notepad when done to continue the script." -ForegroundColor White
                 Write-Host ""
-                
+
                 try {
                     $notepadProcess = Start-Process -FilePath "notepad.exe" -ArgumentList $script:deviceListFile -PassThru
                     $notepadProcess.WaitForExit()
@@ -173,31 +151,31 @@ vm-wsz
                     Write-Host "   [WARN] Could not open Notepad: $($_.Exception.Message)" -ForegroundColor Yellow
                     Write-Host "   Continuing with default device list..." -ForegroundColor White
                 }
-                
+
             } catch {
                 Write-Host "   [FAIL] Failed to create device list file: $($_.Exception.Message)" -ForegroundColor Red
                 Write-Host "   Continuing without device list..." -ForegroundColor Yellow
                 $DeviceListPath = $null
             }
         } else {
-            # User provided a device file path
-            $cleanedFilePath = Get-CleanPath -InputPath $deviceFileInput -IsDirectory $false
-            
-            if (-not $cleanedFilePath) {
-                Write-Host "   [WARN] Invalid file path format. Continuing without device list..." -ForegroundColor Yellow
+            # User provided a device file path - validate it
+            $pathValidation = Test-ValidPath -Path $deviceFileInput -PathType File -RequireExists:$false
+
+            if (-not $pathValidation.IsValid) {
+                Write-Host "   [WARN] $($pathValidation.Error). Continuing without device list..." -ForegroundColor Yellow
                 $DeviceListPath = $null
-            } elseif (Test-Path $cleanedFilePath) {
+            } elseif ($pathValidation.Exists) {
                 # Existing file found
-                $DeviceListPath = $cleanedFilePath
+                $DeviceListPath = $pathValidation.FullPath
                 Write-Host "   [OK] Found existing device list: $DeviceListPath" -ForegroundColor Green
-                
+
                 $editChoice = Read-Host "   Edit the device list before proceeding? [Y/N] (default: N)"
                 if ($editChoice -eq "Y" -or $editChoice -eq "y") {
                     Write-Host ""
                     Write-Host "   Opening device list in Notepad for editing..." -ForegroundColor Cyan
                     Write-Host "   Close Notepad when done to continue the script." -ForegroundColor White
                     Write-Host ""
-                    
+
                     try {
                         $notepadProcess = Start-Process -FilePath "notepad.exe" -ArgumentList $DeviceListPath -PassThru
                         $notepadProcess.WaitForExit()
@@ -210,32 +188,7 @@ vm-wsz
                     Write-Host "   [OK] Using device list as-is" -ForegroundColor Green
                 }
             } else {
-                # File doesn't exist - create it with timestamp
-                $fileInfo = [System.IO.FileInfo]$cleanedFilePath
-                $directory = $fileInfo.DirectoryName
-                $baseName = [System.IO.Path]::GetFileNameWithoutExtension($fileInfo.Name)
-                $extension = $fileInfo.Extension
-                
-                if ([string]::IsNullOrEmpty($extension)) {
-                    $extension = ".txt"
-                }
-                
-                $timestampedFileName = "${baseName}_${timestamp}${extension}"
-                $script:deviceListFile = Join-Path $directory $timestampedFileName
-                
-                # Ensure directory exists
-                if (-not (Test-Path $directory)) {
-                    try {
-                        New-Item -Path $directory -ItemType Directory -Force | Out-Null
-                        Write-Host "   [OK] Created directory: $directory" -ForegroundColor Green
-                    } catch {
-                        Write-Host "   [FAIL] Failed to create directory: $($_.Exception.Message)" -ForegroundColor Red
-                        Write-Host "   Using default location instead..." -ForegroundColor Yellow
-                        $script:deviceListFile = Join-Path $defaultLocation "DeviceList_$timestamp.txt"
-                    }
-                }
-                
-                # Create new device list content
+                # File doesn't exist - create new one in the standardized folder
                 $newContent = @"
 # Azure Arc Device List
 # Enter one device name per line
@@ -250,18 +203,18 @@ vm-wsx
 vm-wsy
 vm-wsz
 "@
-                
+
                 try {
                     $newContent | Out-File -FilePath $script:deviceListFile -Encoding UTF8
                     Write-Host "   [OK] New device list created: $script:deviceListFile" -ForegroundColor Green
                     $DeviceListPath = $script:deviceListFile
-                    
+
                     Write-Host ""
                     Write-Host "   Opening new device list in Notepad for editing..." -ForegroundColor Cyan
                     Write-Host "   Edit your device names and save the file." -ForegroundColor White
                     Write-Host "   Close Notepad when done to continue the script." -ForegroundColor White
                     Write-Host ""
-                    
+
                     try {
                         $notepadProcess = Start-Process -FilePath "notepad.exe" -ArgumentList $script:deviceListFile -PassThru
                         $notepadProcess.WaitForExit()
@@ -270,7 +223,7 @@ vm-wsz
                         Write-Host "   [WARN] Could not open Notepad: $($_.Exception.Message)" -ForegroundColor Yellow
                         Write-Host "   Continuing with new device list..." -ForegroundColor White
                     }
-                    
+
                 } catch {
                     Write-Host "   [FAIL] Failed to create device list file: $($_.Exception.Message)" -ForegroundColor Red
                     Write-Host "   Continuing without device list..." -ForegroundColor Yellow
@@ -279,42 +232,27 @@ vm-wsz
             }
         }
     } else {
-        # DeviceListPath was provided as parameter - validate and clean it
+        # DeviceListPath was provided as parameter - validate it
         Write-Host "   Using provided device list parameter: $DeviceListPath" -ForegroundColor White
-        
-        $cleanedDeviceListPath = Get-CleanPath -InputPath $DeviceListPath -IsDirectory $false
-        
-        if (-not $cleanedDeviceListPath) {
-            Write-Host "   [WARN] Invalid device list path format provided" -ForegroundColor Yellow
+
+        $pathValidation = Test-ValidPath -Path $DeviceListPath -PathType File -RequireExists
+
+        if (-not $pathValidation.IsValid) {
+            Write-Host "   [WARN] $($pathValidation.Error)" -ForegroundColor Yellow
             Write-Host "   Continuing without device list..." -ForegroundColor Yellow
             $DeviceListPath = $null
-        } elseif (-not (Test-Path $cleanedDeviceListPath)) {
-            Write-Host "   [WARN] Provided device list file not found: $cleanedDeviceListPath" -ForegroundColor Yellow
+        } elseif (-not $pathValidation.Exists) {
+            Write-Host "   [WARN] Provided device list file not found: $($pathValidation.FullPath)" -ForegroundColor Yellow
             Write-Host "   Continuing without device list..." -ForegroundColor Yellow
             $DeviceListPath = $null
         } else {
-            $DeviceListPath = $cleanedDeviceListPath
+            $DeviceListPath = $pathValidation.FullPath
             Write-Host "   [OK] Device list file verified" -ForegroundColor Green
         }
-    }
-    
-    # Set up log file path (use same directory as device list or default)
-    if ($DeviceListPath) {
-        $logDirectory = [System.IO.Path]::GetDirectoryName($DeviceListPath)
-        $script:globalLogFile = Join-Path $logDirectory "AzureArc_Prerequisites_$timestamp.log"
-    } else {
-        $script:globalLogFile = Join-Path $defaultLocation "AzureArc_Prerequisites_$timestamp.log"
     }
 
     try {
         Clear-Host
-        Write-Host ""
-        Write-Host " ████████╗███████╗███████╗████████╗██╗███╗   ██╗ ██████╗ " -ForegroundColor Cyan
-        Write-Host " ╚══██╔══╝██╔════╝██╔════╝╚══██╔══╝██║████╗  ██║██╔════╝ " -ForegroundColor Cyan
-        Write-Host "    ██║   █████╗  ███████╗   ██║   ██║██╔██╗ ██║██║  ███╗" -ForegroundColor Cyan
-        Write-Host "    ██║   ██╔══╝  ╚════██║   ██║   ██║██║╚██╗██║██║   ██║" -ForegroundColor Cyan
-        Write-Host "    ██║   ███████╗███████║   ██║   ██║██║ ╚████║╚██████╔╝" -ForegroundColor Cyan
-        Write-Host "    ╚═╝   ╚══════╝╚══════╝   ╚═╝   ╚═╝╚═╝  ╚═══╝ ╚═════╝ " -ForegroundColor Cyan
         Write-Host ""
         Write-Host " AZURE ARC PREREQUISITES VALIDATION" -ForegroundColor Green
         Write-Host " Testing system readiness for Azure Arc onboarding" -ForegroundColor Gray
@@ -336,19 +274,19 @@ vm-wsz
         $deviceResults = @{}
         $overallRecommendations = @()
         $devicesToTest = @()
-        
+
         # Determine devices to test
         if ($DeviceListPath -and (Test-Path $DeviceListPath)) {
             Write-Host " LOADING DEVICE LIST" -ForegroundColor Yellow
             Write-Host ""
             Write-Host "   Reading device list from: $DeviceListPath" -ForegroundColor White
-            
+
             try {
                 $deviceListContent = Get-Content $DeviceListPath -ErrorAction Stop
-                $devicesToTest = $deviceListContent | Where-Object { 
-                    $_.Trim() -ne "" -and -not $_.Trim().StartsWith("#") 
+                $devicesToTest = $deviceListContent | Where-Object {
+                    $_.Trim() -ne "" -and -not $_.Trim().StartsWith("#")
                 } | ForEach-Object { $_.Trim() }
-                
+
                 if ($devicesToTest.Count -eq 0) {
                     Write-Host "   [WARN] No valid device names found in device list" -ForegroundColor Yellow
                     Write-Host "   Testing local machine only..." -ForegroundColor White
@@ -357,19 +295,19 @@ vm-wsz
                     Write-Host "   [OK] Found $($devicesToTest.Count) device(s) to test" -ForegroundColor Green
                     $devicesToTest | ForEach-Object { Write-Host "     - $_" -ForegroundColor Gray }
                 }
-                
+
                 # Log device list
                 "DEVICE LIST PROCESSING" | Out-File -FilePath $script:globalLogFile -Append
                 ("-" * 50) | Out-File -FilePath $script:globalLogFile -Append
                 "Total devices found: $($devicesToTest.Count)" | Out-File -FilePath $script:globalLogFile -Append
                 $devicesToTest | ForEach-Object { "  - $_" | Out-File -FilePath $script:globalLogFile -Append }
                 "" | Out-File -FilePath $script:globalLogFile -Append
-                
+
             } catch {
                 Write-Host "   [FAIL] Failed to read device list: $($_.Exception.Message)" -ForegroundColor Red
                 Write-Host "   Testing local machine only..." -ForegroundColor White
                 $devicesToTest = @($env:COMPUTERNAME)
-                
+
                 "ERROR: Failed to read device list - $($_.Exception.Message)" | Out-File -FilePath $script:globalLogFile -Append
                 "Defaulting to local machine: $env:COMPUTERNAME" | Out-File -FilePath $script:globalLogFile -Append
                 "" | Out-File -FilePath $script:globalLogFile -Append
@@ -377,7 +315,7 @@ vm-wsz
         } else {
             Write-Host "   No device list provided, testing local machine only" -ForegroundColor White
             $devicesToTest = @($env:COMPUTERNAME)
-            
+
             "DEVICE LIST: Not provided - testing local machine only" | Out-File -FilePath $script:globalLogFile -Append
             "Device: $env:COMPUTERNAME" | Out-File -FilePath $script:globalLogFile -Append
             "" | Out-File -FilePath $script:globalLogFile -Append
@@ -407,7 +345,7 @@ vm-wsz
         if (-not $skipAuth) {
             try {
                 Write-Host "   Attempting Azure authentication..." -ForegroundColor White
-                
+
                 # Try to get current context first
                 $currentContext = Get-AzContext -ErrorAction SilentlyContinue
                 if ($currentContext) {
@@ -435,7 +373,7 @@ vm-wsz
                 # Register required resource providers
                 if ($script:azureLoginCompleted) {
                     Write-Host "   Registering Azure resource providers..." -ForegroundColor White
-                    
+
                     $providers = @(
                         "Microsoft.HybridCompute",
                         "Microsoft.GuestConfiguration",
@@ -449,7 +387,7 @@ vm-wsz
                         try {
                             Write-Host "     Checking $provider..." -ForegroundColor Gray
                             $resourceProvider = Get-AzResourceProvider -ProviderNamespace $provider -ErrorAction SilentlyContinue
-                            
+
                             if ($resourceProvider -and $resourceProvider.RegistrationState -eq "Registered") {
                                 Write-Host "     [OK] $provider - Already registered" -ForegroundColor Green
                                 $registrationResults += "SUCCESS: $provider - Already registered"
@@ -490,11 +428,11 @@ vm-wsz
         # Test each device
         foreach ($deviceName in $devicesToTest) {
             $isLocalMachine = ($deviceName -eq $env:COMPUTERNAME -or $deviceName -eq "localhost" -or $deviceName -eq ".")
-            
+
             Write-Host " DEVICE: $deviceName" -ForegroundColor Cyan
             Write-Host " $("=" * ($deviceName.Length + 8))" -ForegroundColor Cyan
             Write-Host ""
-            
+
             # Initialize device result
             $deviceResult = @{
                 DeviceName = $deviceName
@@ -506,7 +444,7 @@ vm-wsz
                 Errors = @()
                 TestDateTime = Get-Date
             }
-            
+
             # Log device section start
             ("=" * 100) | Out-File -FilePath $script:globalLogFile -Append
             "DEVICE: $deviceName" | Out-File -FilePath $script:globalLogFile -Append
@@ -518,10 +456,10 @@ vm-wsz
         # Step 1: Basic PowerShell Environment Check
         Write-Host " STEP 1: POWERSHELL ENVIRONMENT VALIDATION" -ForegroundColor Yellow
         Write-Host ""
-        
+
         "STEP 1: POWERSHELL ENVIRONMENT VALIDATION" | Out-File -FilePath $script:globalLogFile -Append
         ("-" * 50) | Out-File -FilePath $script:globalLogFile -Append
-        
+
         # Check PowerShell version
         Write-Host "   Checking PowerShell version..." -ForegroundColor White
         try {
@@ -535,7 +473,7 @@ vm-wsz
                 $psHost = "Unknown (Remote)"
                 $deviceResult.Warnings += "Remote PowerShell testing not implemented"
             }
-            
+
             if ($psVersion -ne "Unknown (Remote)") {
                 if ($psVersion.Major -ge 5 -and ($psVersion.Major -gt 5 -or $psVersion.Minor -ge 1)) {
                     Write-Host "     [OK] PowerShell $($psVersion.ToString()) ($psHost) - Compatible" -ForegroundColor Green
@@ -588,7 +526,7 @@ vm-wsz
                 $execPolicy = "Unknown (Remote)"
                 $deviceResult.Warnings += "Remote execution policy testing not implemented"
             }
-            
+
             $compatiblePolicies = @("RemoteSigned", "Unrestricted", "Bypass")
             if ($execPolicy -in $compatiblePolicies) {
                 Write-Host "     [OK] Execution Policy: $execPolicy - Compatible" -ForegroundColor Green
@@ -629,16 +567,16 @@ vm-wsz
             $deviceResult.Errors += "Failed to check execution policy: $($_.Exception.Message)"
             "[FAIL] Execution Policy Check Failed: $($_.Exception.Message)" | Out-File -FilePath $script:globalLogFile -Append
         }
-        
+
         "" | Out-File -FilePath $script:globalLogFile -Append
 
         # Step 2: Azure PowerShell Module Check
         Write-Host "`n STEP 2: AZURE POWERSHELL MODULE VALIDATION" -ForegroundColor Yellow
         Write-Host ""
-        
+
         "STEP 2: AZURE POWERSHELL MODULE VALIDATION" | Out-File -FilePath $script:globalLogFile -Append
         ("-" * 50) | Out-File -FilePath $script:globalLogFile -Append
-        
+
         Write-Host "   Checking Azure PowerShell modules..." -ForegroundColor White
         try {
             if ($isLocalMachine) {
@@ -716,7 +654,7 @@ vm-wsz
             $deviceResult.Errors += "Failed to check Azure modules: $($_.Exception.Message)"
             "[FAIL] Azure Modules Check Failed: $($_.Exception.Message)" | Out-File -FilePath $script:globalLogFile -Append
         }
-        
+
         "" | Out-File -FilePath $script:globalLogFile -Append
 
         # Step 3: System Requirements Check
@@ -827,7 +765,7 @@ vm-wsz
                 $architecture = "Unknown (Remote)"
                 $deviceResult.Warnings += "Remote processor testing not implemented"
             }
-            
+
             if ($processor) {
                 if ($processor.Architecture -in @(9, 12)) {
                     Write-Host "     [OK] Architecture: $architecture - Supported" -ForegroundColor Green
@@ -878,7 +816,7 @@ vm-wsz
                 $totalMemoryGB = 0
                 $deviceResult.Warnings += "Remote memory testing not implemented"
             }
-            
+
             if ($totalMemoryGB -gt 0) {
                 if ($totalMemoryGB -ge 2) {
                     Write-Host "     [OK] Memory: $totalMemoryGB GB - Adequate" -ForegroundColor Green
@@ -917,7 +855,7 @@ vm-wsz
             $deviceResult.Errors += "Failed to check memory: $($_.Exception.Message)"
             "[FAIL] System Memory Check Failed: $($_.Exception.Message)" | Out-File -FilePath $script:globalLogFile -Append
         }
-        
+
         "" | Out-File -FilePath $script:globalLogFile -Append
 
         # Step 4: Required Services Check
@@ -944,7 +882,7 @@ vm-wsz
                     $serviceStatus = $null
                     $deviceResult.Warnings += "Remote service testing not implemented for $($service.DisplayName)"
                 }
-                
+
                 if ($serviceStatus -and $serviceStatus.Status -eq "Running") {
                     Write-Host "     [OK] $($service.DisplayName) - Running" -ForegroundColor Green
                     $deviceResult.TestResults.Services[$service.Name] = @{
@@ -999,7 +937,7 @@ vm-wsz
                 "[FAIL] Service Check Failed: $($service.DisplayName) - $($_.Exception.Message)" | Out-File -FilePath $script:globalLogFile -Append
             }
         }
-        
+
         "" | Out-File -FilePath $script:globalLogFile -Append
 
         # Step 5: Network Connectivity Check
@@ -1028,11 +966,11 @@ vm-wsz
                         $tcpClient = New-Object System.Net.Sockets.TcpClient
                         $tcpClient.ReceiveTimeout = 3000  # Reduced timeout
                         $tcpClient.SendTimeout = 3000     # Reduced timeout
-                        
+
                         # Use async connect with timeout
                         $connectTask = $tcpClient.BeginConnect($endpoint.Url, $endpoint.Port, $null, $null)
                         $success = $connectTask.AsyncWaitHandle.WaitOne(3000, $false)  # 3 second timeout
-                        
+
                         if ($success) {
                             try {
                                 $tcpClient.EndConnect($connectTask)
@@ -1062,7 +1000,7 @@ vm-wsz
                     $result = $false
                     $deviceResult.Warnings += "Remote network testing not implemented for $($endpoint.Name)"
                 }
-                
+
                 if ($result) {
                     Write-Host "     [OK] $($endpoint.Url):$($endpoint.Port) - Reachable" -ForegroundColor Green
                     $deviceResult.TestResults.NetworkConnectivity[$endpoint.Url] = @{
@@ -1109,15 +1047,15 @@ vm-wsz
                 "[FAIL] Network Test Failed: $($endpoint.Name) ($($endpoint.Url):$($endpoint.Port)) - $($_.Exception.Message)" | Out-File -FilePath $script:globalLogFile -Append
             }
         }
-        
+
         "" | Out-File -FilePath $script:globalLogFile -Append
 
         # Determine overall device status
         $hasErrors = $deviceResult.Errors.Count -gt 0
         $hasWarnings = $deviceResult.Warnings.Count -gt 0
-        
+
         Write-Host ""
-        
+
         if ($hasErrors) {
             $deviceResult.OverallStatus = "Not Ready"
             Write-Host " DEVICE STATUS: NOT READY FOR AZURE ARC" -ForegroundColor Red
@@ -1128,7 +1066,7 @@ vm-wsz
             $deviceResult.OverallStatus = "Ready"
             Write-Host " DEVICE STATUS: READY FOR AZURE ARC" -ForegroundColor Green
         }
-        
+
         Write-Host ""
 
         # Log device summary
@@ -1137,19 +1075,19 @@ vm-wsz
         "Overall Status: $($deviceResult.OverallStatus)" | Out-File -FilePath $script:globalLogFile -Append
         "Test Completed: $(Get-Date)" | Out-File -FilePath $script:globalLogFile -Append
         "" | Out-File -FilePath $script:globalLogFile -Append
-        
+
         if ($deviceResult.Errors.Count -gt 0) {
             "CRITICAL ISSUES ($($deviceResult.Errors.Count)):" | Out-File -FilePath $script:globalLogFile -Append
             $deviceResult.Errors | ForEach-Object { "  [FAIL] $_" | Out-File -FilePath $script:globalLogFile -Append }
             "" | Out-File -FilePath $script:globalLogFile -Append
         }
-        
+
         if ($deviceResult.Warnings.Count -gt 0) {
             "WARNINGS ($($deviceResult.Warnings.Count)):" | Out-File -FilePath $script:globalLogFile -Append
             $deviceResult.Warnings | ForEach-Object { "  [WARN] $_" | Out-File -FilePath $script:globalLogFile -Append }
             "" | Out-File -FilePath $script:globalLogFile -Append
         }
-        
+
         if ($deviceResult.Recommendations.Count -gt 0) {
             "RECOMMENDATIONS ($($deviceResult.Recommendations.Count)):" | Out-File -FilePath $script:globalLogFile -Append
             $deviceResult.Recommendations | ForEach-Object { "  => $_" | Out-File -FilePath $script:globalLogFile -Append }
@@ -1158,14 +1096,14 @@ vm-wsz
 
         # Store device result
         $deviceResults[$deviceName] = $deviceResult
-        
+
         # Add overall recommendations
         if ($hasErrors) {
             $overallRecommendations += "Device '$deviceName' has critical issues that must be resolved before Azure Arc deployment"
         } elseif ($hasWarnings) {
             $overallRecommendations += "Device '$deviceName' has warnings that should be addressed for optimal Azure Arc performance"
         }
-        
+
         Write-Host ""
         } # End of device loop
 
@@ -1187,20 +1125,20 @@ vm-wsz
         # Display device summary
         Write-Host " DEVICE READINESS SUMMARY:" -ForegroundColor Cyan
         Write-Host ""
-        
+
         $readyDevices = 0
         $readyWithWarningsDevices = 0
         $notReadyDevices = 0
-        
+
         "DEVICE READINESS SUMMARY" | Out-File -FilePath $script:globalLogFile -Append
         ("-" * 50) | Out-File -FilePath $script:globalLogFile -Append
-        
+
         foreach ($device in $deviceResults.Keys) {
             $result = $deviceResults[$device]
             $status = $result.OverallStatus
             $errorCount = $result.Errors.Count
             $warningCount = $result.Warnings.Count
-            
+
             switch ($status) {
                 "Ready" {
                     Write-Host "   [OK] $device - READY FOR AZURE ARC" -ForegroundColor Green
@@ -1219,14 +1157,14 @@ vm-wsz
                 }
             }
         }
-        
+
         Write-Host ""
         Write-Host " OVERALL STATISTICS:" -ForegroundColor Cyan
         Write-Host "   Ready: $readyDevices device(s)" -ForegroundColor Green
         Write-Host "   Ready with Warnings: $readyWithWarningsDevices device(s)" -ForegroundColor Yellow
         Write-Host "   Not Ready: $notReadyDevices device(s)" -ForegroundColor Red
         Write-Host ""
-        
+
         "" | Out-File -FilePath $script:globalLogFile -Append
         "OVERALL STATISTICS" | Out-File -FilePath $script:globalLogFile -Append
         ("-" * 20) | Out-File -FilePath $script:globalLogFile -Append
@@ -1254,7 +1192,7 @@ vm-wsz
         if ($DeviceListPath) {
             Write-Host "   Device list: $DeviceListPath" -ForegroundColor Gray
         }
-        
+
         Write-Host ""
         Write-Host " NEXT STEPS:" -ForegroundColor Yellow
         if ($notReadyDevices -gt 0) {
@@ -1276,13 +1214,13 @@ vm-wsz
         "" | Out-File -FilePath $script:globalLogFile -Append
         "NEXT STEPS RECOMMENDATIONS" | Out-File -FilePath $script:globalLogFile -Append
         ("-" * 30) | Out-File -FilePath $script:globalLogFile -Append
-        
+
         if ($overallRecommendations.Count -gt 0) {
             "PRIORITY ACTIONS:" | Out-File -FilePath $script:globalLogFile -Append
             $overallRecommendations | ForEach-Object { "  => $_" | Out-File -FilePath $script:globalLogFile -Append }
             "" | Out-File -FilePath $script:globalLogFile -Append
         }
-        
+
         if ($notReadyDevices -gt 0) {
             "Critical: Address issues on $notReadyDevices device(s) before Azure Arc deployment" | Out-File -FilePath $script:globalLogFile -Append
         } elseif ($readyWithWarningsDevices -gt 0) {
@@ -1290,21 +1228,21 @@ vm-wsz
         } else {
             "All devices ready: Proceed with Azure Arc deployment" | Out-File -FilePath $script:globalLogFile -Append
         }
-        
+
         "" | Out-File -FilePath $script:globalLogFile -Append
         "Log file location: $script:globalLogFile" | Out-File -FilePath $script:globalLogFile -Append
         "Report generated: $(Get-Date)" | Out-File -FilePath $script:globalLogFile -Append
 
         # Ensure all background processes are complete
         Start-Sleep -Milliseconds 500
-        
+
         # Clean up any remaining background jobs or processes
         Get-Job -ErrorAction SilentlyContinue | Remove-Job -Force -ErrorAction SilentlyContinue
-        
+
         # Force garbage collection to clean up network connections
         [System.GC]::Collect()
         [System.GC]::WaitForPendingFinalizers()
-        
+
         # Additional delay to ensure all network operations complete
         Start-Sleep -Milliseconds 500
 
@@ -1329,4 +1267,6 @@ vm-wsz
         return $false
     }
 }
+
+
 

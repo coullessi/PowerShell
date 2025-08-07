@@ -1,4 +1,5 @@
-﻿function Set-AzureArcResourcePricing {
+function Set-AzureArcResourcePricing {
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
 <#
 .SYNOPSIS
     Configure Azure Defender for Cloud pricing at resource level for Virtual Machines, Virtual Machine Scale Sets, and ARC machines.
@@ -6,15 +7,15 @@
 .DESCRIPTION
     This function allows you to configure Azure Defender for Cloud pricing settings at the resource level for:
     - Virtual Machines
-    - Virtual Machine Scale Sets  
+    - Virtual Machine Scale Sets
     - Azure Arc-enabled machines
-    
+
     You can target resources either by Resource Group or by Tag, and perform the following actions:
     - READ: View current pricing configuration
     - FREE: Remove Defender protection (set to Free tier)
     - STANDARD: Enable Defender for Cloud Plan 1 (P1)
     - DELETE: Remove resource-level configuration (inherit from parent)
-    
+
     This function is designed to be used as a post-deployment script after Azure Arc onboarding
     to ensure proper Defender for Servers pricing configuration.
 
@@ -53,7 +54,7 @@
     Version: 2.0
     Last Updated: July 2025
     Module: ServerProtection
-    
+
     Requirements:
     - Azure PowerShell module (Az)
     - Appropriate Azure permissions for the target subscription and resources
@@ -61,10 +62,10 @@
 
 .DISCLAIMER
     This function is provided "AS IS" without warranty of any kind. Use at your own risk.
-    Always test in a non-production environment first. The authors are not responsible 
+    Always test in a non-production environment first. The authors are not responsible
     for any damage or data loss that may occur from using this function.
-    
-    Please ensure you have appropriate permissions and understand the implications 
+
+    Please ensure you have appropriate permissions and understand the implications
     of changing Azure Defender for Cloud pricing configurations before proceeding.
 #>
 
@@ -72,24 +73,44 @@
 param(
     [Parameter(Mandatory=$false)]
     [string]$SubscriptionId,
-    
+
     [Parameter(Mandatory=$false)]
     [string]$ResourceGroupName,
-    
+
     [Parameter(Mandatory=$false)]
     [string]$TagName,
-    
+
     [Parameter(Mandatory=$false)]
     [string]$TagValue,
-    
+
     [Parameter(Mandatory=$false)]
     [ValidateSet('RG', 'TAG')]
     [string]$Mode,
-    
+
     [Parameter(Mandatory=$false)]
     [ValidateSet('read', 'free', 'standard', 'delete')]
     [string]$Action
 )
+
+# MANDATORY: Initialize standardized environment at the very beginning
+# This ensures the folder selection menu is ALWAYS shown and AzureArc folder is configured
+$environment = Initialize-StandardizedEnvironment -ScriptName "Set-AzureArcResourcePricing" -RequiredFileTypes @("DeviceLog")
+
+# Check if user chose to quit (return to main menu)
+if ($environment.UserQuit) {
+    Write-Host "Returning to main menu..." -ForegroundColor Yellow
+    return
+}
+
+# Check if initialization failed
+if (-not $environment.Success) {
+    Write-Host "Failed to initialize environment. Exiting..." -ForegroundColor Red
+    return
+}
+
+# Set up paths from standardized environment
+$workingFolder = $environment.FolderPath
+$logFile = $environment.FilePaths["DeviceLog"]
 
 # Initialize counters and arrays
 $failureCount = 0
@@ -167,20 +188,20 @@ if ($mode.ToLower() -eq "rg") {
         }
         Write-Host ""
         Write-Host "Note: Enter a valid resource group name or type 'exit' to quit the script." -ForegroundColor Yellow
-        
+
         do {
             $resourceGroupName = Read-Host "Enter the name of the resource group"
-            
+
             if ($resourceGroupName.ToLower() -eq 'exit') {
                 Write-Host "`[*`] Exiting script as requested." -ForegroundColor Yellow
                 exit 0
             }
-            
+
             if ([string]::IsNullOrWhiteSpace($resourceGroupName)) {
                 Write-Host "`[-`] Resource group name cannot be empty. Please enter a valid name or 'exit' to quit." -ForegroundColor Red
                 continue
             }
-            
+
             # Verify the resource group exists
             try {
                 $rg = Get-AzResourceGroup -Name $resourceGroupName -ErrorAction Stop
@@ -216,15 +237,15 @@ function Get-FreshAccessToken {
         if (-not $context -or -not $context.Account) {
             throw "No Azure context found. Please run Connect-AzAccount first."
         }
-        
+
         # Get tenant name instead of ID
         $tenant = Get-AzTenant -TenantId $context.Tenant.Id -ErrorAction SilentlyContinue
         $tenantName = if ($tenant -and $tenant.Name) { $tenant.Name } else { "Unknown Tenant" }
         Write-Host "`[*`] Getting token for tenant: $tenantName" -ForegroundColor Cyan
-        
+
         # Get token specifically for Azure Resource Manager with explicit tenant
         $tokenInfo = Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id -ErrorAction Stop
-        
+
         # Handle both current string format and future SecureString format
         $tokenValue = $tokenInfo.Token
         if ($tokenValue -is [System.Security.SecureString]) {
@@ -233,9 +254,9 @@ function Get-FreshAccessToken {
             $tokenValue = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
             [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
         }
-        
+
         Write-Host "`[+`] Token obtained successfully" -ForegroundColor Green
-        
+
         return @{
             Token = $tokenValue
             ExpiresOn = $tokenInfo.ExpiresOn.LocalDateTime
@@ -254,10 +275,10 @@ function Update-TokenIfNeeded {
         [ref]$AccessToken,
         [ref]$ExpiresOn
     )
-    
+
     $currentTime = Get-Date
     $bufferMinutes = 5  # Refresh token 5 minutes before expiry
-    
+
     if ($currentTime.AddMinutes($bufferMinutes) -ge $ExpiresOn.Value) {
         Write-Host "`[*`] Token is about to expire, refreshing..." -ForegroundColor Yellow
         try {
@@ -279,83 +300,196 @@ function Format-PricingConfiguration {
         [Parameter(Mandatory=$true)]
         $PricingResponse,
         [Parameter(Mandatory=$true)]
-        [string]$ResourceName
+        [string]$ResourceName,
+        [Parameter(Mandatory=$false)]
+        $ResourceDetails
     )
-    
-    Write-Host "`[*`] Pricing Configuration for: $ResourceName" -ForegroundColor Cyan
-    
-    if ($PricingResponse -and $PricingResponse.properties) {
-        $props = $PricingResponse.properties
-        
-        # Create a custom object for table formatting
-        $configTable = [PSCustomObject]@{
-            'Property' = @()
-            'Value' = @()
+
+    Write-Host ""
+    Write-Host "---------------------------------------------------------------------------------------------------"
+    Write-Host "DEFENDER FOR SERVERS CONFIGURATION REPORT - Resource: $ResourceName"
+    Write-Host "---------------------------------------------------------------------------------------------------"
+    Write-Host ""
+
+    # Resource Information Section
+    if ($ResourceDetails) {
+        Write-Host "RESOURCE INFORMATION"
+        Write-Host ""
+        if ($ResourceDetails.location) {
+            Write-Host "  Location              : $($ResourceDetails.location)"
         }
-        
-        # Add basic properties
-        if ($props.pricingTier) {
-            $configTable.Property += "Pricing Tier"
-            $configTable.Value += $props.pricingTier.ToUpper()
+        if ($ResourceDetails.type) {
+            Write-Host "  Resource Type         : $($ResourceDetails.type)"
         }
-        
-        if ($props.subPlan) {
-            $configTable.Property += "Sub Plan"
-            $configTable.Value += $props.subPlan
+        if ($ResourceDetails.id) {
+            Write-Host "  Resource ID           : $($ResourceDetails.id)"
         }
-        
-        if ($props.freeTrialRemainingTime) {
-            $configTable.Property += "Free Trial Remaining"
-            $configTable.Value += $props.freeTrialRemainingTime
-        }
-        
-        if ($props.enablementTime) {
-            $configTable.Property += "Enablement Time"
-            $configTable.Value += $props.enablementTime
-        }
-        
-        if ($props.deprecated) {
-            $configTable.Property += "Deprecated"
-            $configTable.Value += $props.deprecated
-        }
-        
-        # Display the formatted table
-        for ($i = 0; $i -lt $configTable.Property.Count; $i++) {
-            $property = $configTable.Property[$i]
-            $value = $configTable.Value[$i]
-            Write-Host ("{0,-25}: {1}" -f $property, $value) -ForegroundColor White
-        }
-        
-        # Display extensions if they exist
-        if ($props.extensions -and $props.extensions.Count -gt 0) {
-            Write-Host "`n[*] Extensions:" -ForegroundColor Yellow
-            foreach ($extension in $props.extensions) {
-                Write-Host ("  Name: {0}" -f $extension.name) -ForegroundColor White
-                if ($extension.isEnabled) {
-                    Write-Host ("  Status: {0}" -f $(if ($extension.isEnabled -eq $true) { "Enabled" } else { "Disabled" })) -ForegroundColor $(if ($extension.isEnabled -eq $true) { "Green" } else { "Red" })
-                }
-                if ($extension.additionalExtensionProperties) {
-                    Write-Host "  Additional Properties:" -ForegroundColor Gray
-                    $extension.additionalExtensionProperties.PSObject.Properties | ForEach-Object {
-                        Write-Host ("    {0}: {1}" -f $_.Name, $_.Value) -ForegroundColor Gray
-                    }
-                }
-                Write-Host ""
+        if ($ResourceDetails.tags -and $ResourceDetails.tags.PSObject.Properties.Count -gt 0) {
+            Write-Host "  Tags                  :"
+            $ResourceDetails.tags.PSObject.Properties | ForEach-Object {
+                Write-Host "    $($_.Name) = $($_.Value)"
             }
         }
+        Write-Host ""
     }
-    else {
-        Write-Host "`[!`] No pricing configuration data available" -ForegroundColor Yellow
+
+    # Pricing Configuration Section
+    Write-Host "DEFENDER FOR SERVERS PRICING CONFIGURATION"
+    Write-Host ""
+
+    if ($PricingResponse -and $PricingResponse.properties) {
+        $props = $PricingResponse.properties
+
+        # Pricing Tier
+        if ($props.pricingTier) {
+            $tier = $props.pricingTier.ToUpper()
+            Write-Host "  Pricing Tier          : $tier"
+
+            if ($tier -eq "STANDARD") {
+                Write-Host "  Status                : Defender for Servers ENABLED"
+            } else {
+                Write-Host "  Status                : Defender for Servers DISABLED"
+            }
+        }
+
+        # Sub Plan
+        if ($props.subPlan) {
+            Write-Host "  Sub Plan              : $($props.subPlan)"
+        }
+
+        # Enablement Time
+        if ($props.enablementTime) {
+            $enablementDate = try { [DateTime]::Parse($props.enablementTime).ToString("yyyy-MM-dd HH:mm:ss UTC") } catch { $props.enablementTime }
+            Write-Host "  Enabled On            : $enablementDate"
+        }
+
+        # Free Trial Information
+        if ($props.freeTrialRemainingTime) {
+            Write-Host "  Free Trial Remaining  : $($props.freeTrialRemainingTime)"
+        }
+
+        # Deprecated Status
+        if ($props.deprecated -eq $true) {
+            Write-Host "  Deprecated            : YES"
+        }
+
+    } else {
+        Write-Host "  Status                : NO PRICING CONFIGURATION FOUND"
+        Write-Host "  Note                  : Resource inherits parent configuration"
     }
-    
-    # Display resource metadata
+
+    Write-Host ""
+
+    # Security Extensions Section
+    if ($PricingResponse -and $PricingResponse.properties -and $PricingResponse.properties.extensions -and $PricingResponse.properties.extensions.Count -gt 0) {
+        Write-Host "SECURITY EXTENSIONS & FEATURES"
+        Write-Host ""
+
+        foreach ($extension in $PricingResponse.properties.extensions) {
+            $extensionName = $extension.name
+            $isEnabled = $extension.isEnabled
+            $statusText = if ($isEnabled -eq $true) { "ENABLED" } else { "DISABLED" }
+
+            Write-Host "  Extension: $extensionName"
+            Write-Host "    Status              : $statusText"
+            Write-Host ""
+        }
+    }
+
+    # Check for Microsoft Defender for Endpoint (MDE) on Azure Arc machines
+    if ($ResourceDetails -and $ResourceDetails.type -eq "Microsoft.HybridCompute/machines") {
+        Write-Host "MICROSOFT DEFENDER FOR ENDPOINT (MDE) STATUS"
+        Write-Host ""
+
+        try {
+            # Get fresh access token for the extension query
+            Update-TokenIfNeeded -AccessToken ([ref]$script:accessToken) -ExpiresOn ([ref]$script:expireson)
+
+            # Query for MDE extension
+            $extensionsUrl = "https://management.azure.com$($ResourceDetails.id)/extensions?api-version=2022-12-27"
+            $extensionsResponse = Invoke-RestMethod -Method Get -Uri $extensionsUrl -Headers @{Authorization = "Bearer $script:accessToken"} -TimeoutSec 120
+
+            # Look for MDE.Windows extension
+            $mdeExtension = $extensionsResponse.value | Where-Object { $_.properties.type -eq "MDE.Windows" }
+
+            if ($mdeExtension) {
+                $provisioningState = $mdeExtension.properties.provisioningState
+                $typeHandlerVersion = $mdeExtension.properties.typeHandlerVersion
+
+                Write-Host "  MDE Extension         : $provisioningState"
+                Write-Host "  Extension Name        : $($mdeExtension.name)"
+                Write-Host "  Type Handler Version  : $typeHandlerVersion"
+
+                # Additional MDE extension properties
+                if ($mdeExtension.properties.publisher) {
+                    Write-Host "  Publisher             : $($mdeExtension.properties.publisher)"
+                }
+
+                if ($mdeExtension.properties.enableAutomaticUpgrade) {
+                    Write-Host "  Auto Upgrade          : $($mdeExtension.properties.enableAutomaticUpgrade)"
+                }
+
+            } else {
+                Write-Host "  MDE Extension         : NOT INSTALLED"
+                Write-Host "  Note                  : Microsoft Defender for Endpoint extension not found"
+            }
+
+        } catch {
+            Write-Host "  MDE Extension         : UNABLE TO QUERY"
+            Write-Host "  Error                 : $($_.Exception.Message)"
+        }
+
+        Write-Host ""
+    }
+
+    # Azure Arc Agent Status (for Arc machines only)
+    if ($ResourceDetails -and $ResourceDetails.type -eq "Microsoft.HybridCompute/machines" -and $ResourceDetails.properties) {
+        Write-Host "AZURE ARC AGENT STATUS"
+        Write-Host ""
+
+        $props = $ResourceDetails.properties
+
+        if ($props.status) {
+            Write-Host "  Connection Status     : $($props.status)"
+        }
+
+        if ($props.agentVersion) {
+            Write-Host "  Agent Version         : $($props.agentVersion)"
+        }
+
+        if ($props.lastStatusChange) {
+            $lastChange = try { [DateTime]::Parse($props.lastStatusChange).ToString("yyyy-MM-dd HH:mm:ss UTC") } catch { $props.lastStatusChange }
+            Write-Host "  Last Status Change    : $lastChange"
+        }
+
+        if ($props.osName) {
+            Write-Host "  Operating System      : $($props.osName)"
+        }
+
+        if ($props.osVersion) {
+            Write-Host "  OS Version            : $($props.osVersion)"
+        }
+
+        if ($props.vmId) {
+            Write-Host "  VM ID                 : $($props.vmId)"
+        }
+
+        Write-Host ""
+    }
+
+    # Resource Configuration Summary
+    Write-Host "CONFIGURATION SUMMARY"
+    Write-Host ""
     if ($PricingResponse.name) {
-        Write-Host "`n[*] Resource Information:" -ForegroundColor Magenta
-        Write-Host ("Configuration Name: {0}" -f $PricingResponse.name) -ForegroundColor White
+        Write-Host "  Configuration Name    : $($PricingResponse.name)"
     }
     if ($PricingResponse.type) {
-        Write-Host ("Resource Type: {0}" -f $PricingResponse.type) -ForegroundColor White
+        Write-Host "  Configuration Type    : $($PricingResponse.type)"
     }
+    Write-Host "  Report Generated      : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
+    Write-Host ""
+    Write-Host "---------------------------------------------------------------------------------------------------"
+    Write-Host ""
 }
 
 #region Token Acquisition
@@ -365,9 +499,9 @@ Write-Host "`[*`] Token Acquisition" -ForegroundColor Cyan
 try {
     Write-Host "`[*`] Obtaining access token..." -ForegroundColor Yellow
     $tokenInfo = Get-FreshAccessToken
-    $accessToken = $tokenInfo.Token
-    $expireson = $tokenInfo.ExpiresOn
-    Write-Host "`[+`] Token obtained successfully. Expires: $expireson" -ForegroundColor Green
+    $script:accessToken = $tokenInfo.Token
+    $script:expireson = $tokenInfo.ExpiresOn
+    Write-Host "`[+`] Token obtained successfully. Expires: $script:expireson" -ForegroundColor Green
 }
 catch {
     Write-Host "`[-`] Failed to obtain access token: $($_.Exception.Message)" -ForegroundColor Red
@@ -387,32 +521,43 @@ if ($mode.ToLower() -eq "rg") {
     # Fetch resources under a given Resource Group
     try {
         Write-Host "`[*`] Fetching resources from Resource Group '$resourceGroupName'..." -ForegroundColor Yellow
-        
+
         # Check if token needs refresh before API calls
-        Update-TokenIfNeeded -AccessToken ([ref]$accessToken) -ExpiresOn ([ref]$expireson)
-        
+        Update-TokenIfNeeded -AccessToken ([ref]$script:accessToken) -ExpiresOn ([ref]$script:expireson)
+
         # Get all virtual machines, VMSSs, and ARC machines in the resource group
         $vmUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resourceGroups/$resourceGroupName/providers/Microsoft.Compute/virtualMachines?api-version=2021-04-01"
-        
+
         do{
-            $vmResponse = Invoke-RestMethod -Method Get -Uri $vmUrl -Headers @{Authorization = "Bearer $accessToken"} -TimeoutSec 120
-            $vmResponseMachines += $vmResponse.value 
+            $vmResponse = Invoke-RestMethod -Method Get -Uri $vmUrl -Headers @{Authorization = "Bearer $script:accessToken"} -TimeoutSec 120
+            $vmResponseMachines += $vmResponse.value
             $vmUrl = $vmResponse.nextLink
         } while (![string]::IsNullOrEmpty($vmUrl))
         Write-Host "`[+`] Found $($vmResponseMachines.Count) VMs" -ForegroundColor Green
 
         $vmssUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resourceGroups/$resourceGroupName/providers/Microsoft.Compute/virtualMachineScaleSets?api-version=2021-04-01"
         do{
-            $vmssResponse = Invoke-RestMethod -Method Get -Uri $vmssUrl -Headers @{Authorization = "Bearer $accessToken"} -TimeoutSec 120
+            $vmssResponse = Invoke-RestMethod -Method Get -Uri $vmssUrl -Headers @{Authorization = "Bearer $script:accessToken"} -TimeoutSec 120
             $vmssResponseMachines += $vmssResponse.value
             $vmssUrl = $vmssResponse.nextLink
         } while (![string]::IsNullOrEmpty($vmssUrl))
         Write-Host "`[+`] Found $($vmssResponseMachines.Count) VMSSs" -ForegroundColor Green
-        
+
         $arcUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resourceGroups/$resourceGroupName/providers/Microsoft.HybridCompute/machines?api-version=2022-12-27"
         do{
-            $arcResponse = Invoke-RestMethod -Method Get -Uri $arcUrl -Headers @{Authorization = "Bearer $accessToken"} -TimeoutSec 120
-            $arcResponseMachines += $arcResponse.value
+            $arcResponse = Invoke-RestMethod -Method Get -Uri $arcUrl -Headers @{Authorization = "Bearer $script:accessToken"} -TimeoutSec 120
+            # Get detailed information for each Arc machine
+            foreach ($arcMachine in $arcResponse.value) {
+                # Get full details for the Arc machine
+                $detailUrl = "https://management.azure.com$($arcMachine.id)?api-version=2022-12-27"
+                try {
+                    $detailResponse = Invoke-RestMethod -Method Get -Uri $detailUrl -Headers @{Authorization = "Bearer $script:accessToken"} -TimeoutSec 120
+                    $arcResponseMachines += $detailResponse
+                } catch {
+                    # If detailed call fails, use basic info
+                    $arcResponseMachines += $arcMachine
+                }
+            }
             $arcUrl = $arcResponse.nextLink
         } while (![string]::IsNullOrEmpty($arcUrl))
         Write-Host "`[+`] Found $($arcResponseMachines.Count) ARC machines" -ForegroundColor Green
@@ -438,7 +583,7 @@ if ($mode.ToLower() -eq "rg") {
         $tagName = $TagName
         Write-Host "`[+`] Using provided tag name: $tagName" -ForegroundColor Green
     }
-    
+
     if (-not $TagValue) {
         $defaultTagValue = "Production"
         $tagValue = Read-Host "Enter the value of the tag (default: $defaultTagValue)"
@@ -447,34 +592,46 @@ if ($mode.ToLower() -eq "rg") {
         $tagValue = $TagValue
         Write-Host "`[+`] Using provided tag value: $tagValue" -ForegroundColor Green
     }
-    
+
     try {
         Write-Host "`[*`] Fetching resources by tag '$tagName=$tagValue'..." -ForegroundColor Yellow
-        
+
         # Check if token needs refresh before API calls
-        Update-TokenIfNeeded -AccessToken ([ref]$accessToken) -ExpiresOn ([ref]$expireson)
-        
+        Update-TokenIfNeeded -AccessToken ([ref]$script:accessToken) -ExpiresOn ([ref]$script:expireson)
+
         # Get all virtual machines, VMSSs, and ARC machines based on the given tag
         $vmUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resources?`$filter=resourceType eq 'Microsoft.Compute/virtualMachines'`&api-version=2021-04-01"
         do{
-            $vmResponse = Invoke-RestMethod -Method Get -Uri $vmUrl -Headers @{Authorization = "Bearer $accessToken"} -TimeoutSec 120
+            $vmResponse = Invoke-RestMethod -Method Get -Uri $vmUrl -Headers @{Authorization = "Bearer $script:accessToken"} -TimeoutSec 120
             $vmResponseMachines += $vmResponse.value | Where-Object {$_.tags.$tagName -eq $tagValue}
             $vmUrl = $vmResponse.nextLink
         } while (![string]::IsNullOrEmpty($vmUrl))
         Write-Host "`[+`] Found $($vmResponseMachines.Count) VMs with tag '$tagName=$tagValue'" -ForegroundColor Green
-        
+
         $vmssUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resources?`$filter=resourceType eq 'Microsoft.Compute/virtualMachineScaleSets'`&api-version=2021-04-01"
         do{
-            $vmssResponse = Invoke-RestMethod -Method Get -Uri $vmssUrl -Headers @{Authorization = "Bearer $accessToken"} -TimeoutSec 120
+            $vmssResponse = Invoke-RestMethod -Method Get -Uri $vmssUrl -Headers @{Authorization = "Bearer $script:accessToken"} -TimeoutSec 120
             $vmssResponseMachines += $vmssResponse.value | Where-Object {$_.tags.$tagName -eq $tagValue}
             $vmssUrl = $vmssResponse.nextLink
         } while (![string]::IsNullOrEmpty($vmssUrl))
         Write-Host "`[+`] Found $($vmssResponseMachines.Count) VMSSs with tag '$tagName=$tagValue'" -ForegroundColor Green
-        
+
         $arcUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resources?`$filter=resourceType eq 'Microsoft.HybridCompute/machines'`&api-version=2023-07-01"
         do{
-            $arcResponse = Invoke-RestMethod -Method Get -Uri $arcUrl -Headers @{Authorization = "Bearer $accessToken"} -TimeoutSec 120
-            $arcResponseMachines += $arcResponse.value | Where-Object {$_.tags.$tagName -eq $tagValue}
+            $arcResponse = Invoke-RestMethod -Method Get -Uri $arcUrl -Headers @{Authorization = "Bearer $script:accessToken"} -TimeoutSec 120
+            $filteredArcMachines = $arcResponse.value | Where-Object {$_.tags.$tagName -eq $tagValue}
+            # Get detailed information for each filtered Arc machine
+            foreach ($arcMachine in $filteredArcMachines) {
+                # Get full details for the Arc machine
+                $detailUrl = "https://management.azure.com$($arcMachine.id)?api-version=2022-12-27"
+                try {
+                    $detailResponse = Invoke-RestMethod -Method Get -Uri $detailUrl -Headers @{Authorization = "Bearer $script:accessToken"} -TimeoutSec 120
+                    $arcResponseMachines += $detailResponse
+                } catch {
+                    # If detailed call fails, use basic info
+                    $arcResponseMachines += $arcMachine
+                }
+            }
             $arcUrl = $arcResponse.nextLink
         } while (![string]::IsNullOrEmpty($arcUrl))
         Write-Host "`[+`] Found $($arcResponseMachines.Count) ARC machines with tag '$tagName=$tagValue'" -ForegroundColor Green
@@ -580,8 +737,8 @@ if ($vmResponseMachines.Count -gt 0) {
     Write-Host ""
     foreach ($machine in $vmResponseMachines) {
         # Check if token needs refresh, refresh only if needed
-        Update-TokenIfNeeded -AccessToken ([ref]$accessToken) -ExpiresOn ([ref]$expireson)
-        
+        Update-TokenIfNeeded -AccessToken ([ref]$script:accessToken) -ExpiresOn ([ref]$script:expireson)
+
         $pricingUrl = "https://management.azure.com$($machine.id)/providers/Microsoft.Security/pricings/virtualMachines?api-version=2024-01-01"
         if($PricingTier.ToLower() -eq "free") {
             $pricingBody = @{
@@ -601,18 +758,18 @@ if ($vmResponseMachines.Count -gt 0) {
         Write-Host "`[*`] Processing pricing configuration for '$($machine.name)':"
         try {
             if($PricingTier.ToLower() -eq "delete") {
-                $pricingResponse = Invoke-RestMethod -Method Delete -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -ContentType "application/json" -TimeoutSec 120
+                $pricingResponse = Invoke-RestMethod -Method Delete -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -ContentType "application/json" -TimeoutSec 120
                 Write-Host "`[+`] Successfully deleted pricing configuration for $($machine.name)" -ForegroundColor Green
                 $successCount++
                 $vmSuccessCount++
             } elseif ($PricingTier.ToLower() -eq "read") {
-                $pricingResponse = Invoke-RestMethod -Method Get -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -ContentType "application/json" -TimeoutSec 120
+                $pricingResponse = Invoke-RestMethod -Method Get -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -ContentType "application/json" -TimeoutSec 120
                 Write-Host "`[+`] Successfully read pricing configuration for $($machine.name)" -ForegroundColor Green
-                Format-PricingConfiguration -PricingResponse $pricingResponse -ResourceName $machine.name
+                Format-PricingConfiguration -PricingResponse $pricingResponse -ResourceName $machine.name -ResourceDetails $machine
                 $successCount++
                 $vmSuccessCount++
             } else {
-                $pricingResponse = Invoke-RestMethod -Method Put -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -Body ($pricingBody | ConvertTo-Json) -ContentType "application/json" -TimeoutSec 120
+                $pricingResponse = Invoke-RestMethod -Method Put -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -Body ($pricingBody | ConvertTo-Json) -ContentType "application/json" -TimeoutSec 120
                 Write-Host "`[+`] Successfully updated pricing configuration for $($machine.name)" -ForegroundColor Green
                 $successCount++
                 $vmSuccessCount++
@@ -637,8 +794,8 @@ if ($vmssResponseMachines.Count -gt 0) {
     Write-Host ""
     foreach ($machine in $vmssResponseMachines) {
         # Check if token needs refresh, refresh only if needed
-        Update-TokenIfNeeded -AccessToken ([ref]$accessToken) -ExpiresOn ([ref]$expireson)
-        
+        Update-TokenIfNeeded -AccessToken ([ref]$script:accessToken) -ExpiresOn ([ref]$script:expireson)
+
         $pricingUrl = "https://management.azure.com$($machine.id)/providers/Microsoft.Security/pricings/virtualMachines?api-version=2024-01-01"
         if($PricingTier.ToLower() -eq "free") {
             $pricingBody = @{
@@ -658,18 +815,18 @@ if ($vmssResponseMachines.Count -gt 0) {
         Write-Host "`[*`] Processing pricing configuration for '$($machine.name)':"
         try {
             if($PricingTier.ToLower() -eq "delete") {
-                $pricingResponse = Invoke-RestMethod -Method Delete -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -ContentType "application/json" -TimeoutSec 120
+                $pricingResponse = Invoke-RestMethod -Method Delete -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -ContentType "application/json" -TimeoutSec 120
                 Write-Host "`[+`] Successfully deleted pricing configuration for $($machine.name)" -ForegroundColor Green
                 $successCount++
                 $vmssSuccessCount++
             } elseif ($PricingTier.ToLower() -eq "read") {
-                $pricingResponse = Invoke-RestMethod -Method Get -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -ContentType "application/json" -TimeoutSec 120
+                $pricingResponse = Invoke-RestMethod -Method Get -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -ContentType "application/json" -TimeoutSec 120
                 Write-Host "`[+`] Successfully read pricing configuration for $($machine.name)" -ForegroundColor Green
-                Format-PricingConfiguration -PricingResponse $pricingResponse -ResourceName $machine.name
+                Format-PricingConfiguration -PricingResponse $pricingResponse -ResourceName $machine.name -ResourceDetails $machine
                 $successCount++
                 $vmssSuccessCount++
             } else {
-                $pricingResponse = Invoke-RestMethod -Method Put -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -Body ($pricingBody | ConvertTo-Json) -ContentType "application/json" -TimeoutSec 120
+                $pricingResponse = Invoke-RestMethod -Method Put -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -Body ($pricingBody | ConvertTo-Json) -ContentType "application/json" -TimeoutSec 120
                 Write-Host "`[+`] Successfully updated pricing configuration for $($machine.name)" -ForegroundColor Green
                 $successCount++
                 $vmssSuccessCount++
@@ -694,8 +851,8 @@ if ($arcResponseMachines.Count -gt 0) {
     Write-Host ""
     foreach ($machine in $arcResponseMachines) {
         # Check if token needs refresh, refresh only if needed
-        Update-TokenIfNeeded -AccessToken ([ref]$accessToken) -ExpiresOn ([ref]$expireson)
-        
+        Update-TokenIfNeeded -AccessToken ([ref]$script:accessToken) -ExpiresOn ([ref]$script:expireson)
+
         $pricingUrl = "https://management.azure.com$($machine.id)/providers/Microsoft.Security/pricings/virtualMachines?api-version=2024-01-01"
         if($PricingTier.ToLower() -eq "free") {
             $pricingBody = @{
@@ -715,18 +872,18 @@ if ($arcResponseMachines.Count -gt 0) {
         Write-Host "`[*`] Processing pricing configuration for '$($machine.name)':" -ForegroundColor Cyan
         try {
             if($PricingTier.ToLower() -eq "delete") {
-                $pricingResponse = Invoke-RestMethod -Method Delete -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -ContentType "application/json" -TimeoutSec 120
+                $pricingResponse = Invoke-RestMethod -Method Delete -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -ContentType "application/json" -TimeoutSec 120
                 Write-Host "`[+`] Successfully deleted pricing configuration for $($machine.name)" -ForegroundColor Green
                 $successCount++
                 $arcSuccessCount++
             } elseif ($PricingTier.ToLower() -eq "read") {
-                $pricingResponse = Invoke-RestMethod -Method Get -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -ContentType "application/json" -TimeoutSec 120
+                $pricingResponse = Invoke-RestMethod -Method Get -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -ContentType "application/json" -TimeoutSec 120
                 Write-Host "`[+`] Successfully read pricing configuration for $($machine.name)" -ForegroundColor Green
-                Format-PricingConfiguration -PricingResponse $pricingResponse -ResourceName $machine.name
+                Format-PricingConfiguration -PricingResponse $pricingResponse -ResourceName $machine.name -ResourceDetails $machine
                 $successCount++
                 $arcSuccessCount++
             } else {
-                $pricingResponse = Invoke-RestMethod -Method Put -Uri $pricingUrl -Headers @{Authorization = "Bearer $accessToken"} -Body ($pricingBody | ConvertTo-Json) -ContentType "application/json" -TimeoutSec 120
+                $pricingResponse = Invoke-RestMethod -Method Put -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -Body ($pricingBody | ConvertTo-Json) -ContentType "application/json" -TimeoutSec 120
                 Write-Host "`[+`] Successfully updated pricing configuration for $($machine.name)" -ForegroundColor Green
                 $successCount++
                 $arcSuccessCount++
@@ -779,4 +936,6 @@ Write-Host "Function execution completed!`n" -ForegroundColor Green
 #endregion
 
 }
+
+
 

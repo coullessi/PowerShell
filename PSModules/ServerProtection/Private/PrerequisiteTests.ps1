@@ -1,4 +1,4 @@
-﻿function Test-AzureResourceProviders {
+function Test-AzureResourceProviders {
     <#
     .SYNOPSIS
         Tests and registers Azure Resource Providers required for Azure Arc.
@@ -6,37 +6,37 @@
     if (-not $script:azureLoginCompleted -or $script:resourceProvidersChecked) {
         return
     }
-    
+
     # Suppress warnings for resource provider operations
     $OriginalWarningPreference = $WarningPreference
     $WarningPreference = 'SilentlyContinue'
-    
+
     try {
         Write-Step "Checking and registering Azure Resource Provider registrations"
         $providers = @(
             "Microsoft.HybridCompute",
-            "Microsoft.GuestConfiguration", 
+            "Microsoft.GuestConfiguration",
             "Microsoft.AzureArcData",
             "Microsoft.HybridConnectivity"
         )
-        
+
         $results = @()
-        
+
         # Show progress while checking and registering providers
         Write-Progress -Activity "Processing Resource Providers" -Status "Initializing..." -PercentComplete 0
-        
+
         for ($i = 0; $i -lt $providers.Count; $i++) {
             $provider = $providers[$i]
             $percentComplete = [math]::Round((($i + 1) / $providers.Count) * 100)
             Write-Progress -Activity "Processing Resource Providers" -Status "Processing $provider... ($($i + 1)/$($providers.Count))" -PercentComplete $percentComplete
-            
+
             try {
                 # Check current status
                 $resourceProvider = Get-AzResourceProvider -ProviderNamespace $provider -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
-                
+
                 if ($resourceProvider) {
                     $currentStatus = $resourceProvider.RegistrationState
-                    
+
                     if ($currentStatus -eq "Registered") {
                         Write-Host "     $provider : Already registered" -ForegroundColor Green
                         $results += [PSCustomObject]@{
@@ -50,21 +50,21 @@
                     # Register the provider
                     Write-Host "     $provider : Registering..." -ForegroundColor Yellow
                     Register-AzResourceProvider -ProviderNamespace $provider -ErrorAction Stop | Out-Null
-                    
+
                     # Wait for registration to complete (with shorter timeout for better UX)
                     $timeout = 120  # 2 minutes
                     $timer = 0
                     $interval = 5
-                    
+
                     do {
                         Start-Sleep -Seconds $interval
                         $timer += $interval
-                        
+
                         $providerStatus = Get-AzResourceProvider -ProviderNamespace $provider -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
                         $status = $providerStatus.RegistrationState
-                        
+
                     } while ($timer -lt $timeout -and $status -ne "Registered")
-                    
+
                     if ($status -eq "Registered") {
                         Write-Host "     $provider : Successfully registered" -ForegroundColor Green
                         $results += [PSCustomObject]@{
@@ -97,9 +97,9 @@
                 }
             }
         }
-        
+
         Write-Progress -Activity "Processing Resource Providers" -Completed
-        
+
         # Display registration summary
         Write-Host "`n Resource Provider Registration Summary:" -ForegroundColor Cyan
         $successCount = ($results | Where-Object { $_.Success }).Count
@@ -126,19 +126,19 @@ function Test-DeviceCheck {
     <#
     .SYNOPSIS
         Performs comprehensive prerequisite checks on a single device for Azure Arc and MDE integration.
-    
+
     .PARAMETER DeviceName
         Name of the device to check.
-    
+
     .PARAMETER ValidateDefenderConfiguration
         Perform deep validation of Microsoft Defender for Endpoint configuration.
-    
+
     .PARAMETER CheckSystemRequirements
         Validate hardware and system requirements.
-    
+
     .PARAMETER SkipInteractiveChecks
         Skip checks that require user interaction.
-    
+
     .PARAMETER GenerateRemediationScript
         Generate remediation scripts for identified issues.
     #>
@@ -149,19 +149,19 @@ function Test-DeviceCheck {
         [switch]$SkipInteractiveChecks,
         [switch]$GenerateRemediationScript
     )
-    
+
     # Initialize remediation script content
     $script:remediationScriptContent = @()
     $script:remediationScriptContent += "# Azure Arc `& MDE Prerequisites Remediation Script"
     $script:remediationScriptContent += "# Generated on: $(Get-Date)"
     $script:remediationScriptContent += "# Target Device: $DeviceName"
     $script:remediationScriptContent += ""
-    
+
     # Get OS version for header display
     $osVersion = "Unknown OS"
     $session = $null
     $deviceInfo = @{}
-    
+
     try {
         # Test device connectivity first
         $isReachable = Test-DeviceConnectivity -DeviceName $DeviceName
@@ -172,47 +172,47 @@ function Test-DeviceCheck {
             }
             $osVersion = Get-DeviceOSVersion -DeviceName $DeviceName -Session $session
             $script:deviceOSVersions[$DeviceName] = $osVersion
-            
+
             # Get comprehensive device information
             $deviceInfo = Get-DeviceSystemInfo -DeviceName $DeviceName -Session $session
         }
     } catch {
         $osVersion = "Unknown OS"
     }
-    
+
     Write-Host "`n  COMPREHENSIVE PREREQUISITES CHECK: $DeviceName" -ForegroundColor Yellow
     Write-Host "    OS: $osVersion | Architecture: $($deviceInfo.Architecture)" -ForegroundColor Gray
     Write-Host "" -ForegroundColor Yellow
-    
+
     # Add device header to consolidated log
     "" | Out-File -FilePath $script:globalLogFile -Append
     "DEVICE: $DeviceName - Comprehensive Prerequisites Check Started at $(Get-Date)" | Out-File -FilePath $script:globalLogFile -Append
     "OS: $osVersion | Architecture: $($deviceInfo.Architecture)" | Out-File -FilePath $script:globalLogFile -Append
     "=" * 100 | Out-File -FilePath $script:globalLogFile -Append
-    
+
     # Test device connectivity
     Write-Step "Testing device connectivity and accessibility" $DeviceName
     if (-not $isReachable) {
         $isReachable = Test-DeviceConnectivity -DeviceName $DeviceName
     }
-    
+
     if (-not $isReachable) {
-        Test-Prerequisites $DeviceName "Device Connectivity" "Error" "Device is not reachable via network or WinRM"
+        Test-Prerequisite $DeviceName "Device Connectivity" "Error" "Device is not reachable via network or WinRM"
         Write-Host "     Device is unreachable. Skipping all other checks." -ForegroundColor Red
         Add-RemediationStep "# Device connectivity failed - verify network connectivity and WinRM configuration"
         Add-RemediationStep "Test-NetConnection -ComputerName $DeviceName -Port 5985"
         Add-RemediationStep "Enable-PSRemoting -Force  # Run on target device"
         return
     } else {
-        Test-Prerequisites $DeviceName "Device Connectivity" "OK" "Device is reachable and accessible"
+        Test-Prerequisite $DeviceName "Device Connectivity" "OK" "Device is reachable and accessible"
     }
-    
+
     # Calculate total steps for comprehensive checking
     $totalSteps = 25
     if ($CheckSystemRequirements) { $totalSteps += 8 }
     if ($ValidateDefenderConfiguration) { $totalSteps += 12 }
     $currentStep = 0
-    
+
     try {
         if ($DeviceName -ne $env:COMPUTERNAME -and $DeviceName -ne "localhost") {
             if (-not $session) {
@@ -221,135 +221,135 @@ function Test-DeviceCheck {
                 Write-Host "     Secure remote session established successfully" -ForegroundColor Green
             }
         }
-        
+
         # ============================================================================
         # 1. OPERATING SYSTEM REQUIREMENTS VALIDATION
         # ============================================================================
         Write-Host "`n 1. OPERATING SYSTEM REQUIREMENTS" -ForegroundColor Cyan
-        
+
         # Windows Version and Build Check
         $currentStep++
         Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
         Write-Step "Validating Windows version and build compatibility" $DeviceName
         $osCompatibility = Test-WindowsVersionCompatibility -DeviceName $DeviceName -Session $session
         if ($osCompatibility.IsSupported) {
-            Test-Prerequisites $DeviceName "Windows Version" "OK" "$($osCompatibility.Version) - Build $($osCompatibility.Build)"
+            Test-Prerequisite $DeviceName "Windows Version" "OK" "$($osCompatibility.Version) - Build $($osCompatibility.Build)"
         } else {
-            Test-Prerequisites $DeviceName "Windows Version" "Error" "$($osCompatibility.Version) - $($osCompatibility.Reason)"
+            Test-Prerequisite $DeviceName "Windows Version" "Error" "$($osCompatibility.Version) - $($osCompatibility.Reason)"
             Add-RemediationStep "# Windows version $($osCompatibility.Version) is not supported"
             Add-RemediationStep "# Minimum requirement: Windows Server 2012 R2 or later"
             Add-RemediationStep "# Consider upgrading to a supported Windows Server version"
         }
-        
+
         # Architecture Check
         $currentStep++
         Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
         Write-Step "Checking processor architecture compatibility" $DeviceName
         $archResult = Test-ProcessorArchitecture -DeviceName $DeviceName -Session $session
         if ($archResult.IsSupported) {
-            Test-Prerequisites $DeviceName "Processor Architecture" "OK" "$($archResult.Architecture) - Supported"
+            Test-Prerequisite $DeviceName "Processor Architecture" "OK" "$($archResult.Architecture) - Supported"
         } else {
-            Test-Prerequisites $DeviceName "Processor Architecture" "Error" "$($archResult.Architecture) - Not supported for Azure Arc"
+            Test-Prerequisite $DeviceName "Processor Architecture" "Error" "$($archResult.Architecture) - Not supported for Azure Arc"
             Add-RemediationStep "# Processor architecture $($archResult.Architecture) is not supported"
             Add-RemediationStep "# Azure Arc requires x64 or ARM64 architecture"
         }
-        
+
         # System Requirements Check (if enabled)
         if ($CheckSystemRequirements) {
             Write-Host "`n SYSTEM HARDWARE REQUIREMENTS" -ForegroundColor Cyan
-            
+
             # Memory Check
             $currentStep++
             Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
             Write-Step "Validating system memory requirements" $DeviceName
             $memoryResult = Test-SystemMemoryRequirements -DeviceName $DeviceName -Session $session
             if ($memoryResult.IsSufficient) {
-                Test-Prerequisites $DeviceName "System Memory" "OK" "$([math]::Round($memoryResult.TotalGB, 1)) GB available"
+                Test-Prerequisite $DeviceName "System Memory" "OK" "$([math]::Round($memoryResult.TotalGB, 1)) GB available"
             } else {
-                Test-Prerequisites $DeviceName "System Memory" "Warning" "$([math]::Round($memoryResult.TotalGB, 1)) GB - Below recommended 4GB"
+                Test-Prerequisite $DeviceName "System Memory" "Warning" "$([math]::Round($memoryResult.TotalGB, 1)) GB - Below recommended 4GB"
                 Add-RemediationStep "# System has only $([math]::Round($memoryResult.TotalGB, 1)) GB RAM"
                 Add-RemediationStep "# Consider adding more memory for optimal performance"
             }
-            
+
             # Disk Space Check
             $currentStep++
             Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
             Write-Step "Checking system drive free space" $DeviceName
             $diskResult = Test-SystemDiskSpace -DeviceName $DeviceName -Session $session
             if ($diskResult.IsSufficient) {
-                Test-Prerequisites $DeviceName "System Drive Space" "OK" "$([math]::Round($diskResult.FreeSpaceGB, 1)) GB free on $($diskResult.Drive)"
+                Test-Prerequisite $DeviceName "System Drive Space" "OK" "$([math]::Round($diskResult.FreeSpaceGB, 1)) GB free on $($diskResult.Drive)"
             } else {
-                Test-Prerequisites $DeviceName "System Drive Space" "Warning" "$([math]::Round($diskResult.FreeSpaceGB, 1)) GB free - Below recommended 2GB"
+                Test-Prerequisite $DeviceName "System Drive Space" "Warning" "$([math]::Round($diskResult.FreeSpaceGB, 1)) GB free - Below recommended 2GB"
                 Add-RemediationStep "# System drive has only $([math]::Round($diskResult.FreeSpaceGB, 1)) GB free space"
                 Add-RemediationStep "# Free up disk space or consider disk cleanup"
                 Add-RemediationStep "cleanmgr /sagerun:1  # Run disk cleanup"
             }
         }
-        
+
         # ============================================================================
         # 2. POWERSHELL `& EXECUTION ENVIRONMENT
         # ============================================================================
         Write-Host "`n 2. POWERSHELL `& EXECUTION ENVIRONMENT" -ForegroundColor Cyan
-        
+
         # PowerShell Version
         $currentStep++
         Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
         Write-Step "Validating PowerShell version and capabilities" $DeviceName
         $psResult = Test-PowerShellVersion -DeviceName $DeviceName -Session $session
         if ($psResult.IsCompatible) {
-            Test-Prerequisites $DeviceName "PowerShell Version" "OK" "Version $($psResult.Version) - Compatible"
+            Test-Prerequisite $DeviceName "PowerShell Version" "OK" "Version $($psResult.Version) - Compatible"
         } else {
-            Test-Prerequisites $DeviceName "PowerShell Version" "Error" "Version $($psResult.Version) - Requires 5.1 or higher"
+            Test-Prerequisite $DeviceName "PowerShell Version" "Error" "Version $($psResult.Version) - Requires 5.1 or higher"
             Add-RemediationStep "# PowerShell version $($psResult.Version) is not compatible"
             Add-RemediationStep "# Install Windows Management Framework 5.1 or PowerShell 7+"
             Add-RemediationStep "# Download from: https://docs.microsoft.com/powershell/scripting/install/installing-powershell"
         }
-        
+
         # .NET Framework Version
         $currentStep++
         Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
         Write-Step "Checking .NET Framework version" $DeviceName
         $dotNetResult = Test-DotNetFrameworkVersion -DeviceName $DeviceName -Session $session
         if ($dotNetResult.IsCompatible) {
-            Test-Prerequisites $DeviceName ".NET Framework" "OK" "Version $($dotNetResult.Version) - Compatible"
+            Test-Prerequisite $DeviceName ".NET Framework" "OK" "Version $($dotNetResult.Version) - Compatible"
         } else {
-            Test-Prerequisites $DeviceName ".NET Framework" "Warning" "Version $($dotNetResult.Version) - Consider upgrading to 4.7.2+"
+            Test-Prerequisite $DeviceName ".NET Framework" "Warning" "Version $($dotNetResult.Version) - Consider upgrading to 4.7.2+"
             Add-RemediationStep "# .NET Framework version $($dotNetResult.Version) may cause compatibility issues"
             Add-RemediationStep "# Install .NET Framework 4.7.2 or later"
             Add-RemediationStep "# Download from: https://dotnet.microsoft.com/download/dotnet-framework"
         }
-        
+
         # Execution Policy
         $currentStep++
         Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
         Write-Step "Validating PowerShell execution policy" $DeviceName
         $execPolicyResult = Test-ExecutionPolicy -DeviceName $DeviceName -Session $session
         if ($execPolicyResult.IsCompatible) {
-            Test-Prerequisites $DeviceName "Execution Policy" "OK" "$($execPolicyResult.Policy) - Allows script execution"
+            Test-Prerequisite $DeviceName "Execution Policy" "OK" "$($execPolicyResult.Policy) - Allows script execution"
         } else {
-            Test-Prerequisites $DeviceName "Execution Policy" "Warning" "$($execPolicyResult.Policy) - May block Azure Arc scripts"
+            Test-Prerequisite $DeviceName "Execution Policy" "Warning" "$($execPolicyResult.Policy) - May block Azure Arc scripts"
             Add-RemediationStep "# PowerShell execution policy is set to $($execPolicyResult.Policy)"
             Add-RemediationStep "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine"
         }
-        
+
         # Azure PowerShell Module
         $currentStep++
         Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
         Write-Step "Checking Azure PowerShell module availability" $DeviceName
         $azModuleResult = Test-AzurePowerShellModule -DeviceName $DeviceName -Session $session
         if ($azModuleResult.IsInstalled) {
-            Test-Prerequisites $DeviceName "Azure PowerShell (Az)" "OK" "Version $($azModuleResult.Version) installed"
+            Test-Prerequisite $DeviceName "Azure PowerShell (Az)" "OK" "Version $($azModuleResult.Version) installed"
         } else {
-            Test-Prerequisites $DeviceName "Azure PowerShell (Az)" "Info" "Not installed - will be handled during Azure authentication"
+            Test-Prerequisite $DeviceName "Azure PowerShell (Az)" "Info" "Not installed - will be handled during Azure authentication"
             Add-RemediationStep "# Azure PowerShell module not found"
             Add-RemediationStep "Install-Module -Name Az -Repository PSGallery -Force"
         }
-        
+
         # ============================================================================
         # 3. WINDOWS SYSTEM REQUIREMENTS
         # ============================================================================
         Write-Host "`n  3. WINDOWS SYSTEM REQUIREMENTS" -ForegroundColor Cyan
-        
+
         # Windows Services
         $currentStep++
         Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
@@ -357,76 +357,76 @@ function Test-DeviceCheck {
         $servicesResult = Test-RequiredWindowsServices -DeviceName $DeviceName -Session $session
         $criticalServiceIssues = $servicesResult | Where-Object { $_.Status -ne "Running" -and $_.Critical }
         if ($criticalServiceIssues.Count -eq 0) {
-            Test-Prerequisites $DeviceName "Windows Services" "OK" "All critical services are running"
+            Test-Prerequisite $DeviceName "Windows Services" "OK" "All critical services are running"
         } else {
-            Test-Prerequisites $DeviceName "Windows Services" "Error" "$($criticalServiceIssues.Count) critical services not running"
+            Test-Prerequisite $DeviceName "Windows Services" "Error" "$($criticalServiceIssues.Count) critical services not running"
             foreach ($service in $criticalServiceIssues) {
                 Add-RemediationStep "# Critical service '$($service.Name)' is $($service.Status)"
                 Add-RemediationStep "Start-Service -Name '$($service.Name)'"
                 Add-RemediationStep "Set-Service -Name '$($service.Name)' -StartupType Automatic"
             }
         }
-        
+
         # WMI Functionality
         $currentStep++
         Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
         Write-Step "Testing Windows Management Instrumentation (WMI)" $DeviceName
         $wmiResult = Test-WMIFunctionality -DeviceName $DeviceName -Session $session
         if ($wmiResult.IsWorking) {
-            Test-Prerequisites $DeviceName "WMI Functionality" "OK" "WMI is responding correctly"
+            Test-Prerequisite $DeviceName "WMI Functionality" "OK" "WMI is responding correctly"
         } else {
-            Test-Prerequisites $DeviceName "WMI Functionality" "Error" "WMI is not responding - $($wmiResult.Error)"
+            Test-Prerequisite $DeviceName "WMI Functionality" "Error" "WMI is not responding - $($wmiResult.Error)"
             Add-RemediationStep "# WMI functionality test failed"
             Add-RemediationStep "# Try rebuilding WMI repository"
             Add-RemediationStep "winmgmt /resetrepository"
             Add-RemediationStep "winmgmt /salvagerepository"
         }
-        
+
         # Windows Update Service
         $currentStep++
         Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
         Write-Step "Checking Windows Update service availability" $DeviceName
         $updateResult = Test-WindowsUpdateService -DeviceName $DeviceName -Session $session
         if ($updateResult.IsAvailable) {
-            Test-Prerequisites $DeviceName "Windows Update" "OK" "Service is available and configured"
+            Test-Prerequisite $DeviceName "Windows Update" "OK" "Service is available and configured"
         } else {
-            Test-Prerequisites $DeviceName "Windows Update" "Warning" "Service may not be properly configured"
+            Test-Prerequisite $DeviceName "Windows Update" "Warning" "Service may not be properly configured"
             Add-RemediationStep "# Windows Update service issues detected"
             Add-RemediationStep "Start-Service -Name 'wuauserv'"
             Add-RemediationStep "Set-Service -Name 'wuauserv' -StartupType Manual"
         }
-        
+
         # Registry Permissions
         $currentStep++
         Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
         Write-Step "Validating registry permissions for Azure Arc" $DeviceName
         $registryResult = Test-RegistryPermissions -DeviceName $DeviceName -Session $session
         if ($registryResult.HasPermissions) {
-            Test-Prerequisites $DeviceName "Registry Permissions" "OK" "Adequate permissions for Azure Arc operations"
+            Test-Prerequisite $DeviceName "Registry Permissions" "OK" "Adequate permissions for Azure Arc operations"
         } else {
-            Test-Prerequisites $DeviceName "Registry Permissions" "Warning" "May have insufficient registry permissions"
+            Test-Prerequisite $DeviceName "Registry Permissions" "Warning" "May have insufficient registry permissions"
             Add-RemediationStep "# Registry permission issues detected"
             Add-RemediationStep "# Ensure running with administrative privileges"
         }
-        
+
         # ============================================================================
         # 4. AZURE ARC AGENT REQUIREMENTS
         # ============================================================================
         Write-Host "`n 4. AZURE ARC AGENT REQUIREMENTS" -ForegroundColor Cyan
-        
+
         # Azure Connected Machine Agent Installation
         $currentStep++
         Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
         Write-Step "Checking Azure Connected Machine Agent installation" $DeviceName
         $arcAgentResult = Test-AzureArcAgentInstallation -DeviceName $DeviceName -Session $session
         if ($arcAgentResult.IsInstalled) {
-            Test-Prerequisites $DeviceName "Azure Arc Agent" "OK" "Version $($arcAgentResult.Version) installed"
+            Test-Prerequisite $DeviceName "Azure Arc Agent" "OK" "Version $($arcAgentResult.Version) installed"
         } else {
-            Test-Prerequisites $DeviceName "Azure Arc Agent" "Info" "Not installed - ready for deployment"
+            Test-Prerequisite $DeviceName "Azure Arc Agent" "Info" "Not installed - ready for deployment"
             Add-RemediationStep "# Azure Connected Machine Agent not installed"
             Add-RemediationStep "# Download and install from: https://aka.ms/AzureConnectedMachineAgent"
         }
-        
+
         # Agent Service Status (if installed)
         if ($arcAgentResult.IsInstalled) {
             $currentStep++
@@ -434,15 +434,15 @@ function Test-DeviceCheck {
             Write-Step "Validating Azure Arc agent service status" $DeviceName
             $agentServiceResult = Test-AzureArcAgentService -DeviceName $DeviceName -Session $session
             if ($agentServiceResult.IsRunning) {
-                Test-Prerequisites $DeviceName "Arc Agent Service" "OK" "Service is running and healthy"
+                Test-Prerequisite $DeviceName "Arc Agent Service" "OK" "Service is running and healthy"
             } else {
-                Test-Prerequisites $DeviceName "Arc Agent Service" "Warning" "Service status: $($agentServiceResult.Status)"
+                Test-Prerequisite $DeviceName "Arc Agent Service" "Warning" "Service status: $($agentServiceResult.Status)"
                 Add-RemediationStep "# Azure Arc agent service issues"
                 Add-RemediationStep "Start-Service -Name 'himds'"
                 Add-RemediationStep "Restart-Service -Name 'GCArcService'"
             }
         }
-        
+
         # Agent Configuration Validation (if installed)
         if ($arcAgentResult.IsInstalled) {
             $currentStep++
@@ -450,113 +450,113 @@ function Test-DeviceCheck {
             Write-Step "Validating Azure Arc agent configuration" $DeviceName
             $configResult = Test-AzureArcAgentConfiguration -DeviceName $DeviceName -Session $session
             if ($configResult.IsValid) {
-                Test-Prerequisites $DeviceName "Arc Agent Config" "OK" "Configuration is valid"
+                Test-Prerequisite $DeviceName "Arc Agent Config" "OK" "Configuration is valid"
             } else {
-                Test-Prerequisites $DeviceName "Arc Agent Config" "Warning" "Configuration may need attention"
+                Test-Prerequisite $DeviceName "Arc Agent Config" "Warning" "Configuration may need attention"
                 Add-RemediationStep "# Azure Arc agent configuration issues detected"
                 Add-RemediationStep "# Review agent logs and configuration files"
             }
         }
-        
+
         # ============================================================================
         # 5. MICROSOFT DEFENDER INTEGRATION (if enabled)
         # ============================================================================
         if ($ValidateDefenderConfiguration) {
             Write-Host "`n  5. MICROSOFT DEFENDER INTEGRATION" -ForegroundColor Cyan
-            
+
             # Windows Defender Antivirus Status
             $currentStep++
             Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
             Write-Step "Checking Windows Defender Antivirus status" $DeviceName
             $defenderAvResult = Test-WindowsDefenderAntivirus -DeviceName $DeviceName -Session $session
             if ($defenderAvResult.IsHealthy) {
-                Test-Prerequisites $DeviceName "Windows Defender AV" "OK" "Active and healthy"
+                Test-Prerequisite $DeviceName "Windows Defender AV" "OK" "Active and healthy"
             } else {
-                Test-Prerequisites $DeviceName "Windows Defender AV" "Warning" "$($defenderAvResult.Issues -join '; ')"
+                Test-Prerequisite $DeviceName "Windows Defender AV" "Warning" "$($defenderAvResult.Issues -join '; ')"
                 Add-RemediationStep "# Windows Defender Antivirus issues detected"
                 Add-RemediationStep "Set-MpPreference -DisableRealtimeMonitoring `$false"
                 Add-RemediationStep "Update-MpSignature"
             }
-            
+
             # Microsoft Defender for Endpoint Service
             $currentStep++
             Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
             Write-Step "Checking Microsoft Defender for Endpoint service" $DeviceName
             $mdeServiceResult = Test-MicrosoftDefenderForEndpointService -DeviceName $DeviceName -Session $session
             if ($mdeServiceResult.IsRunning) {
-                Test-Prerequisites $DeviceName "MDE Service" "OK" "Service is running"
+                Test-Prerequisite $DeviceName "MDE Service" "OK" "Service is running"
             } else {
-                Test-Prerequisites $DeviceName "MDE Service" "Info" "Service not found - will be installed via Defender for Servers"
+                Test-Prerequisite $DeviceName "MDE Service" "Info" "Service not found - will be installed via Defender for Servers"
                 Add-RemediationStep "# Microsoft Defender for Endpoint service not found"
                 Add-RemediationStep "# This is expected if not yet onboarded to Defender for Servers"
             }
-            
+
             # Defender for Cloud Extension
             $currentStep++
             Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
             Write-Step "Checking Microsoft Defender for Cloud extension" $DeviceName
             $defenderExtResult = Test-DefenderForCloudExtension -DeviceName $DeviceName -Session $session
             if ($defenderExtResult.IsInstalled) {
-                Test-Prerequisites $DeviceName "Defender for Cloud Ext" "OK" "Extension is installed and configured"
+                Test-Prerequisite $DeviceName "Defender for Cloud Ext" "OK" "Extension is installed and configured"
             } else {
-                Test-Prerequisites $DeviceName "Defender for Cloud Ext" "Info" "Extension not found - will be deployed automatically"
+                Test-Prerequisite $DeviceName "Defender for Cloud Ext" "Info" "Extension not found - will be deployed automatically"
                 Add-RemediationStep "# Defender for Cloud extension not installed"
                 Add-RemediationStep "# This will be automatically installed after Azure Arc onboarding"
             }
         }
-        
+
         # ============================================================================
         # 6. SECURITY `& COMPLIANCE VALIDATION
         # ============================================================================
         Write-Host "`n 6. SECURITY `& COMPLIANCE" -ForegroundColor Cyan
-        
+
         # Windows Security Center Status
         $currentStep++
         Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
         Write-Step "Checking Windows Security Center status" $DeviceName
         $securityCenterResult = Test-WindowsSecurityCenter -DeviceName $DeviceName -Session $session
         if ($securityCenterResult.IsHealthy) {
-            Test-Prerequisites $DeviceName "Windows Security" "OK" "Security Center is healthy"
+            Test-Prerequisite $DeviceName "Windows Security" "OK" "Security Center is healthy"
         } else {
-            Test-Prerequisites $DeviceName "Windows Security" "Warning" "Security Center has warnings"
+            Test-Prerequisite $DeviceName "Windows Security" "Warning" "Security Center has warnings"
             Add-RemediationStep "# Windows Security Center issues detected"
             Add-RemediationStep "# Review Windows Security settings manually"
         }
-        
+
         # Group Policy Conflicts
         $currentStep++
         Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
         Write-Step "Scanning for Group Policy conflicts" $DeviceName
         $gpConflictResult = Test-GroupPolicyConflicts -DeviceName $DeviceName -Session $session
         if ($gpConflictResult.HasConflicts) {
-            Test-Prerequisites $DeviceName "Group Policy" "Warning" "$($gpConflictResult.ConflictCount) potential conflicts found"
+            Test-Prerequisite $DeviceName "Group Policy" "Warning" "$($gpConflictResult.ConflictCount) potential conflicts found"
             Add-RemediationStep "# Group Policy conflicts detected:"
             foreach ($conflict in $gpConflictResult.Conflicts) {
                 Add-RemediationStep "# - $conflict"
             }
         } else {
-            Test-Prerequisites $DeviceName "Group Policy" "OK" "No conflicts detected"
+            Test-Prerequisite $DeviceName "Group Policy" "OK" "No conflicts detected"
         }
-        
+
         # Certificate Store Validation
         $currentStep++
         Write-ProgressStep "Prerequisites Check - $DeviceName" $currentStep $totalSteps
         Write-Step "Validating certificate store for Azure root certificates" $DeviceName
         $certStoreResult = Test-CertificateStore -DeviceName $DeviceName -Session $session
         if ($certStoreResult.HasAzureCerts) {
-            Test-Prerequisites $DeviceName "Certificate Store" "OK" "Azure root certificates present"
+            Test-Prerequisite $DeviceName "Certificate Store" "OK" "Azure root certificates present"
         } else {
-            Test-Prerequisites $DeviceName "Certificate Store" "Warning" "Some Azure certificates may be missing"
+            Test-Prerequisite $DeviceName "Certificate Store" "Warning" "Some Azure certificates may be missing"
             Add-RemediationStep "# Azure root certificates may need updating"
             Add-RemediationStep "# Run Windows Update to get latest certificate updates"
             Add-RemediationStep "certlm.msc  # Manually review certificate store"
         }
-        
+
         # ============================================================================
         # 7. FINAL SUMMARY AND RECOMMENDATIONS
         # ============================================================================
         Write-Host "`n COMPREHENSIVE CHECK SUMMARY" -ForegroundColor Green
-        
+
         # Generate device summary
         $deviceResults = $script:allResults[$DeviceName]
         $totalChecks = $deviceResults.Count
@@ -564,13 +564,13 @@ function Test-DeviceCheck {
         $warningChecks = ($deviceResults | Where-Object { $_.Result -eq "Warning" }).Count
         $errorChecks = ($deviceResults | Where-Object { $_.Result -eq "Error" }).Count
         $infoChecks = ($deviceResults | Where-Object { $_.Result -eq "Info" }).Count
-        
+
         Write-Host "    Total Checks: $totalChecks" -ForegroundColor White
         Write-Host "     Passed: $okChecks" -ForegroundColor Green
         Write-Host "      Warnings: $warningChecks" -ForegroundColor Yellow
         Write-Host "     Errors: $errorChecks" -ForegroundColor Red
         Write-Host "      Info: $infoChecks" -ForegroundColor Cyan
-        
+
         # Determine overall readiness
         if ($errorChecks -eq 0 -and $warningChecks -le 2) {
             Write-Host "`n READINESS STATUS: READY FOR AZURE ARC ONBOARDING" -ForegroundColor Green
@@ -582,7 +582,7 @@ function Test-DeviceCheck {
             Write-Host "`n READINESS STATUS: REQUIRES REMEDIATION" -ForegroundColor Red
             Write-Host "   Critical issues must be resolved before Azure Arc onboarding" -ForegroundColor Red
         }
-        
+
         # Generate remediation script if requested
         if ($GenerateRemediationScript -and $script:remediationScriptContent.Count -gt 4) {
             # Use standardized output directory for remediation scripts
@@ -590,17 +590,17 @@ function Test-DeviceCheck {
             $script:remediationScriptContent | Out-File -FilePath $remediationFile -Encoding UTF8
             Write-Host "`n Remediation script generated: $remediationFile" -ForegroundColor Cyan
         }
-        
+
     } catch {
         Write-Host "`n Error during prerequisites check for $DeviceName`: $($_.Exception.Message)" -ForegroundColor Red
-        Test-Prerequisites $DeviceName "Prerequisites Check" "Error" "Failed to complete prerequisites check: $($_.Exception.Message)"
+        Test-Prerequisite $DeviceName "Prerequisites Check" "Error" "Failed to complete prerequisites check: $($_.Exception.Message)"
     } finally {
         if ($session) {
             Remove-PSSession $session -ErrorAction SilentlyContinue
             Write-Host "`n Remote session closed for $DeviceName" -ForegroundColor Gray
         }
     }
-    
+
     # Complete progress for this device
     Write-Progress "Prerequisites Check - $DeviceName" -Completed
 }
@@ -624,7 +624,7 @@ function Get-DeviceSystemInfo {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $systemInfo = Invoke-Command -Session $Session -ScriptBlock {
@@ -666,7 +666,7 @@ function Test-WindowsVersionCompatibility {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $osInfo = Invoke-Command -Session $Session -ScriptBlock {
@@ -687,7 +687,7 @@ function Test-WindowsVersionCompatibility {
                 ProductType = $os.ProductType
             }
         }
-        
+
         # Define supported versions (server only)
         $supportedVersions = @{
             "Windows Server 2012 R2" = @{ MinBuild = 9600 }
@@ -696,10 +696,10 @@ function Test-WindowsVersionCompatibility {
             "Windows Server 2022" = @{ MinBuild = 20348 }
             "Windows Server 2025" = @{ MinBuild = 26100 }
         }
-        
+
         $isSupported = $false
         $reason = "Unknown Windows version"
-        
+
         foreach ($supportedOS in $supportedVersions.Keys) {
             if ($osInfo.Caption -like "*$supportedOS*") {
                 if ([int]$osInfo.BuildNumber -ge $supportedVersions[$supportedOS].MinBuild) {
@@ -710,7 +710,7 @@ function Test-WindowsVersionCompatibility {
                 }
             }
         }
-        
+
         return [PSCustomObject]@{
             IsSupported = $isSupported
             Version = $osInfo.Caption
@@ -736,7 +736,7 @@ function Test-ProcessorArchitecture {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $archInfo = Invoke-Command -Session $Session -ScriptBlock {
@@ -745,7 +745,7 @@ function Test-ProcessorArchitecture {
         } else {
             $archInfo = (Get-CimInstance Win32_Processor).Architecture
         }
-        
+
         # Architecture codes: 0=x86, 9=x64, 12=ARM64
         $supportedArchitectures = @(9, 12)  # x64 and ARM64
         $archNames = @{
@@ -753,10 +753,10 @@ function Test-ProcessorArchitecture {
             9 = "x64"
             12 = "ARM64"
         }
-        
+
         $archName = $archNames[$archInfo]
         $isSupported = $archInfo -in $supportedArchitectures
-        
+
         return [PSCustomObject]@{
             IsSupported = $isSupported
             Architecture = $archName
@@ -778,7 +778,7 @@ function Test-SystemMemoryRequirements {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $memoryInfo = Invoke-Command -Session $Session -ScriptBlock {
@@ -789,10 +789,10 @@ function Test-SystemMemoryRequirements {
             $totalMemory = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory
             $memoryInfo = [math]::Round($totalMemory / 1GB, 2)
         }
-        
+
         $minimumGB = 4
         $isSufficient = $memoryInfo -ge $minimumGB
-        
+
         return [PSCustomObject]@{
             IsSufficient = $isSufficient
             TotalGB = $memoryInfo
@@ -816,7 +816,7 @@ function Test-SystemDiskSpace {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $diskInfo = Invoke-Command -Session $Session -ScriptBlock {
@@ -835,10 +835,10 @@ function Test-SystemDiskSpace {
                 FreeSpaceGB = [math]::Round($disk.FreeSpace / 1GB, 2)
             }
         }
-        
+
         $minimumGB = 2
         $isSufficient = $diskInfo.FreeSpaceGB -ge $minimumGB
-        
+
         return [PSCustomObject]@{
             IsSufficient = $isSufficient
             FreeSpaceGB = $diskInfo.FreeSpaceGB
@@ -864,7 +864,7 @@ function Test-PowerShellVersion {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $psVersion = Invoke-Command -Session $Session -ScriptBlock {
@@ -873,9 +873,9 @@ function Test-PowerShellVersion {
         } else {
             $psVersion = $PSVersionTable.PSVersion
         }
-        
+
         $isCompatible = $psVersion.Major -ge 5 -and ($psVersion.Major -gt 5 -or $psVersion.Minor -ge 1)
-        
+
         return [PSCustomObject]@{
             IsCompatible = $isCompatible
             Version = $psVersion.ToString()
@@ -901,7 +901,7 @@ function Test-DotNetFrameworkVersion {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $dotNetVersion = Invoke-Command -Session $Session -ScriptBlock {
@@ -928,9 +928,9 @@ function Test-DotNetFrameworkVersion {
                 $dotNetVersion = "Unknown"
             }
         }
-        
+
         $isCompatible = $dotNetVersion -like "4.7*" -or $dotNetVersion -like "4.8*"
-        
+
         return [PSCustomObject]@{
             IsCompatible = $isCompatible
             Version = $dotNetVersion
@@ -952,7 +952,7 @@ function Test-ExecutionPolicy {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $policy = Invoke-Command -Session $Session -ScriptBlock {
@@ -961,10 +961,10 @@ function Test-ExecutionPolicy {
         } else {
             $policy = Get-ExecutionPolicy
         }
-        
+
         $compatiblePolicies = @("RemoteSigned", "Unrestricted", "Bypass")
         $isCompatible = $policy -in $compatiblePolicies
-        
+
         return [PSCustomObject]@{
             IsCompatible = $isCompatible
             Policy = $policy.ToString()
@@ -986,7 +986,7 @@ function Test-AzurePowerShellModule {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $azModule = Invoke-Command -Session $Session -ScriptBlock {
@@ -995,7 +995,7 @@ function Test-AzurePowerShellModule {
         } else {
             $azModule = Get-Module -ListAvailable -Name Az | Select-Object -First 1
         }
-        
+
         return [PSCustomObject]@{
             IsInstalled = $null -ne $azModule
             Version = if ($azModule) { $azModule.Version.ToString() } else { "Not installed" }
@@ -1017,7 +1017,7 @@ function Test-RequiredWindowsServices {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     $requiredServices = @(
         @{ Name = "WinRM"; DisplayName = "Windows Remote Management"; Critical = $true },
         @{ Name = "wuauserv"; DisplayName = "Windows Update"; Critical = $true },
@@ -1027,9 +1027,9 @@ function Test-RequiredWindowsServices {
         @{ Name = "Dhcp"; DisplayName = "DHCP Client"; Critical = $false },
         @{ Name = "Dnscache"; DisplayName = "DNS Client"; Critical = $true }
     )
-    
+
     $results = @()
-    
+
     try {
         foreach ($service in $requiredServices) {
             if ($Session) {
@@ -1040,7 +1040,7 @@ function Test-RequiredWindowsServices {
             } else {
                 $serviceStatus = Get-Service -Name $service.Name -ErrorAction SilentlyContinue
             }
-            
+
             $results += [PSCustomObject]@{
                 Name = $service.Name
                 DisplayName = $service.DisplayName
@@ -1048,7 +1048,7 @@ function Test-RequiredWindowsServices {
                 Critical = $service.Critical
             }
         }
-        
+
         return $results
     } catch {
         return @()
@@ -1064,7 +1064,7 @@ function Test-WMIFunctionality {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $wmiTest = Invoke-Command -Session $Session -ScriptBlock {
@@ -1083,7 +1083,7 @@ function Test-WMIFunctionality {
                 $wmiTest = $false
             }
         }
-        
+
         return [PSCustomObject]@{
             IsWorking = $wmiTest
             Error = if (-not $wmiTest) { "WMI query failed" } else { $null }
@@ -1105,7 +1105,7 @@ function Test-WindowsUpdateService {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $updateService = Invoke-Command -Session $Session -ScriptBlock {
@@ -1114,7 +1114,7 @@ function Test-WindowsUpdateService {
         } else {
             $updateService = Get-Service -Name "wuauserv" -ErrorAction SilentlyContinue
         }
-        
+
         return [PSCustomObject]@{
             IsAvailable = $null -ne $updateService
             Status = if ($updateService) { $updateService.Status.ToString() } else { "Not Found" }
@@ -1136,7 +1136,7 @@ function Test-RegistryPermissions {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $registryTest = Invoke-Command -Session $Session -ScriptBlock {
@@ -1156,7 +1156,7 @@ function Test-RegistryPermissions {
                 $registryTest = $false
             }
         }
-        
+
         return [PSCustomObject]@{
             HasPermissions = $registryTest
         }
@@ -1176,14 +1176,14 @@ function Test-AzureArcAgentInstallation {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $agentInfo = Invoke-Command -Session $Session -ScriptBlock {
                 $agentPath = "C:\Program Files\AzureConnectedMachineAgent"
                 $agentExists = Test-Path $agentPath
                 $version = "Unknown"
-                
+
                 if ($agentExists) {
                     try {
                         $versionFile = Join-Path $agentPath "azcmagent.exe"
@@ -1194,7 +1194,7 @@ function Test-AzureArcAgentInstallation {
                         $version = "Unknown"
                     }
                 }
-                
+
                 [PSCustomObject]@{
                     IsInstalled = $agentExists
                     Version = $version
@@ -1204,7 +1204,7 @@ function Test-AzureArcAgentInstallation {
             $agentPath = "C:\Program Files\AzureConnectedMachineAgent"
             $agentExists = Test-Path $agentPath
             $version = "Unknown"
-            
+
             if ($agentExists) {
                 try {
                     $versionFile = Join-Path $agentPath "azcmagent.exe"
@@ -1215,13 +1215,13 @@ function Test-AzureArcAgentInstallation {
                     $version = "Unknown"
                 }
             }
-            
+
             $agentInfo = [PSCustomObject]@{
                 IsInstalled = $agentExists
                 Version = $version
             }
         }
-        
+
         return $agentInfo
     } catch {
         return [PSCustomObject]@{
@@ -1240,32 +1240,32 @@ function Test-AzureArcAgentService {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $serviceInfo = Invoke-Command -Session $Session -ScriptBlock {
                 $himdsService = Get-Service -Name "himds" -ErrorAction SilentlyContinue
                 $gcArcService = Get-Service -Name "GCArcService" -ErrorAction SilentlyContinue
-                
+
                 [PSCustomObject]@{
                     HimdsStatus = if ($himdsService) { $himdsService.Status.ToString() } else { "Not Found" }
                     GCArcStatus = if ($gcArcService) { $gcArcService.Status.ToString() } else { "Not Found" }
-                    IsRunning = ($himdsService -and $himdsService.Status -eq "Running") -or 
+                    IsRunning = ($himdsService -and $himdsService.Status -eq "Running") -or
                                ($gcArcService -and $gcArcService.Status -eq "Running")
                 }
             }
         } else {
             $himdsService = Get-Service -Name "himds" -ErrorAction SilentlyContinue
             $gcArcService = Get-Service -Name "GCArcService" -ErrorAction SilentlyContinue
-            
+
             $serviceInfo = [PSCustomObject]@{
                 HimdsStatus = if ($himdsService) { $himdsService.Status.ToString() } else { "Not Found" }
                 GCArcStatus = if ($gcArcService) { $gcArcService.Status.ToString() } else { "Not Found" }
-                IsRunning = ($himdsService -and $himdsService.Status -eq "Running") -or 
+                IsRunning = ($himdsService -and $himdsService.Status -eq "Running") -or
                            ($gcArcService -and $gcArcService.Status -eq "Running")
             }
         }
-        
+
         return $serviceInfo
     } catch {
         return [PSCustomObject]@{
@@ -1286,13 +1286,13 @@ function Test-AzureArcAgentConfiguration {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $configInfo = Invoke-Command -Session $Session -ScriptBlock {
                 $configPath = "C:\ProgramData\AzureConnectedMachineAgent"
                 $configExists = Test-Path $configPath
-                
+
                 [PSCustomObject]@{
                     ConfigExists = $configExists
                     IsValid = $configExists  # Simplified check
@@ -1301,13 +1301,13 @@ function Test-AzureArcAgentConfiguration {
         } else {
             $configPath = "C:\ProgramData\AzureConnectedMachineAgent"
             $configExists = Test-Path $configPath
-            
+
             $configInfo = [PSCustomObject]@{
                 ConfigExists = $configExists
                 IsValid = $configExists  # Simplified check
             }
         }
-        
+
         return $configInfo
     } catch {
         return [PSCustomObject]@{
@@ -1326,16 +1326,16 @@ function Test-WindowsDefenderAntivirus {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $defenderInfo = Invoke-Command -Session $Session -ScriptBlock {
                 try {
                     $mpPrefs = Get-MpPreference -ErrorAction SilentlyContinue
                     $mpStatus = Get-MpComputerStatus -ErrorAction SilentlyContinue
-                    
+
                     $issues = @()
-                    
+
                     if (-not $mpStatus.RealTimeProtectionEnabled) {
                         $issues += "Real-time protection disabled"
                     }
@@ -1345,7 +1345,7 @@ function Test-WindowsDefenderAntivirus {
                     if (-not $mpStatus.OnAccessProtectionEnabled) {
                         $issues += "On-access protection disabled"
                     }
-                    
+
                     [PSCustomObject]@{
                         IsHealthy = $issues.Count -eq 0
                         Issues = $issues
@@ -1365,9 +1365,9 @@ function Test-WindowsDefenderAntivirus {
             try {
                 $mpPrefs = Get-MpPreference -ErrorAction SilentlyContinue
                 $mpStatus = Get-MpComputerStatus -ErrorAction SilentlyContinue
-                
+
                 $issues = @()
-                
+
                 if (-not $mpStatus.RealTimeProtectionEnabled) {
                     $issues += "Real-time protection disabled"
                 }
@@ -1377,7 +1377,7 @@ function Test-WindowsDefenderAntivirus {
                 if (-not $mpStatus.OnAccessProtectionEnabled) {
                     $issues += "On-access protection disabled"
                 }
-                
+
                 $defenderInfo = [PSCustomObject]@{
                     IsHealthy = $issues.Count -eq 0
                     Issues = $issues
@@ -1393,7 +1393,7 @@ function Test-WindowsDefenderAntivirus {
                 }
             }
         }
-        
+
         return $defenderInfo
     } catch {
         return [PSCustomObject]@{
@@ -1414,7 +1414,7 @@ function Test-MicrosoftDefenderForEndpointService {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $mdeService = Invoke-Command -Session $Session -ScriptBlock {
@@ -1423,7 +1423,7 @@ function Test-MicrosoftDefenderForEndpointService {
         } else {
             $mdeService = Get-Service -Name "Sense" -ErrorAction SilentlyContinue
         }
-        
+
         return [PSCustomObject]@{
             IsRunning = $mdeService -and $mdeService.Status -eq "Running"
             Status = if ($mdeService) { $mdeService.Status.ToString() } else { "Not Found" }
@@ -1445,7 +1445,7 @@ function Test-DefenderForCloudExtension {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $extensionInfo = Invoke-Command -Session $Session -ScriptBlock {
@@ -1453,7 +1453,7 @@ function Test-DefenderForCloudExtension {
                     "C:\Packages\Plugins\Microsoft.Azure.AzureDefenderForServers",
                     "C:\WindowsAzure\Packages\Plugins\Microsoft.Azure.Security.Monitoring.AzureSecurityCenterForServers"
                 )
-                
+
                 $isInstalled = $false
                 foreach ($path in $extPaths) {
                     if (Test-Path $path) {
@@ -1461,7 +1461,7 @@ function Test-DefenderForCloudExtension {
                         break
                     }
                 }
-                
+
                 [PSCustomObject]@{
                     IsInstalled = $isInstalled
                 }
@@ -1471,7 +1471,7 @@ function Test-DefenderForCloudExtension {
                 "C:\Packages\Plugins\Microsoft.Azure.AzureDefenderForServers",
                 "C:\WindowsAzure\Packages\Plugins\Microsoft.Azure.Security.Monitoring.AzureSecurityCenterForServers"
             )
-            
+
             $isInstalled = $false
             foreach ($path in $extPaths) {
                 if (Test-Path $path) {
@@ -1479,12 +1479,12 @@ function Test-DefenderForCloudExtension {
                     break
                 }
             }
-            
+
             $extensionInfo = [PSCustomObject]@{
                 IsInstalled = $isInstalled
             }
         }
-        
+
         return $extensionInfo
     } catch {
         return [PSCustomObject]@{
@@ -1502,7 +1502,7 @@ function Test-WindowsSecurityCenter {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $securityInfo = Invoke-Command -Session $Session -ScriptBlock {
@@ -1533,7 +1533,7 @@ function Test-WindowsSecurityCenter {
                 }
             }
         }
-        
+
         return $securityInfo
     } catch {
         return [PSCustomObject]@{
@@ -1552,34 +1552,34 @@ function Test-GroupPolicyConflicts {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $gpInfo = Invoke-Command -Session $Session -ScriptBlock {
                 $conflicts = @()
-                
+
                 try {
                     # Check for PowerShell execution policy restrictions
                     $execPolicy = Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell" -Name "ExecutionPolicy" -ErrorAction SilentlyContinue
                     if ($execPolicy -and $execPolicy.ExecutionPolicy -eq "AllSigned") {
                         $conflicts += "PowerShell execution policy set to AllSigned via Group Policy"
                     }
-                    
+
                     # Check for Windows Update restrictions
                     $wuPolicy = Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" -Name "DisableWindowsUpdateAccess" -ErrorAction SilentlyContinue
                     if ($wuPolicy -and $wuPolicy.DisableWindowsUpdateAccess -eq 1) {
                         $conflicts += "Windows Update access disabled via Group Policy"
                     }
-                    
+
                     # Check for service control restrictions
                     $servicePolicy = Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Services" -ErrorAction SilentlyContinue
                     if ($servicePolicy) {
                         $conflicts += "Service control policies detected"
                     }
                 } catch {
-                    # Ignore errors - this is a best-effort check
+                    Write-Verbose "Could not check registry for group policy conflicts: $($_.Exception.Message)"
                 }
-                
+
                 [PSCustomObject]@{
                     HasConflicts = $conflicts.Count -gt 0
                     ConflictCount = $conflicts.Count
@@ -1588,36 +1588,36 @@ function Test-GroupPolicyConflicts {
             }
         } else {
             $conflicts = @()
-            
+
             try {
                 # Check for PowerShell execution policy restrictions
                 $execPolicy = Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell" -Name "ExecutionPolicy" -ErrorAction SilentlyContinue
                 if ($execPolicy -and $execPolicy.ExecutionPolicy -eq "AllSigned") {
                     $conflicts += "PowerShell execution policy set to AllSigned via Group Policy"
                 }
-                
+
                 # Check for Windows Update restrictions
                 $wuPolicy = Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" -Name "DisableWindowsUpdateAccess" -ErrorAction SilentlyContinue
                 if ($wuPolicy -and $wuPolicy.DisableWindowsUpdateAccess -eq 1) {
                     $conflicts += "Windows Update access disabled via Group Policy"
                 }
-                
+
                 # Check for service control restrictions
                 $servicePolicy = Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Services" -ErrorAction SilentlyContinue
                 if ($servicePolicy) {
                     $conflicts += "Service control policies detected"
                 }
             } catch {
-                # Ignore errors - this is a best-effort check
+                Write-Verbose "Could not check service control policies: $($_.Exception.Message)"
             }
-            
+
             $gpInfo = [PSCustomObject]@{
                 HasConflicts = $conflicts.Count -gt 0
                 ConflictCount = $conflicts.Count
                 Conflicts = $conflicts
             }
         }
-        
+
         return $gpInfo
     } catch {
         return [PSCustomObject]@{
@@ -1637,7 +1637,7 @@ function Test-CertificateStore {
         [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session
     )
-    
+
     try {
         if ($Session) {
             $certInfo = Invoke-Command -Session $Session -ScriptBlock {
@@ -1668,7 +1668,7 @@ function Test-CertificateStore {
                 }
             }
         }
-        
+
         return $certInfo
     } catch {
         return [PSCustomObject]@{
@@ -1677,4 +1677,7 @@ function Test-CertificateStore {
         }
     }
 }
+
+
+
 

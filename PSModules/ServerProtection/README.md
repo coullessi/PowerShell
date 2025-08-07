@@ -1,15 +1,16 @@
-# ServerProtection PowerShell Module
+# ServerProtection PowerShell Module (ARC-DFS)
 
-> **Enterprise-Grade Server Protection through Azure Arc Device Deployment & Microsoft Defender Endpoint Integration**
+> **Enterprise-Grade Server Protection through Azure Arc Device Deployment & Microsoft Defender for Servers Integration**
 
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-blue.svg)](https://github.com/PowerShell/PowerShell)
-[![Version](https://img.shields.io/badge/Version-1.0.0-brightgreen.svg)](https://github.com/LessIT/ServerProtection/releases)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-1.0.0-brightgreen.svg)](https://github.com/coullessi/PowerShell/releases)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/coullessi/PowerShell/blob/main/LICENSE)
 [![PowerShell Gallery](https://img.shields.io/badge/PowerShell%20Gallery-ServerProtection-blue.svg)](https://www.powershellgallery.com/packages/ServerProtection)
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Microsoft Defender for Servers Integration](#microsoft-defender-for-servers-integration)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Functions](#functions)
@@ -22,15 +23,27 @@
 
 ## Overview
 
-The **ServerProtection** module provides a comprehensive PowerShell solution for enterprise server protection through Azure Arc-enabled servers and Microsoft Defender for Endpoint integration. Designed for large-scale environments, it delivers professional automation tools with an intuitive interactive interface and robust error handling for mission-critical deployments.
+The **ServerProtection (ARC-DFS)** module provides a comprehensive PowerShell solution for enterprise server protection through Azure Arc-enabled servers and **Microsoft Defender for Servers** integration. Designed for large-scale environments, it delivers professional automation tools with an intuitive interactive interface and robust error handling for mission-critical deployments.
+
+## Microsoft Defender for Servers Integration
+
+Microsoft Defender for Servers provides advanced threat protection for your server workloads in Microsoft Defender for Cloud. This module streamlines the deployment process by automating Azure Arc agent installation and enabling seamless Defender for Servers protection across your infrastructure.
+
+**Defender for Servers Key Benefits:**
+- **🛡️ Advanced Threat Detection** - Behavioral analytics and machine learning-based threat detection
+- **🔍 Vulnerability Assessment** - Continuous vulnerability scanning and management
+- **🔐 Just-in-Time VM Access** - Reduce attack surface with controlled VM access
+- **🛠️ Adaptive Application Controls** - Machine learning-based application allowlisting
+- **📊 Security Recommendations** - Actionable security recommendations and compliance monitoring
+- **🔗 Integration** - Seamless integration with Azure Security Center and Azure Sentinel
 
 **Key Features:**
 - **🔍 Comprehensive Prerequisites Testing** - Complete system validation including TLS requirements, network connectivity, and Azure authentication
 - **🏗️ Automated Device Deployment** - Azure Arc device creation with Group Policy deployment for enterprise environments  
 - **📊 Advanced Diagnostics** - Professional troubleshooting and log collection capabilities
-- **💰 Pricing Management** - Post-deployment Defender for Servers pricing configuration
+- **💰 Pricing Management** - Post-deployment Defender for Servers pricing configuration at resource level
 - **📁 Unified File Management** - Standardized directory system for organized file output
-- **🎮 Interactive Interface** - User-friendly menu system with built-in help and guidance
+- **🎮 Simplified ARC-DFS Interface** - Clean, streamlined menu system with focused functionality
 - **🔐 Enterprise Authentication** - Automated Azure authentication and subscription management
 
 ## Installation

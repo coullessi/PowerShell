@@ -1,4 +1,5 @@
 ﻿function Start-ServerProtection {
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
     <#
     .SYNOPSIS
         Interactive menu system for Azure Arc and Microsoft Defender deployment.
@@ -11,15 +12,15 @@
 
     .EXAMPLE
         Start-ServerProtection
-        
+
         Launches the interactive menu system for Azure Arc deployment.
 
     .NOTES
         Author: Lessi Coulibaly
         Organization: Less-IT (AI and CyberSecurity)
-        Website: https://lessit.net
-        Version: 2.0.0
-        
+        Website: https://github.com/coullessi/PowerShell
+        Version: 1.0.0
+
         This version features a streamlined 3-option workflow:
         1. Test prerequisites with automatic resource provider registration
         2. Complete Azure Arc deployment (service principal + agent + Group Policy)
@@ -32,30 +33,30 @@
     # Module initialization check
     $requiredFunctions = @(
         'Get-AzureArcPrerequisite',
-        'New-AzureArcDevice', 
+        'New-AzureArcDevice',
         'Get-AzureArcDiagnostic',
         'Set-AzureArcResourcePricing'
     )
-    
+
     $missingFunctions = @()
     foreach ($function in $requiredFunctions) {
         if (-not (Get-Command $function -ErrorAction SilentlyContinue)) {
             $missingFunctions += $function
         }
     }
-    
+
     if ($missingFunctions.Count -gt 0) {
         Write-Host ""
-        Write-Host " ERROR: Missing required functions" -ForegroundColor Red
-        Write-Host " The following functions are not available:" -ForegroundColor Yellow
+        Write-Host " ERROR: Missing required functions"
+        Write-Host " The following functions are not available:"
         foreach ($func in $missingFunctions) {
-            Write-Host "   - $func" -ForegroundColor Gray
+            Write-Host "   - $func"
         }
         Write-Host ""
-        Write-Host " SOLUTION:" -ForegroundColor Cyan
-        Write-Host "   1. Ensure you are running this from the correct module context" -ForegroundColor White
-        Write-Host "   2. Try importing the module: Import-Module ServerProtection -Force" -ForegroundColor White
-        Write-Host "   3. Verify the module files are complete and not corrupted" -ForegroundColor White
+        Write-Host " SOLUTION:"
+        Write-Host "   1. Ensure you are running this from the correct module context"
+        Write-Host "   2. Try importing the module: Import-Module ServerProtection -Force"
+        Write-Host "   3. Verify the module files are complete and not corrupted"
         Write-Host ""
         return
     }
@@ -63,68 +64,58 @@
     # Function to display module interface
     function Write-ModuleInterface {
         Write-Host ""
-        
-        # ASCII Art Header
-        Write-Host ""
-        Write-Host "  ██╗    ██╗██╗███╗   ██╗      ███████╗███████╗██████╗ ██╗   ██╗███████╗██████╗ " -ForegroundColor Cyan
-        Write-Host "  ██║    ██║██║████╗  ██║      ██╔════╝██╔════╝██╔══██╗██║   ██║██╔════╝██╔══██╗" -ForegroundColor Cyan
-        Write-Host "  ██║ █╗ ██║██║██╔██╗ ██║█████╗███████╗█████╗  ██████╔╝██║   ██║█████╗  ██████╔╝" -ForegroundColor Cyan
-        Write-Host "  ██║███╗██║██║██║╚██╗██║╚════╝╚════██║██╔══╝  ██╔══██╗╚██╗ ██╔╝██╔══╝  ██╔══██╗" -ForegroundColor Cyan
-        Write-Host "  ╚███╔███╔╝██║██║ ╚████║      ███████║███████╗██║  ██║ ╚████╔╝ ███████╗██║  ██║" -ForegroundColor Cyan
-        Write-Host "   ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝      ╚══════╝╚══════╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝" -ForegroundColor Cyan
-        Write-Host " ██████╗ ██████╗  ██████╗ ████████╗███████╗ ██████╗████████╗██╗ ██████╗ ███╗   ██╗" -ForegroundColor Cyan
-        Write-Host " ██╔══██╗██╔══██╗██╔═══██╗╚══██╔══╝██╔════╝██╔════╝╚══██╔══╝██║██╔═══██╗████╗  ██║" -ForegroundColor Cyan
-        Write-Host " ██████╔╝██████╔╝██║   ██║   ██║   █████╗  ██║        ██║   ██║██║   ██║██╔██╗ ██║" -ForegroundColor Cyan
-        Write-Host " ██╔═══╝ ██╔══██╗██║   ██║   ██║   ██╔══╝  ██║        ██║   ██║██║   ██║██║╚██╗██║" -ForegroundColor Cyan
-        Write-Host " ██║     ██║  ██║╚██████╔╝   ██║   ███████╗╚██████╗   ██║   ██║╚██████╔╝██║ ╚████║" -ForegroundColor Cyan
-        Write-Host " ╚═╝     ╚═╝  ╚═╝ ╚═════╝    ╚═╝   ╚══════╝ ╚═════╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝" -ForegroundColor Cyan
-        Write-Host ""
-        Write-Host " MODULE OVERVIEW:" -ForegroundColor Green
-        Write-Host "   Comprehensive PowerShell module for Azure Arc onboarding and Microsoft Defender" -ForegroundColor White
-        Write-Host "   for Endpoint integration through enterprise-grade Group Policy deployment." -ForegroundColor White
-        Write-Host ""
-        Write-Host " RECOMMENDED WORKFLOW:" -ForegroundColor Cyan
-        Write-Host "    [1]: Start with the validation of your environment and register Azure providers" -ForegroundColor White
-        Write-Host "    [2]: Complete Azure Arc deployment with service principals and Group Policy" -ForegroundColor White
-        Write-Host "    [3]: Perform comprehensive Azure Arc diagnostics and troubleshooting" -ForegroundColor White
-        Write-Host "    [4]: Configure Defender for Servers pricing at resource level (post-deployment)" -ForegroundColor White
-        Write-Host ""
-    }
 
-    # Function to display interactive menu
-    function Write-InteractiveMenu {
-        Write-Host " AVAILABLE COMMANDS:" -ForegroundColor Yellow
+        # ASCII Art Header - ARC-DFS
+        Write-Host ""
+        Write-Host "  █████╗ ██████╗  ██████╗      ██████╗ ███████╗███████╗" -ForegroundColor Cyan
+        Write-Host " ██╔══██╗██╔══██╗██╔════╝      ██╔══██╗██╔════╝██╔════╝" -ForegroundColor Cyan
+        Write-Host " ███████║██████╔╝██║     █████╗██║  ██║█████╗  ███████╗" -ForegroundColor Cyan
+        Write-Host " ██╔══██║██╔══██╗██║     ╚════╝██║  ██║██╔══╝  ╚════██║" -ForegroundColor Cyan
+        Write-Host " ██║  ██║██║  ██║╚██████╗      ██████╔╝██║     ███████║" -ForegroundColor Cyan
+        Write-Host " ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝      ╚═════╝ ╚═╝     ╚══════╝" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host " MODULE OVERVIEW:"
+        Write-Host "   Comprehensive PowerShell module for Azure Arc onboarding and Microsoft Defender"
+        Write-Host "   for Servers integration through enterprise-grade Group Policy deployment."
+        Write-Host ""
+        Write-Host " DEFENDER FOR SERVERS (DFS) INTEGRATION:"
+        Write-Host "   Microsoft Defender for Servers provides advanced threat protection for your"
+        Write-Host "   server workloads in Microsoft Defender for Cloud. This module streamlines"
+        Write-Host "   the deployment process by automating Azure Arc agent installation and"
+        Write-Host "   enabling seamless Defender for Servers protection across your infrastructure."
+        Write-Host ""
+        Write-Host " KEY BENEFITS:"
+        Write-Host "   • Advanced threat detection and behavioral analytics"
+        Write-Host "   • Vulnerability assessment and management"
+        Write-Host "   • Just-in-time VM access and adaptive application controls"
+        Write-Host "   • Security recommendations and compliance monitoring"
+        Write-Host "   • Integration with Microsoft Sentinel"
+        Write-Host ""
+        Write-Host " AVAILABLE COMMANDS:"
         Write-Host "   [1] Test Azure Arc Prerequisites" -ForegroundColor Green
-        Write-Host "        Enhanced prerequisites validation" -ForegroundColor Gray
-        Write-Host "        Automatic Azure resource provider registration" -ForegroundColor Gray
-        Write-Host "        Network connectivity testing" -ForegroundColor Gray
+        Write-Host "       Enhanced prerequisites validation with automatic Azure resource provider registration" -ForegroundColor Gray
         Write-Host ""
         Write-Host "   [2] Deploy Azure Arc Device" -ForegroundColor Green
-        Write-Host "        Complete deployment including service principal creation" -ForegroundColor Gray
-        Write-Host "        Azure Connected Machine Agent installation" -ForegroundColor Gray
-        Write-Host "        Group Policy configuration and deployment" -ForegroundColor Gray
+        Write-Host "       Complete deployment including service principal creation and Group Policy configuration" -ForegroundColor Gray
         Write-Host ""
         Write-Host "   [3] Azure Arc Diagnostics" -ForegroundColor Green
-        Write-Host "        Comprehensive Azure Arc agent diagnostics" -ForegroundColor Gray
-        Write-Host "        Connectivity testing and health validation" -ForegroundColor Gray
-        Write-Host "        Complete log collection and troubleshooting reports" -ForegroundColor Gray
+        Write-Host "       Comprehensive Azure Arc agent diagnostics and troubleshooting reports" -ForegroundColor Gray
         Write-Host ""
         Write-Host "   [4] Configure Defender Pricing (Post-Deployment)" -ForegroundColor Green
-        Write-Host "        Resource-level Defender for Servers pricing configuration" -ForegroundColor Gray
-        Write-Host "        Support for VMs, VMSS, and Azure Arc machines" -ForegroundColor Gray
-        Write-Host "        Resource Group or Tag-based targeting" -ForegroundColor Gray
+        Write-Host "       Resource-level Defender for Servers pricing configuration" -ForegroundColor Gray
         Write-Host ""
         Write-Host "   [H] Help - Detailed command information" -ForegroundColor Cyan
         Write-Host "   [Q] Quit - Exit the module" -ForegroundColor Cyan
-        Write-Host "" -ForegroundColor Cyan
+        Write-Host ""
     }
 
     # Function to handle user selection
     function Start-UserSelection {
+        [CmdletBinding()]
         param (
             [string]$Selection
         )
-        
+
         switch ($Selection.ToUpper()) {
             "1" {
                 Clear-Host
@@ -160,20 +151,22 @@
                 Write-Host "" -ForegroundColor Cyan
                 $confirm = Read-Host "Do you want to proceed with prerequisites testing? [Y/N] (default: Y)"
                 if ([string]::IsNullOrWhiteSpace($confirm) -or $confirm.ToUpper() -eq "Y") {
-                    Write-Host "`n Running Get-AzureArcPrerequisite..." -ForegroundColor Green
-                    try {
-                        # Check if the function is available
-                        if (-not (Get-Command Get-AzureArcPrerequisite -ErrorAction SilentlyContinue)) {
-                            throw "Get-AzureArcPrerequisite function not found. Please ensure the ServerProtection module is properly imported."
+                    if ($PSCmdlet.ShouldProcess("System", "Run Azure Arc Prerequisites Testing")) {
+                        Write-Host "`n Running Get-AzureArcPrerequisite..." -ForegroundColor Green
+                        try {
+                            # Check if the function is available
+                            if (-not (Get-Command Get-AzureArcPrerequisite -ErrorAction SilentlyContinue)) {
+                                throw "Get-AzureArcPrerequisite function not found. Please ensure the ServerProtection module is properly imported."
+                            }
+
+                            Get-AzureArcPrerequisite -Force
+                            Write-Host "`n Prerequisites testing completed successfully." -ForegroundColor Green
                         }
-                        
-                        Get-AzureArcPrerequisite -Force
-                        Write-Host "`n Prerequisites testing completed successfully." -ForegroundColor Green
-                    }
-                    catch {
-                        Write-Host "`n Error during prerequisites testing: $($_.Exception.Message)" -ForegroundColor Red
-                        Write-Host "Please ensure the ServerProtection module is properly imported and try again." -ForegroundColor Yellow
-                        Write-Host "Try running: Import-Module ServerProtection -Force" -ForegroundColor Gray
+                        catch {
+                            Write-Host "`n Error during prerequisites testing: $($_.Exception.Message)" -ForegroundColor Red
+                            Write-Host "Please ensure the ServerProtection module is properly imported and try again." -ForegroundColor Yellow
+                            Write-Host "Try running: Import-Module ServerProtection -Force" -ForegroundColor Gray
+                        }
                     }
                     Write-Host "`nPress any key to return to the main menu..." -ForegroundColor Yellow
                     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
@@ -220,7 +213,7 @@
                         if (-not (Get-Command New-AzureArcDevice -ErrorAction SilentlyContinue)) {
                             throw "New-AzureArcDevice function not found. Please ensure the ServerProtection module is properly imported."
                         }
-                        
+
                         New-AzureArcDevice -Force
                         Write-Host "`n Azure Arc deployment completed successfully." -ForegroundColor Green
                     }
@@ -277,7 +270,7 @@
                 Write-Host ""
                 Write-Host "" -ForegroundColor Cyan
                 $confirm = Read-Host "Do you want to proceed with Azure Arc diagnostics collection? [Y/N] (default: Y)"
-                Clear-Host  
+                Clear-Host
                 Write-Host ""
                 if ([string]::IsNullOrWhiteSpace($confirm) -or $confirm.ToUpper() -eq "Y") {
                     Write-Host "`n Running Get-AzureArcDiagnostic..." -ForegroundColor Green
@@ -286,9 +279,12 @@
                         if (-not (Get-Command Get-AzureArcDiagnostic -ErrorAction SilentlyContinue)) {
                             throw "Get-AzureArcDiagnostic function not found. Please ensure the ServerProtection module is properly imported."
                         }
-                        
+
                         $result = Get-AzureArcDiagnostic
-                        if ($result) {
+                        if ($null -eq $result) {
+                            # User quit to main menu - do nothing, just return
+                            return
+                        } elseif ($result) {
                             Write-Host "`n Azure Arc diagnostics completed successfully." -ForegroundColor Green
                             Write-Host " All diagnostic checks passed. Review the log file for detailed results." -ForegroundColor White
                         } else {
@@ -305,8 +301,12 @@
                         Write-Host "Please check the error details and try again." -ForegroundColor Yellow
                         Write-Host "Try running: Import-Module ServerProtection -Force" -ForegroundColor Gray
                     }
-                    Write-Host "`nPress any key to return to the main menu..." -ForegroundColor Yellow
-                    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+
+                    # Only show "Press any key" if user didn't quit to main menu
+                    if ($null -ne $result) {
+                        Write-Host "`nPress any key to return to the main menu..." -ForegroundColor Yellow
+                        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+                    }
                 } else {
                     Write-Host "`n Operation cancelled by user." -ForegroundColor Yellow
                 }
@@ -361,7 +361,7 @@
                         if (-not (Get-Command Set-AzureArcResourcePricing -ErrorAction SilentlyContinue)) {
                             throw "Set-AzureArcResourcePricing function not found. Please ensure the ServerProtection module is properly imported."
                         }
-                        
+
                         Set-AzureArcResourcePricing
                         Write-Host "`n Defender pricing configuration completed successfully." -ForegroundColor Green
                     }
@@ -391,9 +391,9 @@
                     Write-Host "[4] Set-AzureArcResourcePricing" -ForegroundColor White
                     Write-Host "[Q] Return to main menu" -ForegroundColor White
                     Write-Host ""
-                    
+
                     $helpSelection = Read-Host "Select a command number (1-4) for detailed help or 'Q' to return to main menu"
-                    
+
                     switch ($helpSelection.ToUpper()) {
                         "1" {
                             Clear-Host
@@ -563,16 +563,17 @@
     do {
         Clear-Host
         Write-ModuleInterface
-        Write-InteractiveMenu
-        
+
         $selection = Read-Host "Please select an option [1-4, H, Q]"
-        
+
         Start-UserSelection -Selection $selection
-        
+
         if ($selection.ToUpper() -eq "Q") {
             break
         }
-        
+
     } while ($true)
 }
+
+
 
