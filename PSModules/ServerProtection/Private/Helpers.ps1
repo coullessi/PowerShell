@@ -104,7 +104,7 @@ function Get-StandardizedOutputDirectory {
                 # Custom folder with specific format validation
                 Write-Host ""
                 Write-Host " Please provide the full path to your custom folder."
-                Write-Host " If the folder doesn't exist, a timestamp will be added to prevent conflicts."
+                Write-Host " The folder must exist before proceeding."
                 Write-Host " Supported formats (as specified):"
                 Write-Host "   C:\Users\UserName\Desktop\MyAzureArc"
                 Write-Host "   'C:\Users\UserName\Desktop\MyAzureArc'"
@@ -122,23 +122,17 @@ function Get-StandardizedOutputDirectory {
                 # Remove quotes if present - support all specified formats
                 $customPath = $customPath.Trim('"', "'")
 
-                # Validate the custom path format and create directory
+                # Validate the custom path format and check if directory exists
                 try {
                     # Test if path is valid format
                     $resolvedPath = [System.IO.Path]::GetFullPath($customPath)
 
-                    # Check if directory exists
+                    # Check if directory exists - must exist before proceeding
                     if (-not (Test-Path -PathType Container $resolvedPath)) {
-                        # Directory doesn't exist - add timestamp to avoid conflicts
-                        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-                        $parentDir = [System.IO.Path]::GetDirectoryName($resolvedPath)
-                        $folderName = [System.IO.Path]::GetFileName($resolvedPath)
-                        $timestampedPath = Join-Path $parentDir "${folderName}_$timestamp"
-
-                        New-Item -ItemType Directory -Path $timestampedPath -Force | Out-Null
-                        Write-Host " [SUCCESS] Created custom folder with timestamp: $timestampedPath"
-                        Write-Host " [INFO] Timestamp added to prevent conflicts with existing folders"
-                        $resolvedPath = $timestampedPath
+                        Write-Host " [FAIL] Folder does not exist: $resolvedPath"
+                        Write-Host " Please create the folder first or choose an existing folder."
+                        Write-Host ""
+                        continue
                     } else {
                         Write-Host " [SUCCESS] Using existing folder: $resolvedPath"
                     }
@@ -170,7 +164,7 @@ function Get-StandardizedOutputDirectory {
             "3" {
                 # Quit to main menu - as specified in requirements
                 Write-Host ""
-                Write-Host " Returning to the main menu located under 'Start-ServerProtection.ps1'..." -ForegroundColor Yellow
+                Write-Host " Returning to the main menu located under 'Start-ServerProtection.ps1'..."
                 Write-Host ""
                 return $null
             }
@@ -301,20 +295,166 @@ function Initialize-StandardizedEnvironment {
 
     # Log the successful initialization with specific folder path
     Write-Host ""
-    Write-Host " ENVIRONMENT READY" -ForegroundColor Green -BackgroundColor DarkBlue
-    Write-Host " =================" -ForegroundColor Green -BackgroundColor DarkBlue
+    Write-Host " ENVIRONMENT READY"
+    Write-Host " ================="
     Write-Host ""
-    Write-Host " Working folder: $folderPath" -ForegroundColor White
+    Write-Host " Working folder: $folderPath"
     if ($RequiredFileTypes.Count -gt 0) {
-        Write-Host " Files that will be created:" -ForegroundColor Gray
+        Write-Host " Files that will be created:"
         foreach ($fileType in $RequiredFileTypes) {
             $fileName = [System.IO.Path]::GetFileName($result.FilePaths[$fileType])
-            Write-Host "   - $fileName" -ForegroundColor Gray
+            Write-Host "   - $fileName"
         }
     }
     Write-Host ""
 
     return $result
+}
+
+function Get-DeviceFileSelection {
+    <#
+    .SYNOPSIS
+        Provides a device file selection menu for Azure Arc prerequisites.
+
+    .DESCRIPTION
+        This function presents a menu to the user with two options:
+        1. Use default device list with local hostname
+        2. Provide custom device list file (copies to working directory)
+
+    .PARAMETER WorkingDirectory
+        The working directory where the device file will be stored.
+
+    .PARAMETER DefaultDeviceFile
+        The full path to the default device file to create/use.
+
+    .OUTPUTS
+        String containing the validated device file path, or $null if user chose to quit.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$WorkingDirectory,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DefaultDeviceFile
+    )
+
+    do {
+        Write-Host ""
+        Write-Host " DEVICE FILE SELECTION"
+        Write-Host " ===================="
+        Write-Host ""
+        Write-Host " Please select your device list option:"
+        Write-Host ""
+        Write-Host "   [1] Use default device list with local hostname"
+        Write-Host "       (Creates a device list with current computer name and opens for editing)"
+        Write-Host ""
+        Write-Host "   [2] Provide existing device list file"
+        Write-Host "       (Copy your existing device list to the working directory)"
+        Write-Host ""
+
+        $choice = Read-Host " Please enter your choice [1-2]"
+
+        switch ($choice) {
+            "1" {
+                # Create default device list with local hostname
+                Write-Host ""
+                Write-Host " Creating default device list with local hostname..."
+
+                $defaultContent = @"
+# Azure Arc Device List
+# Enter one device name per line
+# Lines starting with # are comments and will be ignored
+#
+# Examples:
+# SERVER01
+# SERVER02
+#
+# Add your device names below:
+$env:COMPUTERNAME
+"@
+
+                try {
+                    $defaultContent | Out-File -FilePath $DefaultDeviceFile -Encoding UTF8
+                    Write-Host " [OK] Default device list created: $DefaultDeviceFile"
+
+                    Write-Host ""
+                    Write-Host " Opening device list in Notepad for editing..."
+                    Write-Host " Review/edit your device names and save the file."
+                    Write-Host " Close Notepad when done to continue the script."
+                    Write-Host ""
+
+                    try {
+                        $notepadProcess = Start-Process -FilePath "notepad.exe" -ArgumentList $DefaultDeviceFile -PassThru
+                        $notepadProcess.WaitForExit()
+                        Write-Host " [OK] Device list editing completed"
+                    } catch {
+                        Write-Host " [WARN] Could not open Notepad: $($_.Exception.Message)"
+                        Write-Host " Continuing with default device list..."
+                    }
+
+                    return $DefaultDeviceFile
+
+                } catch {
+                    Write-Host " [FAIL] Failed to create device list file: $($_.Exception.Message)"
+                    Write-Host " Please try again."
+                    Write-Host ""
+                    continue
+                }
+            }
+
+            "2" {
+                # User provides existing device list file
+                Write-Host ""
+                Write-Host " Please provide the path to your existing device list file."
+                Write-Host " Supported formats: D:\Path\DeviceList.txt, 'D:\Path\file.csv', `"D:\Path\Device List.txt`""
+                Write-Host ""
+
+                $deviceFileInput = Read-Host " Enter device list file path"
+
+                if ([string]::IsNullOrWhiteSpace($deviceFileInput)) {
+                    Write-Host " [FAIL] Empty path provided. Please try again."
+                    Write-Host ""
+                    continue
+                }
+
+                # Remove quotes if present
+                $deviceFileInput = $deviceFileInput.Trim('"', "'")
+
+                # Validate the file exists
+                if (-not (Test-Path -Path $deviceFileInput -PathType Leaf)) {
+                    Write-Host " [FAIL] File does not exist: $deviceFileInput"
+                    Write-Host " Please check the path and try again."
+                    Write-Host ""
+                    continue
+                }
+
+                try {
+                    # Copy the file to working directory
+                    $fileName = [System.IO.Path]::GetFileName($deviceFileInput)
+                    $destinationPath = Join-Path $WorkingDirectory $fileName
+
+                    Copy-Item -Path $deviceFileInput -Destination $destinationPath -Force
+                    Write-Host " [OK] Device list copied to working directory: $destinationPath"
+                    Write-Host ""
+
+                    return $destinationPath
+
+                } catch {
+                    Write-Host " [FAIL] Failed to copy device list file: $($_.Exception.Message)"
+                    Write-Host " Please try again."
+                    Write-Host ""
+                    continue
+                }
+            }
+
+            default {
+                Write-Host " [FAIL] Invalid choice. Please enter 1 or 2."
+                Write-Host ""
+            }
+        }
+
+    } while ($true)
 }
 
 function Write-Step {

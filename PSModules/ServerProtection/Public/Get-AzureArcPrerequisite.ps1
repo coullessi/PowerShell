@@ -90,13 +90,13 @@ function Get-AzureArcPrerequisite {
 
     # Check if user chose to quit
     if ($environment.UserQuit) {
-        Write-Host "Returning to main menu..." -ForegroundColor Yellow
+        Write-Host "Returning to main menu..."
         return
     }
 
     # Check if initialization failed
     if (-not $environment.Success) {
-        Write-Host "Failed to initialize environment. Exiting..." -ForegroundColor Red
+        Write-Host "Failed to initialize environment. Exiting..."
         return
     }
 
@@ -105,157 +105,29 @@ function Get-AzureArcPrerequisite {
     $script:deviceListFile = $environment.FilePaths["DeviceList"]
     $script:globalLogFile = $environment.FilePaths["PrerequisiteLog"]
 
-
-    Write-Host ""
-    Write-Host " DEVICE LIST SETUP" -ForegroundColor Yellow
-    Write-Host ""
-
+    # Device file selection
     if ([string]::IsNullOrWhiteSpace($DeviceListPath)) {
-        Write-Host "   Supported formats: D:\Path\DeviceList.txt, 'D:\Path\file.csv', `"D:\Path\Device List.txt`"" -ForegroundColor Gray
-        Write-Host ""
-
-        $deviceFileInput = Read-Host "   Enter device list file path (or press Enter for default)"
-
-        if ([string]::IsNullOrWhiteSpace($deviceFileInput)) {
-            $defaultContent = @"
-# Azure Arc Device List
-# Enter one device name per line
-# Lines starting with # are comments and will be ignored
-#
-# Examples:
-# SERVER01
-# SERVER02
-#
-# Add your device names below:
-vm-wsx
-vm-wsy
-vm-wsz
-"@
-
-            try {
-                $defaultContent | Out-File -FilePath $script:deviceListFile -Encoding UTF8
-                Write-Host "   [OK] Default device list created: $script:deviceListFile" -ForegroundColor Green
-                $DeviceListPath = $script:deviceListFile
-
-                Write-Host ""
-                Write-Host "   Opening default device list in Notepad for editing..." -ForegroundColor Cyan
-                Write-Host "   Review/edit your device names and save the file." -ForegroundColor White
-                Write-Host "   Close Notepad when done to continue the script." -ForegroundColor White
-                Write-Host ""
-
-                try {
-                    $notepadProcess = Start-Process -FilePath "notepad.exe" -ArgumentList $script:deviceListFile -PassThru
-                    $notepadProcess.WaitForExit()
-                    Write-Host "   [OK] Device list editing completed" -ForegroundColor Green
-                } catch {
-                    Write-Host "   [WARN] Could not open Notepad: $($_.Exception.Message)" -ForegroundColor Yellow
-                    Write-Host "   Continuing with default device list..." -ForegroundColor White
-                }
-
-            } catch {
-                Write-Host "   [FAIL] Failed to create device list file: $($_.Exception.Message)" -ForegroundColor Red
-                Write-Host "   Continuing without device list..." -ForegroundColor Yellow
-                $DeviceListPath = $null
-            }
-        } else {
-            # User provided a device file path - validate it
-            $pathValidation = Test-ValidPath -Path $deviceFileInput -PathType File -RequireExists:$false
-
-            if (-not $pathValidation.IsValid) {
-                Write-Host "   [WARN] $($pathValidation.Error). Continuing without device list..." -ForegroundColor Yellow
-                $DeviceListPath = $null
-            } elseif ($pathValidation.Exists) {
-                # Existing file found
-                $DeviceListPath = $pathValidation.FullPath
-                Write-Host "   [OK] Found existing device list: $DeviceListPath" -ForegroundColor Green
-
-                $editChoice = Read-Host "   Edit the device list before proceeding? [Y/N] (default: N)"
-                if ($editChoice -eq "Y" -or $editChoice -eq "y") {
-                    Write-Host ""
-                    Write-Host "   Opening device list in Notepad for editing..." -ForegroundColor Cyan
-                    Write-Host "   Close Notepad when done to continue the script." -ForegroundColor White
-                    Write-Host ""
-
-                    try {
-                        $notepadProcess = Start-Process -FilePath "notepad.exe" -ArgumentList $DeviceListPath -PassThru
-                        $notepadProcess.WaitForExit()
-                        Write-Host "   [OK] Device list editing completed" -ForegroundColor Green
-                    } catch {
-                        Write-Host "   [WARN] Could not open Notepad: $($_.Exception.Message)" -ForegroundColor Yellow
-                        Write-Host "   Continuing with existing device list..." -ForegroundColor White
-                    }
-                } else {
-                    Write-Host "   [OK] Using device list as-is" -ForegroundColor Green
-                }
-            } else {
-                # File doesn't exist - create new one in the standardized folder
-                $newContent = @"
-# Azure Arc Device List
-# Enter one device name per line
-# Lines starting with # are comments and will be ignored
-#
-# Examples:
-# SERVER01
-# SERVER02
-#
-# Add your device names below:
-vm-wsx
-vm-wsy
-vm-wsz
-"@
-
-                try {
-                    $newContent | Out-File -FilePath $script:deviceListFile -Encoding UTF8
-                    Write-Host "   [OK] New device list created: $script:deviceListFile" -ForegroundColor Green
-                    $DeviceListPath = $script:deviceListFile
-
-                    Write-Host ""
-                    Write-Host "   Opening new device list in Notepad for editing..." -ForegroundColor Cyan
-                    Write-Host "   Edit your device names and save the file." -ForegroundColor White
-                    Write-Host "   Close Notepad when done to continue the script." -ForegroundColor White
-                    Write-Host ""
-
-                    try {
-                        $notepadProcess = Start-Process -FilePath "notepad.exe" -ArgumentList $script:deviceListFile -PassThru
-                        $notepadProcess.WaitForExit()
-                        Write-Host "   [OK] Device list editing completed" -ForegroundColor Green
-                    } catch {
-                        Write-Host "   [WARN] Could not open Notepad: $($_.Exception.Message)" -ForegroundColor Yellow
-                        Write-Host "   Continuing with new device list..." -ForegroundColor White
-                    }
-
-                } catch {
-                    Write-Host "   [FAIL] Failed to create device list file: $($_.Exception.Message)" -ForegroundColor Red
-                    Write-Host "   Continuing without device list..." -ForegroundColor Yellow
-                    $DeviceListPath = $null
-                }
-            }
-        }
+        # Use the new device file selection menu
+        $DeviceListPath = Get-DeviceFileSelection -WorkingDirectory $workingFolder -DefaultDeviceFile $script:deviceListFile
     } else {
         # DeviceListPath was provided as parameter - validate it
-        Write-Host "   Using provided device list parameter: $DeviceListPath" -ForegroundColor White
+        Write-Host ""
+        Write-Host " Using provided device list parameter: $DeviceListPath"
 
-        $pathValidation = Test-ValidPath -Path $DeviceListPath -PathType File -RequireExists
-
-        if (-not $pathValidation.IsValid) {
-            Write-Host "   [WARN] $($pathValidation.Error)" -ForegroundColor Yellow
-            Write-Host "   Continuing without device list..." -ForegroundColor Yellow
-            $DeviceListPath = $null
-        } elseif (-not $pathValidation.Exists) {
-            Write-Host "   [WARN] Provided device list file not found: $($pathValidation.FullPath)" -ForegroundColor Yellow
-            Write-Host "   Continuing without device list..." -ForegroundColor Yellow
+        if (-not (Test-Path -Path $DeviceListPath -PathType Leaf)) {
+            Write-Host " [WARN] Provided device list file not found: $DeviceListPath"
+            Write-Host " Continuing without device list..."
             $DeviceListPath = $null
         } else {
-            $DeviceListPath = $pathValidation.FullPath
-            Write-Host "   [OK] Device list file verified" -ForegroundColor Green
+            Write-Host " [OK] Device list file verified"
         }
     }
 
     try {
         Clear-Host
         Write-Host ""
-        Write-Host " AZURE ARC PREREQUISITES VALIDATION" -ForegroundColor Green
-        Write-Host " Testing system readiness for Azure Arc onboarding" -ForegroundColor Gray
+        Write-Host " AZURE ARC PREREQUISITES VALIDATION"
+        Write-Host " Testing system readiness for Azure Arc onboarding"
         Write-Host ""
 
         # Log session start
@@ -277,9 +149,9 @@ vm-wsz
 
         # Determine devices to test
         if ($DeviceListPath -and (Test-Path $DeviceListPath)) {
-            Write-Host " LOADING DEVICE LIST" -ForegroundColor Yellow
+            Write-Host " LOADING DEVICE LIST"
             Write-Host ""
-            Write-Host "   Reading device list from: $DeviceListPath" -ForegroundColor White
+            Write-Host "   Reading device list from: $DeviceListPath"
 
             try {
                 $deviceListContent = Get-Content $DeviceListPath -ErrorAction Stop
@@ -288,12 +160,12 @@ vm-wsz
                 } | ForEach-Object { $_.Trim() }
 
                 if ($devicesToTest.Count -eq 0) {
-                    Write-Host "   [WARN] No valid device names found in device list" -ForegroundColor Yellow
-                    Write-Host "   Testing local machine only..." -ForegroundColor White
+                    Write-Host "   [WARN] No valid device names found in device list"
+                    Write-Host "   Testing local machine only..."
                     $devicesToTest = @($env:COMPUTERNAME)
                 } else {
-                    Write-Host "   [OK] Found $($devicesToTest.Count) device(s) to test" -ForegroundColor Green
-                    $devicesToTest | ForEach-Object { Write-Host "     - $_" -ForegroundColor Gray }
+                    Write-Host "   [OK] Found $($devicesToTest.Count) device(s) to test"
+                    $devicesToTest | ForEach-Object { Write-Host "     - $_" }
                 }
 
                 # Log device list
@@ -304,8 +176,8 @@ vm-wsz
                 "" | Out-File -FilePath $script:globalLogFile -Append
 
             } catch {
-                Write-Host "   [FAIL] Failed to read device list: $($_.Exception.Message)" -ForegroundColor Red
-                Write-Host "   Testing local machine only..." -ForegroundColor White
+                Write-Host "   [FAIL] Failed to read device list: $($_.Exception.Message)"
+                Write-Host "   Testing local machine only..."
                 $devicesToTest = @($env:COMPUTERNAME)
 
                 "ERROR: Failed to read device list - $($_.Exception.Message)" | Out-File -FilePath $script:globalLogFile -Append
@@ -313,7 +185,7 @@ vm-wsz
                 "" | Out-File -FilePath $script:globalLogFile -Append
             }
         } else {
-            Write-Host "   No device list provided, testing local machine only" -ForegroundColor White
+            Write-Host "   No device list provided, testing local machine only"
             $devicesToTest = @($env:COMPUTERNAME)
 
             "DEVICE LIST: Not provided - testing local machine only" | Out-File -FilePath $script:globalLogFile -Append
@@ -323,7 +195,7 @@ vm-wsz
 
         # Azure Authentication and Resource Provider Registration (One-time for all devices)
         Write-Host ""
-        Write-Host " AZURE AUTHENTICATION `& RESOURCE PROVIDERS" -ForegroundColor Yellow
+        Write-Host " AZURE AUTHENTICATION & RESOURCE PROVIDERS"
         Write-Host ""
 
         ("=" * 100) | Out-File -FilePath $script:globalLogFile -Append
@@ -332,10 +204,10 @@ vm-wsz
 
         $skipAuth = $false
         if (-not $Force) {
-            Write-Host "   Azure authentication is required to register resource providers." -ForegroundColor White
+            Write-Host "   Azure authentication is required to register resource providers."
             $authConfirm = Read-Host "   Proceed with Azure authentication? [Y/N] (default: Y)"
             if ($authConfirm -eq "N" -or $authConfirm -eq "n") {
-                Write-Host "     [WARN] Skipping Azure authentication and resource provider registration" -ForegroundColor Yellow
+                Write-Host "     [WARN] Skipping Azure authentication and resource provider registration"
                 "Azure authentication skipped by user" | Out-File -FilePath $script:globalLogFile -Append
                 "" | Out-File -FilePath $script:globalLogFile -Append
                 $skipAuth = $true
@@ -344,19 +216,19 @@ vm-wsz
 
         if (-not $skipAuth) {
             try {
-                Write-Host "   Attempting Azure authentication..." -ForegroundColor White
+                Write-Host "   Attempting Azure authentication..."
 
                 # Try to get current context first
                 $currentContext = Get-AzContext -ErrorAction SilentlyContinue
                 if ($currentContext) {
-                    Write-Host "     [OK] Using existing Azure context: $($currentContext.Account)" -ForegroundColor Green
+                    Write-Host "     [OK] Using existing Azure context: $($currentContext.Account)"
                     $script:azureLoginCompleted = $true
                     "SUCCESS: Azure Authentication: Using existing context ($($currentContext.Account))" | Out-File -FilePath $script:globalLogFile -Append
                 } else {
                     # Attempt interactive login
-                    Write-Host "     Initiating Azure login..." -ForegroundColor Gray
+                    Write-Host "     Initiating Azure login..."
                     $null = Connect-AzAccount -ErrorAction Stop
-                    Write-Host "     [OK] Azure authentication successful" -ForegroundColor Green
+                    Write-Host "     [OK] Azure authentication successful"
                     $script:azureLoginCompleted = $true
                     $newContext = Get-AzContext
                     "SUCCESS: Azure Authentication: Successful ($($newContext.Account))" | Out-File -FilePath $script:globalLogFile -Append
@@ -364,15 +236,15 @@ vm-wsz
 
                 # Set subscription if provided
                 if ($SubscriptionId) {
-                    Write-Host "   Setting Azure subscription context..." -ForegroundColor White
+                    Write-Host "   Setting Azure subscription context..."
                     $null = Set-AzContext -SubscriptionId $SubscriptionId -ErrorAction Stop
-                    Write-Host "     [OK] Subscription context set: $SubscriptionId" -ForegroundColor Green
+                    Write-Host "     [OK] Subscription context set: $SubscriptionId"
                     "SUCCESS: Subscription Context: Set to $SubscriptionId" | Out-File -FilePath $script:globalLogFile -Append
                 }
 
                 # Register required resource providers
                 if ($script:azureLoginCompleted) {
-                    Write-Host "   Registering Azure resource providers..." -ForegroundColor White
+                    Write-Host "   Registering Azure resource providers..."
 
                     $providers = @(
                         "Microsoft.HybridCompute",
@@ -385,36 +257,36 @@ vm-wsz
                     $registrationResults = @()
                     foreach ($provider in $providers) {
                         try {
-                            Write-Host "     Checking $provider..." -ForegroundColor Gray
+                            Write-Host "     Checking $provider..."
                             $resourceProvider = Get-AzResourceProvider -ProviderNamespace $provider -ErrorAction SilentlyContinue
 
                             if ($resourceProvider -and $resourceProvider.RegistrationState -eq "Registered") {
-                                Write-Host "     [OK] $provider - Already registered" -ForegroundColor Green
+                                Write-Host "     [OK] $provider - Already registered"
                                 $registrationResults += "SUCCESS: $provider - Already registered"
                                 "  SUCCESS: $provider - Already registered" | Out-File -FilePath $script:globalLogFile -Append
                             } else {
-                                Write-Host "     Registering $provider..." -ForegroundColor Yellow
+                                Write-Host "     Registering $provider..."
                                 $null = Register-AzResourceProvider -ProviderNamespace $provider -ErrorAction Stop
-                                Write-Host "     [OK] $provider - Registration initiated" -ForegroundColor Green
+                                Write-Host "     [OK] $provider - Registration initiated"
                                 $registrationResults += "SUCCESS: $provider - Registration initiated"
                                 "  SUCCESS: $provider - Registration initiated" | Out-File -FilePath $script:globalLogFile -Append
                             }
                         } catch {
-                            Write-Host "     [FAIL] $provider - Registration failed: $($_.Exception.Message)" -ForegroundColor Red
+                            Write-Host "     [FAIL] $provider - Registration failed: $($_.Exception.Message)"
                             $registrationResults += "[FAIL] $provider - Registration failed"
                             "  [FAIL] $provider - Registration failed: $($_.Exception.Message)" | Out-File -FilePath $script:globalLogFile -Append
                         }
                     }
 
-                    Write-Host "     Resource provider registration summary:" -ForegroundColor Cyan
+                    Write-Host "     Resource provider registration summary:"
                     foreach ($result in $registrationResults) {
-                        Write-Host "       $result" -ForegroundColor Gray
+                        Write-Host "       $result"
                     }
                 }
 
             } catch {
-                Write-Host "     [FAIL] Azure authentication failed: $($_.Exception.Message)" -ForegroundColor Red
-                Write-Host "     Resource provider registration skipped" -ForegroundColor Yellow
+                Write-Host "     [FAIL] Azure authentication failed: $($_.Exception.Message)"
+                Write-Host "     Resource provider registration skipped"
                 "[FAIL] Azure Authentication Failed: $($_.Exception.Message)" | Out-File -FilePath $script:globalLogFile -Append
             }
         }
@@ -422,15 +294,15 @@ vm-wsz
         "" | Out-File -FilePath $script:globalLogFile -Append
 
         Write-Host ""
-        Write-Host " TESTING $($devicesToTest.Count) DEVICE(S)" -ForegroundColor Green
+        Write-Host " TESTING $($devicesToTest.Count) DEVICE(S)"
         Write-Host ""
 
         # Test each device
         foreach ($deviceName in $devicesToTest) {
             $isLocalMachine = ($deviceName -eq $env:COMPUTERNAME -or $deviceName -eq "localhost" -or $deviceName -eq ".")
 
-            Write-Host " DEVICE: $deviceName" -ForegroundColor Cyan
-            Write-Host " $("=" * ($deviceName.Length + 8))" -ForegroundColor Cyan
+            Write-Host " DEVICE: $deviceName"
+            Write-Host " $("=" * ($deviceName.Length + 8))"
             Write-Host ""
 
             # Initialize device result
@@ -454,21 +326,21 @@ vm-wsz
             "" | Out-File -FilePath $script:globalLogFile -Append
 
         # Step 1: Basic PowerShell Environment Check
-        Write-Host " STEP 1: POWERSHELL ENVIRONMENT VALIDATION" -ForegroundColor Yellow
+        Write-Host " STEP 1: POWERSHELL ENVIRONMENT VALIDATION"
         Write-Host ""
 
         "STEP 1: POWERSHELL ENVIRONMENT VALIDATION" | Out-File -FilePath $script:globalLogFile -Append
         ("-" * 50) | Out-File -FilePath $script:globalLogFile -Append
 
         # Check PowerShell version
-        Write-Host "   Checking PowerShell version..." -ForegroundColor White
+        Write-Host "   Checking PowerShell version..."
         try {
             if ($isLocalMachine) {
                 $psVersion = $PSVersionTable.PSVersion
                 $psHost = $PSVersionTable.PSEdition
             } else {
                 # For remote machines, we'd need to use Invoke-Command
-                Write-Host "     [WARN] Remote PowerShell testing not implemented yet" -ForegroundColor Yellow
+                Write-Host "     [WARN] Remote PowerShell testing not implemented yet"
                 $psVersion = "Unknown (Remote)"
                 $psHost = "Unknown (Remote)"
                 $deviceResult.Warnings += "Remote PowerShell testing not implemented"
@@ -476,7 +348,7 @@ vm-wsz
 
             if ($psVersion -ne "Unknown (Remote)") {
                 if ($psVersion.Major -ge 5 -and ($psVersion.Major -gt 5 -or $psVersion.Minor -ge 1)) {
-                    Write-Host "     [OK] PowerShell $($psVersion.ToString()) ($psHost) - Compatible" -ForegroundColor Green
+                    Write-Host "     [OK] PowerShell $($psVersion.ToString()) ($psHost) - Compatible"
                     $deviceResult.TestResults.PowerShellVersion = @{
                         Status = "Pass"
                         Version = $psVersion.ToString()
@@ -485,7 +357,7 @@ vm-wsz
                     }
                     "SUCCESS: PowerShell Version: $($psVersion.ToString()) ($psHost) - Compatible" | Out-File -FilePath $script:globalLogFile -Append
                 } else {
-                    Write-Host "     [FAIL] PowerShell $($psVersion.ToString()) - Requires 5.1 or higher" -ForegroundColor Red
+                    Write-Host "     [FAIL] PowerShell $($psVersion.ToString()) - Requires 5.1 or higher"
                     $deviceResult.TestResults.PowerShellVersion = @{
                         Status = "Fail"
                         Version = $psVersion.ToString()
@@ -506,7 +378,7 @@ vm-wsz
                 "[WARN] PowerShell Version: Unknown (Remote testing not implemented)" | Out-File -FilePath $script:globalLogFile -Append
             }
         } catch {
-            Write-Host "     [FAIL] Failed to check PowerShell version: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "     [FAIL] Failed to check PowerShell version: $($_.Exception.Message)"
             $deviceResult.TestResults.PowerShellVersion = @{
                 Status = "Error"
                 Version = "Unknown"
@@ -518,7 +390,7 @@ vm-wsz
         }
 
         # Check execution policy
-        Write-Host "   Checking execution policy..." -ForegroundColor White
+        Write-Host "   Checking execution policy..."
         try {
             if ($isLocalMachine) {
                 $execPolicy = Get-ExecutionPolicy
@@ -529,7 +401,7 @@ vm-wsz
 
             $compatiblePolicies = @("RemoteSigned", "Unrestricted", "Bypass")
             if ($execPolicy -in $compatiblePolicies) {
-                Write-Host "     [OK] Execution Policy: $execPolicy - Compatible" -ForegroundColor Green
+                Write-Host "     [OK] Execution Policy: $execPolicy - Compatible"
                 $deviceResult.TestResults.ExecutionPolicy = @{
                     Status = "Pass"
                     Policy = $execPolicy
@@ -537,7 +409,7 @@ vm-wsz
                 }
                 "SUCCESS: Execution Policy: $execPolicy - Compatible" | Out-File -FilePath $script:globalLogFile -Append
             } elseif ($execPolicy -eq "Unknown (Remote)") {
-                Write-Host "     [WARN] Execution Policy: Unknown (Remote)" -ForegroundColor Yellow
+                Write-Host "     [WARN] Execution Policy: Unknown (Remote)"
                 $deviceResult.TestResults.ExecutionPolicy = @{
                     Status = "Warning"
                     Policy = "Unknown"
@@ -545,8 +417,8 @@ vm-wsz
                 }
                 "[WARN] Execution Policy: Unknown (Remote testing not implemented)" | Out-File -FilePath $script:globalLogFile -Append
             } else {
-                Write-Host "     [WARN] Execution Policy: $execPolicy - May block Azure Arc scripts" -ForegroundColor Yellow
-                Write-Host "       Consider running: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser" -ForegroundColor Gray
+                Write-Host "     [WARN] Execution Policy: $execPolicy - May block Azure Arc scripts"
+                Write-Host "       Consider running: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser"
                 $deviceResult.TestResults.ExecutionPolicy = @{
                     Status = "Warning"
                     Policy = $execPolicy
@@ -558,7 +430,7 @@ vm-wsz
                 "  Recommendation: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser" | Out-File -FilePath $script:globalLogFile -Append
             }
         } catch {
-            Write-Host "     [FAIL] Failed to check execution policy: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "     [FAIL] Failed to check execution policy: $($_.Exception.Message)"
             $deviceResult.TestResults.ExecutionPolicy = @{
                 Status = "Error"
                 Policy = "Unknown"
@@ -571,13 +443,13 @@ vm-wsz
         "" | Out-File -FilePath $script:globalLogFile -Append
 
         # Step 2: Azure PowerShell Module Check
-        Write-Host "`n STEP 2: AZURE POWERSHELL MODULE VALIDATION" -ForegroundColor Yellow
+        Write-Host "`n STEP 2: AZURE POWERSHELL MODULE VALIDATION"
         Write-Host ""
 
         "STEP 2: AZURE POWERSHELL MODULE VALIDATION" | Out-File -FilePath $script:globalLogFile -Append
         ("-" * 50) | Out-File -FilePath $script:globalLogFile -Append
 
-        Write-Host "   Checking Azure PowerShell modules..." -ForegroundColor White
+        Write-Host "   Checking Azure PowerShell modules..."
         try {
             if ($isLocalMachine) {
                 $azAccountsModule = Get-Module -ListAvailable -Name Az.Accounts | Select-Object -First 1
@@ -590,7 +462,7 @@ vm-wsz
 
             # Check Az.Accounts
             if ($azAccountsModule) {
-                Write-Host "     [OK] Az.Accounts module found - Version $($azAccountsModule.Version)" -ForegroundColor Green
+                Write-Host "     [OK] Az.Accounts module found - Version $($azAccountsModule.Version)"
                 $deviceResult.TestResults.AzAccountsModule = @{
                     Status = "Pass"
                     Version = $azAccountsModule.Version.ToString()
@@ -598,7 +470,7 @@ vm-wsz
                 }
                 "[OK] Az.Accounts Module: Version $($azAccountsModule.Version) - Available" | Out-File -FilePath $script:globalLogFile -Append
             } elseif ($isLocalMachine) {
-                Write-Host "     [WARN] Az.Accounts module not found - Will be installed if needed" -ForegroundColor Yellow
+                Write-Host "     [WARN] Az.Accounts module not found - Will be installed if needed"
                 $deviceResult.TestResults.AzAccountsModule = @{
                     Status = "Warning"
                     Version = "Not Installed"
@@ -619,7 +491,7 @@ vm-wsz
 
             # Check Az.Resources
             if ($azResourcesModule) {
-                Write-Host "     [OK] Az.Resources module found - Version $($azResourcesModule.Version)" -ForegroundColor Green
+                Write-Host "     [OK] Az.Resources module found - Version $($azResourcesModule.Version)"
                 $deviceResult.TestResults.AzResourcesModule = @{
                     Status = "Pass"
                     Version = $azResourcesModule.Version.ToString()
@@ -627,7 +499,7 @@ vm-wsz
                 }
                 "[OK] Az.Resources Module: Version $($azResourcesModule.Version) - Available" | Out-File -FilePath $script:globalLogFile -Append
             } elseif ($isLocalMachine) {
-                Write-Host "     [WARN] Az.Resources module not found - Will be installed if needed" -ForegroundColor Yellow
+                Write-Host "     [WARN] Az.Resources module not found - Will be installed if needed"
                 $deviceResult.TestResults.AzResourcesModule = @{
                     Status = "Warning"
                     Version = "Not Installed"
@@ -646,7 +518,7 @@ vm-wsz
                 "[WARN] Az.Resources Module: Unknown (Remote testing not implemented)" | Out-File -FilePath $script:globalLogFile -Append
             }
         } catch {
-            Write-Host "     [FAIL] Failed to check Azure modules: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "     [FAIL] Failed to check Azure modules: $($_.Exception.Message)"
             $deviceResult.TestResults.AzureModules = @{
                 Status = "Error"
                 Message = $_.Exception.Message
@@ -658,14 +530,14 @@ vm-wsz
         "" | Out-File -FilePath $script:globalLogFile -Append
 
         # Step 3: System Requirements Check
-        Write-Host "`n STEP 3: SYSTEM REQUIREMENTS VALIDATION" -ForegroundColor Yellow
+        Write-Host "`n STEP 3: SYSTEM REQUIREMENTS VALIDATION"
         Write-Host ""
 
         "STEP 3: SYSTEM REQUIREMENTS VALIDATION" | Out-File -FilePath $script:globalLogFile -Append
         ("-" * 50) | Out-File -FilePath $script:globalLogFile -Append
 
         # Check OS version
-        Write-Host "   Checking operating system compatibility..." -ForegroundColor White
+        Write-Host "   Checking operating system compatibility..."
         try {
             if ($isLocalMachine) {
                 $os = Get-CimInstance Win32_OperatingSystem
@@ -680,12 +552,12 @@ vm-wsz
             }
 
             if ($os) {
-                Write-Host "     OS: $osName" -ForegroundColor Gray
-                Write-Host "     Version: $($os.Version) (Build $($os.BuildNumber))" -ForegroundColor Gray
+                Write-Host "     OS: $osName"
+                Write-Host "     Version: $($os.Version) (Build $($os.BuildNumber))"
 
                 # Basic OS compatibility check
                 if ($os.ProductType -eq 1) {
-                    Write-Host "     [WARN] Client OS detected - Azure Arc is designed for servers" -ForegroundColor Yellow
+                    Write-Host "     [WARN] Client OS detected - Azure Arc is designed for servers"
                     $deviceResult.TestResults.OperatingSystem = @{
                         Status = "Warning"
                         Name = $osName
@@ -700,7 +572,7 @@ vm-wsz
                     "  OS Version: $($os.Version) (Build $($os.BuildNumber))" | Out-File -FilePath $script:globalLogFile -Append
                     "  Recommendation: Use server OS for production deployments" | Out-File -FilePath $script:globalLogFile -Append
                 } elseif ($osVersion.Build -ge 9600) {
-                    Write-Host "     [OK] Server OS version is compatible with Azure Arc" -ForegroundColor Green
+                    Write-Host "     [OK] Server OS version is compatible with Azure Arc"
                     $deviceResult.TestResults.OperatingSystem = @{
                         Status = "Pass"
                         Name = $osName
@@ -712,7 +584,7 @@ vm-wsz
                     "[OK] Operating System: $osName - COMPATIBLE" | Out-File -FilePath $script:globalLogFile -Append
                     "  OS Version: $($os.Version) (Build $($os.BuildNumber))" | Out-File -FilePath $script:globalLogFile -Append
                 } else {
-                    Write-Host "     [FAIL] OS version may not be fully supported" -ForegroundColor Red
+                    Write-Host "     [FAIL] OS version may not be fully supported"
                     $deviceResult.TestResults.OperatingSystem = @{
                         Status = "Fail"
                         Name = $osName
@@ -728,7 +600,7 @@ vm-wsz
                     "  Recommendation: Upgrade to Windows Server 2012 R2 or later" | Out-File -FilePath $script:globalLogFile -Append
                 }
             } else {
-                Write-Host "     [WARN] OS information unavailable (Remote)" -ForegroundColor Yellow
+                Write-Host "     [WARN] OS information unavailable (Remote)"
                 $deviceResult.TestResults.OperatingSystem = @{
                     Status = "Warning"
                     Name = "Unknown"
@@ -740,7 +612,7 @@ vm-wsz
                 "[WARN] Operating System: Unknown (Remote testing not implemented)" | Out-File -FilePath $script:globalLogFile -Append
             }
         } catch {
-            Write-Host "     [FAIL] Failed to check OS: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "     [FAIL] Failed to check OS: $($_.Exception.Message)"
             $deviceResult.TestResults.OperatingSystem = @{
                 Status = "Error"
                 Message = $_.Exception.Message
@@ -750,7 +622,7 @@ vm-wsz
         }
 
         # Check architecture
-        Write-Host "   Checking processor architecture..." -ForegroundColor White
+        Write-Host "   Checking processor architecture..."
         try {
             if ($isLocalMachine) {
                 $processor = Get-CimInstance Win32_Processor
@@ -768,7 +640,7 @@ vm-wsz
 
             if ($processor) {
                 if ($processor.Architecture -in @(9, 12)) {
-                    Write-Host "     [OK] Architecture: $architecture - Supported" -ForegroundColor Green
+                    Write-Host "     [OK] Architecture: $architecture - Supported"
                     $deviceResult.TestResults.ProcessorArchitecture = @{
                         Status = "Pass"
                         Architecture = $architecture
@@ -777,7 +649,7 @@ vm-wsz
                     }
                     "[OK] Processor Architecture: $architecture - SUPPORTED" | Out-File -FilePath $script:globalLogFile -Append
                 } else {
-                    Write-Host "     [FAIL] Architecture: $architecture - Not supported" -ForegroundColor Red
+                    Write-Host "     [FAIL] Architecture: $architecture - Not supported"
                     $deviceResult.TestResults.ProcessorArchitecture = @{
                         Status = "Fail"
                         Architecture = $architecture
@@ -798,7 +670,7 @@ vm-wsz
                 "[WARN] Processor Architecture: Unknown (Remote testing not implemented)" | Out-File -FilePath $script:globalLogFile -Append
             }
         } catch {
-            Write-Host "     [FAIL] Failed to check processor: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "     [FAIL] Failed to check processor: $($_.Exception.Message)"
             $deviceResult.TestResults.ProcessorArchitecture = @{
                 Status = "Error"
                 Message = $_.Exception.Message
@@ -808,7 +680,7 @@ vm-wsz
         }
 
         # Check memory
-        Write-Host "   Checking system memory..." -ForegroundColor White
+        Write-Host "   Checking system memory..."
         try {
             if ($isLocalMachine) {
                 $totalMemoryGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 1)
@@ -819,7 +691,7 @@ vm-wsz
 
             if ($totalMemoryGB -gt 0) {
                 if ($totalMemoryGB -ge 2) {
-                    Write-Host "     [OK] Memory: $totalMemoryGB GB - Adequate" -ForegroundColor Green
+                    Write-Host "     [OK] Memory: $totalMemoryGB GB - Adequate"
                     $deviceResult.TestResults.SystemMemory = @{
                         Status = "Pass"
                         MemoryGB = $totalMemoryGB
@@ -827,7 +699,7 @@ vm-wsz
                     }
                     "[OK] System Memory: $totalMemoryGB GB - ADEQUATE" | Out-File -FilePath $script:globalLogFile -Append
                 } else {
-                    Write-Host "     [WARN] Memory: $totalMemoryGB GB - Below recommended 2GB" -ForegroundColor Yellow
+                    Write-Host "     [WARN] Memory: $totalMemoryGB GB - Below recommended 2GB"
                     $deviceResult.TestResults.SystemMemory = @{
                         Status = "Warning"
                         MemoryGB = $totalMemoryGB
@@ -847,7 +719,7 @@ vm-wsz
                 "[WARN] System Memory: Unknown (Remote testing not implemented)" | Out-File -FilePath $script:globalLogFile -Append
             }
         } catch {
-            Write-Host "     [FAIL] Failed to check memory: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "     [FAIL] Failed to check memory: $($_.Exception.Message)"
             $deviceResult.TestResults.SystemMemory = @{
                 Status = "Error"
                 Message = $_.Exception.Message
@@ -859,7 +731,7 @@ vm-wsz
         "" | Out-File -FilePath $script:globalLogFile -Append
 
         # Step 4: Required Services Check
-        Write-Host "`n STEP 4: REQUIRED SERVICES VALIDATION" -ForegroundColor Yellow
+        Write-Host "`n STEP 4: REQUIRED SERVICES VALIDATION"
         Write-Host ""
 
         "STEP 4: REQUIRED SERVICES VALIDATION" | Out-File -FilePath $script:globalLogFile -Append
@@ -874,7 +746,7 @@ vm-wsz
 
         $deviceResult.TestResults.Services = @{}
         foreach ($service in $requiredServices) {
-            Write-Host "   Checking $($service.DisplayName)..." -ForegroundColor White
+            Write-Host "   Checking $($service.DisplayName)..."
             try {
                 if ($isLocalMachine) {
                     $serviceStatus = Get-Service -Name $service.Name -ErrorAction SilentlyContinue
@@ -884,7 +756,7 @@ vm-wsz
                 }
 
                 if ($serviceStatus -and $serviceStatus.Status -eq "Running") {
-                    Write-Host "     [OK] $($service.DisplayName) - Running" -ForegroundColor Green
+                    Write-Host "     [OK] $($service.DisplayName) - Running"
                     $deviceResult.TestResults.Services[$service.Name] = @{
                         Status = "Pass"
                         ServiceStatus = "Running"
@@ -893,7 +765,7 @@ vm-wsz
                     }
                     "[OK] Service: $($service.DisplayName) - RUNNING" | Out-File -FilePath $script:globalLogFile -Append
                 } elseif ($serviceStatus) {
-                    Write-Host "     [WARN] $($service.DisplayName) - $($serviceStatus.Status)" -ForegroundColor Yellow
+                    Write-Host "     [WARN] $($service.DisplayName) - $($serviceStatus.Status)"
                     $deviceResult.TestResults.Services[$service.Name] = @{
                         Status = "Warning"
                         ServiceStatus = $serviceStatus.Status
@@ -905,7 +777,7 @@ vm-wsz
                     "[WARN] Service: $($service.DisplayName) - $($serviceStatus.Status.ToUpper())" | Out-File -FilePath $script:globalLogFile -Append
                     "  Recommendation: Start-Service -Name $($service.Name)" | Out-File -FilePath $script:globalLogFile -Append
                 } elseif ($isLocalMachine) {
-                    Write-Host "     [FAIL] $($service.DisplayName) - Not found" -ForegroundColor Red
+                    Write-Host "     [FAIL] $($service.DisplayName) - Not found"
                     $deviceResult.TestResults.Services[$service.Name] = @{
                         Status = "Fail"
                         ServiceStatus = "Not Found"
@@ -926,7 +798,7 @@ vm-wsz
                     "[WARN] Service: $($service.DisplayName) - Unknown (Remote testing not implemented)" | Out-File -FilePath $script:globalLogFile -Append
                 }
             } catch {
-                Write-Host "     [FAIL] Failed to check $($service.DisplayName): $($_.Exception.Message)" -ForegroundColor Red
+                Write-Host "     [FAIL] Failed to check $($service.DisplayName): $($_.Exception.Message)"
                 $deviceResult.TestResults.Services[$service.Name] = @{
                     Status = "Error"
                     ServiceStatus = "Error"
@@ -941,7 +813,7 @@ vm-wsz
         "" | Out-File -FilePath $script:globalLogFile -Append
 
         # Step 5: Network Connectivity Check
-        Write-Host "`n STEP 5: NETWORK CONNECTIVITY VALIDATION" -ForegroundColor Yellow
+        Write-Host "`n STEP 5: NETWORK CONNECTIVITY VALIDATION"
         Write-Host ""
 
         "STEP 5: NETWORK CONNECTIVITY VALIDATION" | Out-File -FilePath $script:globalLogFile -Append
@@ -956,7 +828,7 @@ vm-wsz
 
         $deviceResult.TestResults.NetworkConnectivity = @{}
         foreach ($endpoint in $azureEndpoints) {
-            Write-Host "   Testing connectivity to $($endpoint.Name)..." -ForegroundColor White
+            Write-Host "   Testing connectivity to $($endpoint.Name)..."
             try {
                 if ($isLocalMachine) {
                     # Use .NET TcpClient for completely silent network testing with proper cleanup
@@ -1002,7 +874,7 @@ vm-wsz
                 }
 
                 if ($result) {
-                    Write-Host "     [OK] $($endpoint.Url):$($endpoint.Port) - Reachable" -ForegroundColor Green
+                    Write-Host "     [OK] $($endpoint.Url):$($endpoint.Port) - Reachable"
                     $deviceResult.TestResults.NetworkConnectivity[$endpoint.Url] = @{
                         Status = "Pass"
                         Url = $endpoint.Url
@@ -1012,7 +884,7 @@ vm-wsz
                     }
                     "[OK] Network: $($endpoint.Name) ($($endpoint.Url):$($endpoint.Port)) - REACHABLE" | Out-File -FilePath $script:globalLogFile -Append
                 } elseif ($isLocalMachine) {
-                    Write-Host "     [FAIL] $($endpoint.Url):$($endpoint.Port) - Not reachable" -ForegroundColor Red
+                    Write-Host "     [FAIL] $($endpoint.Url):$($endpoint.Port) - Not reachable"
                     $deviceResult.TestResults.NetworkConnectivity[$endpoint.Url] = @{
                         Status = "Fail"
                         Url = $endpoint.Url
@@ -1035,7 +907,7 @@ vm-wsz
                     "[WARN] Network: $($endpoint.Name) ($($endpoint.Url):$($endpoint.Port)) - Unknown (Remote testing not implemented)" | Out-File -FilePath $script:globalLogFile -Append
                 }
             } catch {
-                Write-Host "     [FAIL] $($endpoint.Url):$($endpoint.Port) - Connection failed" -ForegroundColor Red
+                Write-Host "     [FAIL] $($endpoint.Url):$($endpoint.Port) - Connection failed"
                 $deviceResult.TestResults.NetworkConnectivity[$endpoint.Url] = @{
                     Status = "Error"
                     Url = $endpoint.Url
@@ -1058,13 +930,13 @@ vm-wsz
 
         if ($hasErrors) {
             $deviceResult.OverallStatus = "Not Ready"
-            Write-Host " DEVICE STATUS: NOT READY FOR AZURE ARC" -ForegroundColor Red
+            Write-Host " DEVICE STATUS: NOT READY FOR AZURE ARC"
         } elseif ($hasWarnings) {
             $deviceResult.OverallStatus = "Ready with Warnings"
-            Write-Host " DEVICE STATUS: READY WITH WARNINGS" -ForegroundColor Yellow
+            Write-Host " DEVICE STATUS: READY WITH WARNINGS"
         } else {
             $deviceResult.OverallStatus = "Ready"
-            Write-Host " DEVICE STATUS: READY FOR AZURE ARC" -ForegroundColor Green
+            Write-Host " DEVICE STATUS: READY FOR AZURE ARC"
         }
 
         Write-Host ""
@@ -1109,9 +981,9 @@ vm-wsz
 
         # Step 6: Final Summary
         Write-Host ""
-        Write-Host ("=" * 80) -ForegroundColor Green
-        Write-Host " AZURE ARC PREREQUISITES TESTING COMPLETE" -ForegroundColor Green
-        Write-Host ("=" * 80) -ForegroundColor Green
+        Write-Host ("=" * 80)
+        Write-Host " AZURE ARC PREREQUISITES TESTING COMPLETE"
+        Write-Host ("=" * 80)
         Write-Host ""
 
         # Log final summary header
@@ -1123,7 +995,7 @@ vm-wsz
         "" | Out-File -FilePath $script:globalLogFile -Append
 
         # Display device summary
-        Write-Host " DEVICE READINESS SUMMARY:" -ForegroundColor Cyan
+        Write-Host " DEVICE READINESS SUMMARY:"
         Write-Host ""
 
         $readyDevices = 0
@@ -1141,17 +1013,17 @@ vm-wsz
 
             switch ($status) {
                 "Ready" {
-                    Write-Host "   [OK] $device - READY FOR AZURE ARC" -ForegroundColor Green
+                    Write-Host "   [OK] $device - READY FOR AZURE ARC"
                     $readyDevices++
                     "$device - READY FOR AZURE ARC" | Out-File -FilePath $script:globalLogFile -Append
                 }
                 "Ready with Warnings" {
-                    Write-Host "   [WARN] $device - READY WITH WARNINGS ($warningCount warnings)" -ForegroundColor Yellow
+                    Write-Host "   [WARN] $device - READY WITH WARNINGS ($warningCount warnings)"
                     $readyWithWarningsDevices++
                     "$device - READY WITH WARNINGS ($warningCount warnings)" | Out-File -FilePath $script:globalLogFile -Append
                 }
                 "Not Ready" {
-                    Write-Host "   [FAIL] $device - NOT READY ($errorCount errors, $warningCount warnings)" -ForegroundColor Red
+                    Write-Host "   [FAIL] $device - NOT READY ($errorCount errors, $warningCount warnings)"
                     $notReadyDevices++
                     "$device - NOT READY ($errorCount errors, $warningCount warnings)" | Out-File -FilePath $script:globalLogFile -Append
                 }
@@ -1159,10 +1031,10 @@ vm-wsz
         }
 
         Write-Host ""
-        Write-Host " OVERALL STATISTICS:" -ForegroundColor Cyan
-        Write-Host "   Ready: $readyDevices device(s)" -ForegroundColor Green
-        Write-Host "   Ready with Warnings: $readyWithWarningsDevices device(s)" -ForegroundColor Yellow
-        Write-Host "   Not Ready: $notReadyDevices device(s)" -ForegroundColor Red
+        Write-Host " OVERALL STATISTICS:"
+        Write-Host "   Ready: $readyDevices device(s)"
+        Write-Host "   Ready with Warnings: $readyWithWarningsDevices device(s)"
+        Write-Host "   Not Ready: $notReadyDevices device(s)"
         Write-Host ""
 
         "" | Out-File -FilePath $script:globalLogFile -Append
@@ -1175,38 +1047,38 @@ vm-wsz
 
         # Show Azure authentication status
         if ($script:azureLoginCompleted) {
-            Write-Host " AZURE INTEGRATION:" -ForegroundColor Cyan
-            Write-Host "   [OK] Azure authentication completed" -ForegroundColor Green
-            Write-Host "   [OK] Resource providers processed" -ForegroundColor Green
+            Write-Host " AZURE INTEGRATION:"
+            Write-Host "   [OK] Azure authentication completed"
+            Write-Host "   [OK] Resource providers processed"
             "Azure authentication: Completed" | Out-File -FilePath $script:globalLogFile -Append
             "Resource providers: Processed" | Out-File -FilePath $script:globalLogFile -Append
         } else {
-            Write-Host " AZURE INTEGRATION:" -ForegroundColor Cyan
-            Write-Host "   [WARN] Azure authentication skipped" -ForegroundColor Yellow
+            Write-Host " AZURE INTEGRATION:"
+            Write-Host "   [WARN] Azure authentication skipped"
             "Azure authentication: Skipped" | Out-File -FilePath $script:globalLogFile -Append
         }
 
         Write-Host ""
-        Write-Host " FILES CREATED:" -ForegroundColor Cyan
-        Write-Host "   Log file: $script:globalLogFile" -ForegroundColor Gray
+        Write-Host " FILES CREATED:"
+        Write-Host "   Log file: $script:globalLogFile"
         if ($DeviceListPath) {
-            Write-Host "   Device list: $DeviceListPath" -ForegroundColor Gray
+            Write-Host "   Device list: $DeviceListPath"
         }
 
         Write-Host ""
-        Write-Host " NEXT STEPS:" -ForegroundColor Yellow
+        Write-Host " NEXT STEPS:"
         if ($notReadyDevices -gt 0) {
-            Write-Host "   1. Address critical issues on devices marked as 'Not Ready'" -ForegroundColor White
-            Write-Host "   2. Review detailed recommendations in the log file" -ForegroundColor White
-            Write-Host "   3. Re-run prerequisites testing after resolving issues" -ForegroundColor White
+            Write-Host "   1. Address critical issues on devices marked as 'Not Ready'"
+            Write-Host "   2. Review detailed recommendations in the log file"
+            Write-Host "   3. Re-run prerequisites testing after resolving issues"
         } elseif ($readyWithWarningsDevices -gt 0) {
-            Write-Host "   1. Review warnings in the log file for optimal performance" -ForegroundColor White
-            Write-Host "   2. Proceed with Azure Arc device deployment (Option 2)" -ForegroundColor White
-            Write-Host "   3. Monitor devices during deployment process" -ForegroundColor White
+            Write-Host "   1. Review warnings in the log file for optimal performance"
+            Write-Host "   2. Proceed with Azure Arc device deployment (Option 2)"
+            Write-Host "   3. Monitor devices during deployment process"
         } else {
-            Write-Host "   1. All devices are ready for Azure Arc deployment" -ForegroundColor White
-            Write-Host "   2. Proceed with Azure Arc device deployment (Option 2)" -ForegroundColor White
-            Write-Host "   3. Use the device list file for bulk operations" -ForegroundColor White
+            Write-Host "   1. All devices are ready for Azure Arc deployment"
+            Write-Host "   2. Proceed with Azure Arc device deployment (Option 2)"
+            Write-Host "   3. Use the device list file for bulk operations"
         }
         Write-Host ""
 
@@ -1250,11 +1122,11 @@ vm-wsz
 
     } catch {
         Write-Host ""
-        Write-Host " [FAIL] PREREQUISITES TESTING FAILED" -ForegroundColor Red
-        Write-Host "   Error: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host " [FAIL] PREREQUISITES TESTING FAILED"
+        Write-Host "   Error: $($_.Exception.Message)"
         Write-Host ""
-        Write-Host " FILES CREATED:" -ForegroundColor Cyan
-        Write-Host "   Log file: $script:globalLogFile" -ForegroundColor Gray
+        Write-Host " FILES CREATED:"
+        Write-Host "   Log file: $script:globalLogFile"
         Write-Host ""
 
         # Log error
