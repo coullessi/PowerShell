@@ -1,4 +1,4 @@
-function Start-ServerProtection {
+﻿function Start-ServerProtection {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
     <#
     .SYNOPSIS

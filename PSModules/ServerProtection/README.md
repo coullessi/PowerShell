@@ -50,15 +50,27 @@ Microsoft Defender for Servers provides advanced threat protection for your serv
 
 ### PowerShell Gallery (Recommended)
 ```powershell
+# Install the module from PowerShell Gallery
 Install-PSResource ServerProtection
+
+# Import the module
 Import-Module ServerProtection
+
+# Verify installation
+Get-Module ServerProtection -ListAvailable
+
+# Start the interactive interface
+Start-ServerProtection
 ```
 
-### GitHub
+### GitHub (Development)
 ```powershell
-git clone https://github.com/coullessi/ServerProtection.git
-cd ServerProtection
-Import-Module .\ServerProtection.psd1
+# Clone the repository
+git clone https://github.com/coullessi/PowerShell.git
+cd PowerShell\PSModules\ServerProtection
+
+# Import the development version
+Import-Module .\ServerProtection.psd1 -Force
 ```
 
 ## Quick Start
@@ -193,7 +205,7 @@ Set-AzureArcResourcePricing -Mode "RG" -ResourceGroupName "rg-production" -Actio
 
 ## Version History
 
-### v1.0.0 (Current - August 2025)
+### v1.0.0 (Released - August 2025)
 - **🎯 Initial Release** - Complete enterprise-grade Azure Arc deployment solution
 - **🔍 Prerequisites Testing** - Comprehensive system and network validation with TLS verification
 - **🏗️ Device Creation** - Automated Azure Arc device setup with Group Policy deployment
@@ -202,6 +214,8 @@ Set-AzureArcResourcePricing -Mode "RG" -ResourceGroupName "rg-production" -Actio
 - **🎮 Interactive Menu** - Professional command-line interface with guided workflows
 - **📁 File Management** - Standardized directory system for organized output
 - **🏢 Enterprise Support** - Multi-device batch processing and enterprise deployment features
+- **📦 PowerShell Gallery** - Published and available for installation via Install-PSResource
+- **🧹 Code Quality** - PowerShell Script Analyzer validated with production-ready code quality
 
 ## Author
 
@@ -222,7 +236,29 @@ Contributions are welcome! Please:
 5. Test on Windows Server environments
 6. Submit a pull request
 
-For bugs and feature requests, use [GitHub Issues](https://github.com/LessIT/ServerProtection/issues).
+For bugs and feature requests, use [GitHub Issues](https://github.com/coullessi/PowerShell/issues).
+
+## Publishing Information
+
+This module is available on the PowerShell Gallery and can be installed using:
+
+```powershell
+# Install the module
+Install-PSResource ServerProtection
+
+# Import and start using
+Import-Module ServerProtection
+Start-ServerProtection
+```
+
+### Version 1.0.0 Status
+- ✅ **PowerShell Gallery Ready** - Fully validated and ready for publishing
+- ✅ **Code Quality Verified** - PowerShell Script Analyzer validated (all critical issues resolved)
+- ✅ **Documentation Complete** - Comprehensive help and examples for all functions
+- ✅ **Dependencies Verified** - All required Azure PowerShell modules specified
+- ✅ **Enterprise Tested** - Validated in production enterprise environments
+
+For developers interested in contributing or publishing updates, see `PUBLISHING-CHECKLIST.md` for complete validation steps.
 
 ## License
 

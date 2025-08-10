@@ -10,13 +10,30 @@ spec/
 Demo-*
 Examples/
 Samples/
+Extended-Test.ps1
+Quick-Test.ps1
+
+# Development documentation
+PUBLISHING-CHECKLIST.md
+TEST-RESULTS.md
+TESTING-SUMMARY.md
+notes.txt
+draft*.md
+TODO.txt
+CHANGELOG-draft.md
 
 # Temporary and log files
 *.log
 *.tmp
+*.temp
 *.bak
 *.swp
 *~
+AzureArc_*.log
+*_Checks_Consolidated.log
+Install-*.log
+Deploy-*.log
+Test-*.log
 
 # Version control
 .git/
@@ -61,6 +78,10 @@ profile.ps1
 sample-*.txt
 demo-*.json
 example-*.csv
+devices.txt
+device-list.txt
+*devices*.txt
+*devicelist*.txt
 
 # Private/sensitive files (if any)
 private/
@@ -69,3 +90,25 @@ secrets/
 *.key
 config.json
 appsettings.json
+secrets.json
+.env
+.env.local
+.env.production
+
+# Personal and development directories
+Personal/
+Dev/
+Sandbox/
+old/
+archive/
+backup/
+*.old
+*.backup
+
+# Code workspace files
+*.code-workspace
+
+# Additional Azure Arc specific exclusions
+*devices*.txt
+*devicelist*.txt
+device-*.txt

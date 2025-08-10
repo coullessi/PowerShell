@@ -5,11 +5,11 @@
     ServerProtection PowerShell Module
 
 .DESCRIPTION
-    This module provides comprehensive tools for server protection through Azure Arc device 
-    deployment and Microsoft Defender for Servers (DFS) management. Microsoft Defender for 
-    Servers is a cloud-native security solution that provides advanced threat protection, 
-    vulnerability assessment, and security monitoring for server workloads in Microsoft 
-    Defender for Cloud. It includes functions for prerequisites checking, Azure Arc 
+    This module provides comprehensive tools for server protection through Azure Arc device
+    deployment and Microsoft Defender for Servers (DFS) management. Microsoft Defender for
+    Servers is a cloud-native security solution that provides advanced threat protection,
+    vulnerability assessment, and security monitoring for server workloads in Microsoft
+    Defender for Cloud. It includes functions for prerequisites checking, Azure Arc
     deployment, and seamless integration with Defender for Servers across multiple devices,
     enabling advanced threat detection, behavioral analytics, and security recommendations.
 
