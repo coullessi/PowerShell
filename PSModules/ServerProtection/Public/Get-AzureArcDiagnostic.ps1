@@ -282,144 +282,33 @@ function Get-AzureArcDiagnostic {
     process {
         # Simple menu system for device selection
         if (-not $Force -and [string]::IsNullOrWhiteSpace($DeviceListPath)) {
-            Clear-Host
-            Write-Host ""
-            Write-Host " AZURE ARC DIAGNOSTIC COLLECTION"
-            Write-Host " ================================"
-            Write-Host ""
-            Write-Host " Please select an option:"
-            Write-Host ""
-            Write-Host "   1. Run diagnostics on localhost only"
-            Write-Host "   2. Run diagnostics for a list of devices"
-            Write-Host "   3. Quit and return to main menu"
-            Write-Host ""
-
-            $validChoice = $false
-            do {
-                $choice = Read-Host "   Enter your choice (1-3)"
-
-                switch ($choice) {
-                    "1" {
-                        # Use localhost only
-                        if (-not $Quiet) {
-                            Write-Host "   Selected: Localhost diagnostics"
-                        }
-                        $DeviceListPath = $null
-                        $validChoice = $true
-                    }
-                    "2" {
-                        # Get device list file or create default if using standardized environment
-                        if ($script:deviceListFile -and (-not $DeviceListPath)) {
-                            # Create default device list file in standardized location
-                            $defaultDeviceContent = @"
-# Azure Arc Device List for Diagnostics
-# Enter one device name per line
-# Lines starting with # are comments and will be ignored
-#
-# Examples:
-# SERVER01
-# SERVER02
-# $env:COMPUTERNAME
-#
-# Add your device names below:
-$env:COMPUTERNAME
-"@
-                            try {
-                                $defaultDeviceContent | Out-File -FilePath $script:deviceListFile -Encoding UTF8
-                                Write-Host "   [OK] Created default device list: $([System.IO.Path]::GetFileName($script:deviceListFile))"
-
-                                Write-Host ""
-                                Write-Host "   Opening device list in Notepad for editing..."
-                                Write-Host "   Edit your device names and save the file."
-                                Write-Host "   Close Notepad when done to continue."
-                                Write-Host ""
-
-                                try {
-                                    $notepadProcess = Start-Process -FilePath "notepad.exe" -ArgumentList $script:deviceListFile -PassThru
-                                    $notepadProcess.WaitForExit()
-                                    Write-Host "   [OK] Device list editing completed"
-                                } catch {
-                                    Write-Host "   [WARN] Could not open Notepad: $($_.Exception.Message)"
-                                    Read-Host "   Press Enter after editing the device list file manually"
-                                }
-
-                                $DeviceListPath = $script:deviceListFile
-                                $validChoice = $true
-                            } catch {
-                                Write-Host "   [FAIL] Could not create device list file: $($_.Exception.Message)"
-                                Write-Host "   Using localhost only..."
-                                $DeviceListPath = $null
-                                $validChoice = $true
-                            }
-                        } else {
-                            # Manual device list file selection
-                            Write-Host ""
-                            Write-Host "   Supported formats:"
-                            Write-Host "   - C:\MyAzureArc\Devices.txt"
-                            Write-Host "   - 'C:\MyAzureArc\Devices.txt'"
-                            Write-Host "   - `"C:\MyAzureArc\Devices.txt`""
-                            Write-Host ""
-
-                            $deviceFileInput = Read-Host "   Enter device list file path"
-
-                            if ([string]::IsNullOrWhiteSpace($deviceFileInput)) {
-                                Write-Host "   [WARN] No file path provided. Using localhost only..."
-                                $DeviceListPath = $null
-                                $validChoice = $true
-                            } else {
-                                # Clean and validate the path
-                                $cleanPath = Remove-PathQuote -Path $deviceFileInput.Trim()
-                                $pathValidation = Test-ValidPath -Path $cleanPath -PathType File -RequireExists
-
-                                if (-not $pathValidation.IsValid) {
-                                    Write-Host "   [WARN] Invalid file path: $($pathValidation.Error)"
-                                    Write-Host "   Using localhost only..."
-                                    $DeviceListPath = $null
-                                    $validChoice = $true
-                                } elseif (-not $pathValidation.Exists) {
-                                    Write-Host "   [WARN] File not found: $($pathValidation.FullPath)"
-                                    Write-Host "   Using localhost only..."
-                                    $DeviceListPath = $null
-                                    $validChoice = $true
-                                } else {
-                                    $DeviceListPath = $pathValidation.FullPath
-                                    Write-Host "   [OK] Device list file found: $DeviceListPath"
-                                    $validChoice = $true
-                                }
-                            }
-                        }
-                    }
-                    "3" {
-                        # Quit to main menu
-                        $script:skipCleanup = $true
-                        return $null
-                    }
-                    default {
-                        Write-Host "   [WARN] Invalid choice. Please enter 1, 2, or 3."
-                        $validChoice = $false
-                    }
-                }
-            } while (-not $validChoice)
+            # Use standardized device file selection
+            $DeviceListPath = Get-DeviceFileSelection -WorkingDirectory $workingFolder -DefaultDeviceFile $script:deviceListFile
+            
+            # Handle quit to main menu
+            if ($DeviceListPath -eq "QUIT") {
+                $script:skipCleanup = $true
+                return $null
+            }
         } elseif (-not [string]::IsNullOrWhiteSpace($DeviceListPath)) {
             # DeviceListPath was provided as parameter - validate it
-            $pathValidation = Test-ValidPath -Path $DeviceListPath -PathType File -RequireExists
-
-            if (-not $pathValidation.IsValid -or -not $pathValidation.Exists) {
-                Write-Host "[WARN] Invalid or missing device list file. Using localhost only..."
+            Write-Host ""
+            Write-Host " Using provided device list parameter: $DeviceListPath"
+            
+            if (-not (Test-Path -Path $DeviceListPath -PathType Leaf)) {
+                Write-Host " [WARN] Provided device list file not found: $DeviceListPath" -ForegroundColor Green
+                Write-Host " Continuing without device list..."
                 $DeviceListPath = $null
             } else {
-                $DeviceListPath = $pathValidation.FullPath
-                if (-not $Quiet) {
-                    Write-Host "Using device list file: $DeviceListPath"
-                }
+                Write-Host " [OK] Device list file verified" -ForegroundColor Green
             }
         }
 
         try {
             Clear-Host
             Write-Host ""
-            Write-Host " AZURE ARC DIAGNOSTIC COLLECTION" -ForegroundColor Green
-            Write-Host " Comprehensive Agent Health and Connectivity Analysis" -ForegroundColor Gray
+            Write-Host " AZURE ARC DIAGNOSTIC COLLECTION"
+            Write-Host " Comprehensive Agent Health and Connectivity Analysis"
             Write-Host ""
 
             # Log session start
@@ -452,18 +341,18 @@ $env:COMPUTERNAME
                     } | ForEach-Object { $_.Trim() }
 
                     if ($devicesToDiagnose.Count -eq 0) {
-                        Write-Host "   [WARN] No valid device names found in device list"
+                        Write-Host "   [WARN] No valid device names found in device list" -ForegroundColor Green
                         Write-Host "   Using localhost only..."
                         $devicesToDiagnose = @($env:COMPUTERNAME)
                     } else {
                         if (-not $Quiet) {
-                            Write-Host "   [OK] Found $($devicesToDiagnose.Count) device(s) to diagnose"
+                            Write-Host "   [OK] Found $($devicesToDiagnose.Count) device(s) to diagnose" -ForegroundColor Green
                             $devicesToDiagnose | ForEach-Object { Write-Host "     - $_" }
                         }
                     }
 
                 } catch {
-                    Write-Host "   [FAIL] Failed to read device list: $($_.Exception.Message)"
+                    Write-Host "   [FAIL] Failed to read device list: $($_.Exception.Message)" -ForegroundColor Green
                     Write-Host "   Using localhost only..."
                     $devicesToDiagnose = @($env:COMPUTERNAME)
                 }
@@ -574,10 +463,10 @@ $env:COMPUTERNAME
                         if (-not $pingResult) {
                             throw "Ping test failed"
                         }
-                        Write-Host "   [OK] Remote device is reachable"
+                        Write-Host "   [OK] Remote device is reachable" -ForegroundColor Green
                         "Remote Connectivity: Device is reachable via ping" | Out-File -FilePath $script:globalLogFile -Append
                     } catch {
-                        Write-Host "   [WARN] Remote device not reachable: $($_.Exception.Message)"
+                        Write-Host "   [WARN] Remote device not reachable: $($_.Exception.Message)" -ForegroundColor Green
                         "WARNING: Remote device not reachable - $($_.Exception.Message)" | Out-File -FilePath $script:globalLogFile -Append
                         $deviceResult.Warnings += "Remote device not reachable: $($_.Exception.Message)"
                     }
@@ -594,10 +483,10 @@ $env:COMPUTERNAME
 
                         $testSession = New-PSSession @testSessionParams
                         Remove-PSSession $testSession -ErrorAction SilentlyContinue
-                        Write-Host "   [OK] PowerShell remoting is available"
+                        Write-Host "   [OK] PowerShell remoting is available" -ForegroundColor Green
                         "Remote Connectivity: PowerShell remoting is available" | Out-File -FilePath $script:globalLogFile -Append
                     } catch {
-                        Write-Host "   [FAIL] PowerShell remoting not available: $($_.Exception.Message)"
+                        Write-Host "   [FAIL] PowerShell remoting not available: $($_.Exception.Message)" -ForegroundColor Green
                         Write-Host "   This device will be skipped. Enable PowerShell remoting on the target device."
 
                         "ERROR: PowerShell remoting not available - $($_.Exception.Message)" | Out-File -FilePath $script:globalLogFile -Append
@@ -1061,7 +950,7 @@ $env:COMPUTERNAME
                         $commandSuccess = $LASTEXITCODE -eq 0
                         if ($commandSuccess) {
                             "Status: SUCCESS" | Out-File -FilePath $script:globalLogFile -Append
-                            Write-Host "     Completed successfully ($([math]::Round($duration, 2))s)"
+                            Write-Host "     Completed successfully ($([math]::Round($duration, 2))s)" -ForegroundColor Green
                         }
                         else {
                             "Status: FAILED" | Out-File -FilePath $script:globalLogFile -Append
@@ -1226,7 +1115,7 @@ $env:COMPUTERNAME
             }
 
             if ($allZipFiles.Count -gt 0) {
-                Write-Host "Log Archives Created:"
+                Write-Host "Log Archives Created:" -ForegroundColor Yellow
                 "ALL LOG ARCHIVES:" | Out-File -FilePath $script:globalLogFile -Append
 
                 $localZipFiles = $allZipFiles | Where-Object { -not $_.StartsWith("Remote:") }
@@ -1268,7 +1157,7 @@ $env:COMPUTERNAME
 
             # Display final recommendations
             if ($overallRecommendations.Count -gt 0) {
-                Write-Host "Recommendations:"
+                Write-Host "Recommendations:" -ForegroundColor Yellow
                 "RECOMMENDATIONS:" | Out-File -FilePath $script:globalLogFile -Append
                 foreach ($recommendation in $overallRecommendations) {
                     Write-Host "  - $recommendation"
@@ -1279,7 +1168,7 @@ $env:COMPUTERNAME
             }
 
             # Display output directory
-            Write-Host "Output Directory: $([System.IO.Path]::GetDirectoryName($script:globalLogFile))"
+            Write-Host "Output Directory: $([System.IO.Path]::GetDirectoryName($script:globalLogFile))" -ForegroundColor Green
             Write-Host "Consolidated Log: $(Split-Path $script:globalLogFile -Leaf)"
             Write-Host ""
 
@@ -1296,7 +1185,7 @@ $env:COMPUTERNAME
                 "FINAL RESULT: Some device diagnostics encountered issues" | Out-File -FilePath $script:globalLogFile -Append
             }
 
-            Write-Host "=================================================================="
+            Write-Host "==================================================================" -ForegroundColor Green
 
             # Add session footer to log
             ("=" * 100) | Out-File -FilePath $script:globalLogFile -Append
@@ -1371,6 +1260,9 @@ $env:COMPUTERNAME
         }
     }
 }
+
+
+
 
 
 

@@ -38,7 +38,7 @@ function Test-AzureResourceProviders {
                     $currentStatus = $resourceProvider.RegistrationState
 
                     if ($currentStatus -eq "Registered") {
-                        Write-Host "     $provider : Already registered" -ForegroundColor Green
+                        Write-Host "     $provider : Already registered"
                         $results += [PSCustomObject]@{
                             Provider = $provider
                             Status = "Already Registered"
@@ -48,7 +48,7 @@ function Test-AzureResourceProviders {
                     }
 
                     # Register the provider
-                    Write-Host "     $provider : Registering..." -ForegroundColor Yellow
+                    Write-Host "     $provider : Registering..."
                     Register-AzResourceProvider -ProviderNamespace $provider -ErrorAction Stop | Out-Null
 
                     # Wait for registration to complete (with shorter timeout for better UX)
@@ -66,14 +66,14 @@ function Test-AzureResourceProviders {
                     } while ($timer -lt $timeout -and $status -ne "Registered")
 
                     if ($status -eq "Registered") {
-                        Write-Host "     $provider : Successfully registered" -ForegroundColor Green
+                        Write-Host "     $provider : Successfully registered"
                         $results += [PSCustomObject]@{
                             Provider = $provider
                             Status = "Successfully Registered"
                             Success = $true
                         }
                     } else {
-                        Write-Host "      $provider : Registration timeout (may complete in background)" -ForegroundColor Yellow
+                        Write-Host "      $provider : Registration timeout (may complete in background)"
                         $results += [PSCustomObject]@{
                             Provider = $provider
                             Status = "Registration Timeout"
@@ -81,7 +81,7 @@ function Test-AzureResourceProviders {
                         }
                     }
                 } else {
-                    Write-Host "     $provider : Provider not found" -ForegroundColor Red
+                    Write-Host "     $provider : Provider not found"
                     $results += [PSCustomObject]@{
                         Provider = $provider
                         Status = "Provider Not Found"
@@ -89,7 +89,7 @@ function Test-AzureResourceProviders {
                     }
                 }
             } catch {
-                Write-Host "     $provider : Registration failed - $($_.Exception.Message)" -ForegroundColor Red
+                Write-Host "     $provider : Registration failed - $($_.Exception.Message)"
                 $results += [PSCustomObject]@{
                     Provider = $provider
                     Status = "Registration Failed"
@@ -101,16 +101,16 @@ function Test-AzureResourceProviders {
         Write-Progress -Activity "Processing Resource Providers" -Completed
 
         # Display registration summary
-        Write-Host "`n Resource Provider Registration Summary:" -ForegroundColor Cyan
+        Write-Host "`n Resource Provider Registration Summary:" -ForegroundColor Yellow
         $successCount = ($results | Where-Object { $_.Success }).Count
         $totalCount = $results.Count
 
         if ($successCount -eq $totalCount) {
-            Write-Host " All resource providers registered successfully! ($successCount/$totalCount)" -ForegroundColor Green
+            Write-Host " All resource providers registered successfully! ($successCount/$totalCount)"
             $script:resourceProvidersChecked = $true
             $script:unregisteredProviders = @()
         } else {
-            Write-Host "  Some resource provider registrations incomplete ($successCount/$totalCount)" -ForegroundColor Yellow
+            Write-Host "  Some resource provider registrations incomplete ($successCount/$totalCount)"
             $script:unregisteredProviders = ($results | Where-Object { -not $_.Success }).Provider
             # Still mark as checked since we attempted registration
             $script:resourceProvidersChecked = $true
@@ -180,9 +180,9 @@ function Test-DeviceCheck {
         $osVersion = "Unknown OS"
     }
 
-    Write-Host "`n  COMPREHENSIVE PREREQUISITES CHECK: $DeviceName" -ForegroundColor Yellow
-    Write-Host "    OS: $osVersion | Architecture: $($deviceInfo.Architecture)" -ForegroundColor Gray
-    Write-Host "" -ForegroundColor Yellow
+    Write-Host "`n  COMPREHENSIVE PREREQUISITES CHECK: $DeviceName"
+    Write-Host "    OS: $osVersion | Architecture: $($deviceInfo.Architecture)"
+    Write-Host ""
 
     # Add device header to consolidated log
     "" | Out-File -FilePath $script:globalLogFile -Append
@@ -198,7 +198,7 @@ function Test-DeviceCheck {
 
     if (-not $isReachable) {
         Test-Prerequisite $DeviceName "Device Connectivity" "Error" "Device is not reachable via network or WinRM"
-        Write-Host "     Device is unreachable. Skipping all other checks." -ForegroundColor Red
+        Write-Host "     Device is unreachable. Skipping all other checks."
         Add-RemediationStep "# Device connectivity failed - verify network connectivity and WinRM configuration"
         Add-RemediationStep "Test-NetConnection -ComputerName $DeviceName -Port 5985"
         Add-RemediationStep "Enable-PSRemoting -Force  # Run on target device"
@@ -218,14 +218,14 @@ function Test-DeviceCheck {
             if (-not $session) {
                 Write-Step "Establishing secure remote PowerShell session" $DeviceName
                 $session = New-PSSession -ComputerName $DeviceName -ErrorAction Stop
-                Write-Host "     Secure remote session established successfully" -ForegroundColor Green
+                Write-Host "     Secure remote session established successfully"
             }
         }
 
         # ============================================================================
         # 1. OPERATING SYSTEM REQUIREMENTS VALIDATION
         # ============================================================================
-        Write-Host "`n 1. OPERATING SYSTEM REQUIREMENTS" -ForegroundColor Cyan
+        Write-Host "`n 1. OPERATING SYSTEM REQUIREMENTS"
 
         # Windows Version and Build Check
         $currentStep++
@@ -256,7 +256,7 @@ function Test-DeviceCheck {
 
         # System Requirements Check (if enabled)
         if ($CheckSystemRequirements) {
-            Write-Host "`n SYSTEM HARDWARE REQUIREMENTS" -ForegroundColor Cyan
+            Write-Host "`n SYSTEM HARDWARE REQUIREMENTS"
 
             # Memory Check
             $currentStep++
@@ -289,7 +289,7 @@ function Test-DeviceCheck {
         # ============================================================================
         # 2. POWERSHELL `& EXECUTION ENVIRONMENT
         # ============================================================================
-        Write-Host "`n 2. POWERSHELL `& EXECUTION ENVIRONMENT" -ForegroundColor Cyan
+        Write-Host "`n 2. POWERSHELL `& EXECUTION ENVIRONMENT"
 
         # PowerShell Version
         $currentStep++
@@ -348,7 +348,7 @@ function Test-DeviceCheck {
         # ============================================================================
         # 3. WINDOWS SYSTEM REQUIREMENTS
         # ============================================================================
-        Write-Host "`n  3. WINDOWS SYSTEM REQUIREMENTS" -ForegroundColor Cyan
+        Write-Host "`n  3. WINDOWS SYSTEM REQUIREMENTS"
 
         # Windows Services
         $currentStep++
@@ -412,7 +412,7 @@ function Test-DeviceCheck {
         # ============================================================================
         # 4. AZURE ARC AGENT REQUIREMENTS
         # ============================================================================
-        Write-Host "`n 4. AZURE ARC AGENT REQUIREMENTS" -ForegroundColor Cyan
+        Write-Host "`n 4. AZURE ARC AGENT REQUIREMENTS"
 
         # Azure Connected Machine Agent Installation
         $currentStep++
@@ -462,7 +462,7 @@ function Test-DeviceCheck {
         # 5. MICROSOFT DEFENDER INTEGRATION (if enabled)
         # ============================================================================
         if ($ValidateDefenderConfiguration) {
-            Write-Host "`n  5. MICROSOFT DEFENDER INTEGRATION" -ForegroundColor Cyan
+            Write-Host "`n  5. MICROSOFT DEFENDER INTEGRATION"
 
             # Windows Defender Antivirus Status
             $currentStep++
@@ -508,7 +508,7 @@ function Test-DeviceCheck {
         # ============================================================================
         # 6. SECURITY `& COMPLIANCE VALIDATION
         # ============================================================================
-        Write-Host "`n 6. SECURITY `& COMPLIANCE" -ForegroundColor Cyan
+        Write-Host "`n 6. SECURITY `& COMPLIANCE"
 
         # Windows Security Center Status
         $currentStep++
@@ -555,7 +555,7 @@ function Test-DeviceCheck {
         # ============================================================================
         # 7. FINAL SUMMARY AND RECOMMENDATIONS
         # ============================================================================
-        Write-Host "`n COMPREHENSIVE CHECK SUMMARY" -ForegroundColor Green
+        Write-Host "`n COMPREHENSIVE CHECK SUMMARY"
 
         # Generate device summary
         $deviceResults = $script:allResults[$DeviceName]
@@ -565,22 +565,22 @@ function Test-DeviceCheck {
         $errorChecks = ($deviceResults | Where-Object { $_.Result -eq "Error" }).Count
         $infoChecks = ($deviceResults | Where-Object { $_.Result -eq "Info" }).Count
 
-        Write-Host "    Total Checks: $totalChecks" -ForegroundColor White
-        Write-Host "     Passed: $okChecks" -ForegroundColor Green
-        Write-Host "      Warnings: $warningChecks" -ForegroundColor Yellow
-        Write-Host "     Errors: $errorChecks" -ForegroundColor Red
-        Write-Host "      Info: $infoChecks" -ForegroundColor Cyan
+        Write-Host "    Total Checks: $totalChecks"
+        Write-Host "     Passed: $okChecks"
+        Write-Host "      Warnings: $warningChecks"
+        Write-Host "     Errors: $errorChecks"
+        Write-Host "      Info: $infoChecks"
 
         # Determine overall readiness
         if ($errorChecks -eq 0 -and $warningChecks -le 2) {
-            Write-Host "`n READINESS STATUS: READY FOR AZURE ARC ONBOARDING" -ForegroundColor Green
-            Write-Host "   Device meets all critical requirements for Azure Arc and MDE integration" -ForegroundColor Green
+            Write-Host "`n READINESS STATUS: READY FOR AZURE ARC ONBOARDING"
+            Write-Host "   Device meets all critical requirements for Azure Arc and MDE integration"
         } elseif ($errorChecks -eq 0) {
-            Write-Host "`n READINESS STATUS: READY WITH MINOR WARNINGS" -ForegroundColor Yellow
-            Write-Host "   Device can be onboarded but some optimizations are recommended" -ForegroundColor Yellow
+            Write-Host "`n READINESS STATUS: READY WITH MINOR WARNINGS"
+            Write-Host "   Device can be onboarded but some optimizations are recommended"
         } else {
-            Write-Host "`n READINESS STATUS: REQUIRES REMEDIATION" -ForegroundColor Red
-            Write-Host "   Critical issues must be resolved before Azure Arc onboarding" -ForegroundColor Red
+            Write-Host "`n READINESS STATUS: REQUIRES REMEDIATION"
+            Write-Host "   Critical issues must be resolved before Azure Arc onboarding"
         }
 
         # Generate remediation script if requested
@@ -588,16 +588,16 @@ function Test-DeviceCheck {
             # Use standardized output directory for remediation scripts
             $remediationFile = New-StandardizedOutputFile -FileName "AzureArc_Remediation_$($DeviceName)" -Extension ".ps1"
             $script:remediationScriptContent | Out-File -FilePath $remediationFile -Encoding UTF8
-            Write-Host "`n Remediation script generated: $remediationFile" -ForegroundColor Cyan
+            Write-Host "`n Remediation script generated: $remediationFile"
         }
 
     } catch {
-        Write-Host "`n Error during prerequisites check for $DeviceName`: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "`n Error during prerequisites check for $DeviceName`: $($_.Exception.Message)"
         Test-Prerequisite $DeviceName "Prerequisites Check" "Error" "Failed to complete prerequisites check: $($_.Exception.Message)"
     } finally {
         if ($session) {
             Remove-PSSession $session -ErrorAction SilentlyContinue
-            Write-Host "`n Remote session closed for $DeviceName" -ForegroundColor Gray
+            Write-Host "`n Remote session closed for $DeviceName"
         }
     }
 
@@ -1677,6 +1677,10 @@ function Test-CertificateStore {
         }
     }
 }
+
+
+
+
 
 
 

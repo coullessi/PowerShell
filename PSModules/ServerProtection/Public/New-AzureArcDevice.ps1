@@ -83,13 +83,13 @@ function New-AzureArcDevice {
 
     # Check if user chose to quit
     if ($environment.UserQuit) {
-        Write-Host "Returning to main menu..." -ForegroundColor Yellow
+        Write-Host "Returning to main menu..."
         return
     }
 
     # Check if initialization failed
     if (-not $environment.Success) {
-        Write-Host "Failed to initialize environment. Exiting..." -ForegroundColor Red
+        Write-Host "Failed to initialize environment. Exiting..."
         return
     }
 
@@ -100,12 +100,12 @@ function New-AzureArcDevice {
 
     Clear-Host
 
-    Write-Host "" -ForegroundColor Cyan
-    Write-Host " ======================== AZURE ARC DEVICE DEPLOYMENT ========================  " -ForegroundColor Cyan
-    Write-Host "" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host " ======================== AZURE ARC DEVICE DEPLOYMENT ========================  " -ForegroundColor Green
+    Write-Host ""
     Write-Host ""
 
-    Write-Host " Initializing Azure Arc Device Deployment..." -ForegroundColor Cyan
+    Write-Host " Initializing Azure Arc Device Deployment..."
     Write-Host ""
 
     # Log session start
@@ -119,18 +119,18 @@ function New-AzureArcDevice {
     # Azure Authentication and Subscription Selection
     $authResult = Initialize-AzureAuthenticationAndSubscription -SubscriptionId $SubscriptionId
     if (-not $authResult.Success) {
-        Write-Host " Azure authentication or subscription selection failed: $($authResult.Message)" -ForegroundColor Red
+        Write-Host " Azure authentication or subscription selection failed: $($authResult.Message)"
         "FAILED: Azure authentication - $($authResult.Message)" | Out-File -FilePath $logFile -Append
         return
     }
 
-    Write-Host " Using Azure context: $($authResult.Context.Account.Id)" -ForegroundColor Green
+    Write-Host " Using Azure context: $($authResult.Context.Account.Id)"
     $subId = $authResult.SubscriptionId
     $TenantId = $authResult.Context.Tenant.Id
 
     # 1. Get resource group and location information
-    Write-Host "`n Azure Resource Configuration" -ForegroundColor Cyan
-    Write-Host "" -ForegroundColor Cyan
+    Write-Host "`n Azure Resource Configuration"
+    Write-Host ""
 
     # Prompt for resource group
     if ([string]::IsNullOrWhiteSpace($ResourceGroupName)) {
@@ -140,13 +140,13 @@ function New-AzureArcDevice {
         # Use default if user pressed Enter without input
         if ([string]::IsNullOrWhiteSpace($resourceGroup)) {
             $resourceGroup = $defaultResourceGroup
-            Write-Host " Using default resource group: $resourceGroup" -ForegroundColor Green
+            Write-Host " Using default resource group: $resourceGroup"
         } else {
-            Write-Host " Resource group: $resourceGroup" -ForegroundColor Green
+            Write-Host " Resource group: $resourceGroup"
         }
     } else {
         $resourceGroup = $ResourceGroupName
-        Write-Host " Using provided resource group: $resourceGroup" -ForegroundColor Green
+        Write-Host " Using provided resource group: $resourceGroup"
     }
 
     # Prompt for location
@@ -157,13 +157,13 @@ function New-AzureArcDevice {
         # Use default if user pressed Enter without input
         if ([string]::IsNullOrWhiteSpace($location)) {
             $location = $defaultLocation
-            Write-Host " Using default location: $location" -ForegroundColor Green
+            Write-Host " Using default location: $location"
         } else {
             $validLocations = @("eastus", "eastus2", "westus", "westus2", "westeurope", "northeurope", "southeastasia", "eastasia", "australiaeast", "uksouth", "canadacentral", "francecentral", "germanywestcentral", "japaneast", "koreacentral", "southafricanorth", "uaenorth", "brazilsouth", "southcentralus", "northcentralus", "centralus", "westcentralus", "westus3")
 
             while ($validLocations -notcontains $location.ToLower()) {
-                Write-Host " Invalid location: '$location'" -ForegroundColor Red
-                Write-Host " Common locations: eastus, westus2, westeurope, eastasia, australiaeast" -ForegroundColor Yellow
+                Write-Host " Invalid location: '$location'"
+                Write-Host " Common locations: eastus, westus2, westeurope, eastasia, australiaeast"
                 $location = Read-Host "Provide a valid Azure region for your deployment [default: $defaultLocation]"
 
                 # Use default if user pressed Enter without input
@@ -172,16 +172,16 @@ function New-AzureArcDevice {
                     break
                 }
             }
-            Write-Host " Location: $location" -ForegroundColor Green
+            Write-Host " Location: $location"
         }
     } else {
         $location = $Location
-        Write-Host " Using provided location: $location" -ForegroundColor Green
+        Write-Host " Using provided location: $location"
     }
 
     # 2. Create a resource group
-    Write-Host "`n  Creating Azure Resource Group" -ForegroundColor Cyan
-    Write-Host "" -ForegroundColor Cyan
+    Write-Host "`n  Creating Azure Resource Group"
+    Write-Host ""
 
     # Check if resource group already exists
     $existingRG = Get-AzResourceGroup -Name $resourceGroup -ErrorAction SilentlyContinue
@@ -189,76 +189,76 @@ function New-AzureArcDevice {
     if ($existingRG) {
         if ($existingRG.Location -eq $location) {
             # Same location - resource group already exists, just continue
-            Write-Host " Resource group '$resourceGroup' already exists in '$location' - continuing..." -ForegroundColor Yellow
+            Write-Host " Resource group '$resourceGroup' already exists in '$location' - continuing..."
         } else {
             # Different location - not allowed by Azure, show clear error
-            Write-Host " ERROR: Resource group '$resourceGroup' already exists in '$($existingRG.Location)'" -ForegroundColor Red
-            Write-Host " Azure does not allow resource groups with the same name in different locations within the same subscription." -ForegroundColor Yellow
-            Write-Host " Please choose a different resource group name or use the existing location '$($existingRG.Location)'." -ForegroundColor Yellow
+            Write-Host " ERROR: Resource group '$resourceGroup' already exists in '$($existingRG.Location)'"
+            Write-Host " Azure does not allow resource groups with the same name in different locations within the same subscription."
+            Write-Host " Please choose a different resource group name or use the existing location '$($existingRG.Location)'."
             throw "Resource group name conflict: '$resourceGroup' already exists in '$($existingRG.Location)'"
         }
     } else {
         # Resource group doesn't exist - create it
-        Write-Host "Creating resource group '$resourceGroup' in '$location'..." -ForegroundColor Yellow
+        Write-Host "Creating resource group '$resourceGroup' in '$location'..."
         try {
             New-AzResourceGroup -Name $resourceGroup -Location $location | Out-Null
-            Write-Host " Resource group created successfully!" -ForegroundColor Green
+            Write-Host " Resource group created successfully!"
         }
         catch {
-            Write-Host " Failed to create resource group: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host " Failed to create resource group: $($_.Exception.Message)"
             throw
         }
     }
 
     # 3. Configure remote share using standardized folder
-    Write-Host "`n Remote Share Configuration" -ForegroundColor Cyan
-    Write-Host "" -ForegroundColor Cyan
+    Write-Host "`n Remote Share Configuration"
+    Write-Host ""
 
     try {
         $DomainName = (Get-ADDomain).DNSRoot
     }
     catch {
-        Write-Host " Unable to retrieve Active Directory domain information. Ensure this is run on a domain-joined machine." -ForegroundColor Red
+        Write-Host " Unable to retrieve Active Directory domain information. Ensure this is run on a domain-joined machine."
         "FAILED: Active Directory domain information retrieval" | Out-File -FilePath $logFile -Append
         throw
     }
 
     # Use the standardized working folder for the remote share
     $path = $workingFolder
-    Write-Host " Using standardized working folder for remote share: $path" -ForegroundColor Green
+    Write-Host " Using standardized working folder for remote share: $path"
     "Remote share location: $path" | Out-File -FilePath $logFile -Append
 
     # Extract share name from the last directory in the path
     $shareName = Split-Path -Leaf $path
-    Write-Host " Share name will be: $shareName" -ForegroundColor Green
+    Write-Host " Share name will be: $shareName"
 
     # Check if share name already exists and points to a different path
     $existingShare = Get-SmbShare | Where-Object { $_.Name -eq $shareName } -ErrorAction SilentlyContinue
     $useExistingShare = $false
 
     if ($existingShare -and $existingShare.Path -ne $path) {
-        Write-Host "  Share '$shareName' already exists and points to: $($existingShare.Path)" -ForegroundColor Yellow
-        Write-Host " You specified a different path: $path" -ForegroundColor Yellow
+        Write-Host "  Share '$shareName' already exists and points to: $($existingShare.Path)"
+        Write-Host " You specified a different path: $path"
 
         # Create a unique share name by appending a timestamp
         $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
         $originalShareName = $shareName
         $shareName = "$originalShareName`_$timestamp"
-        Write-Host " Using unique share name: $shareName" -ForegroundColor Green
+        Write-Host " Using unique share name: $shareName"
     } elseif ($existingShare -and $existingShare.Path -eq $path) {
-        Write-Host " Share '$shareName' already exists and points to the correct path" -ForegroundColor Green
+        Write-Host " Share '$shareName' already exists and points to the correct path"
         $useExistingShare = $true
     }
 
     # Create directory and share if needed
-    Write-Host "`nCreating remote share..." -ForegroundColor Yellow
+    Write-Host "`nCreating remote share..."
 
     # Verify the directory exists (it should have been created by Test-ValidPath if needed)
     if (-not (Test-Path -PathType container $path)) {
-        Write-Host " [FAIL] Directory does not exist and could not be created: $path" -ForegroundColor Red
+        Write-Host " [FAIL] Directory does not exist and could not be created: $path" -ForegroundColor Green
         throw "Directory validation failed: $path"
     } else {
-        Write-Host " Directory verified: $path" -ForegroundColor Green
+        Write-Host " Directory verified: $path"
     }
 
     # Create share if it doesn't exist or if we need a new unique name
@@ -271,13 +271,13 @@ function New-AzureArcDevice {
         }
         try {
             New-SmbShare @parameters -ErrorAction Stop | Out-Null
-            Write-Host " SMB share '$shareName' created successfully!" -ForegroundColor Green
+            Write-Host " SMB share '$shareName' created successfully!"
         }
         catch {
             if ($_.Exception.Message -match "already exists" -or $_.Exception.Message -match "already shared" -or $_.Exception.Message -match "name has already been shared") {
-                Write-Host "  SMB share '$shareName' already exists" -ForegroundColor Yellow
+                Write-Host "  SMB share '$shareName' already exists"
             } else {
-                Write-Host " Failed to create SMB share: $($_.Exception.Message)" -ForegroundColor Red
+                Write-Host " Failed to create SMB share: $($_.Exception.Message)"
                 throw
             }
         }
@@ -285,33 +285,33 @@ function New-AzureArcDevice {
 
     # Set the remote share name for use in GPO deployment
     $RemoteShare = $shareName
-    Write-Host " Remote share '$RemoteShare' is ready for deployment" -ForegroundColor Green
-    Write-Host " All files will be stored in: $path" -ForegroundColor Gray
+    Write-Host " Remote share '$RemoteShare' is ready for deployment"
+    Write-Host " All files will be stored in: $path"
 
     # 4. Download and prepare Azure Arc Components (enhanced functionality)
-    Write-Host "`n Downloading Azure Arc Components" -ForegroundColor Cyan
-    Write-Host "" -ForegroundColor Cyan
+    Write-Host "`n Downloading Azure Arc Components"
+    Write-Host ""
 
     # Download Azure Connected Machine Agent with enhanced error handling
-    Write-Host " Downloading Azure Connected Machine Agent..." -ForegroundColor Yellow
+    Write-Host " Downloading Azure Connected Machine Agent..."
     $agentPath = "$path\AzureConnectedMachineAgent.msi"
 
     try {
         # Check if agent already exists
         if (Test-Path $agentPath) {
-            Write-Host "  Agent installer already exists. Checking if update is needed..." -ForegroundColor Yellow
+            Write-Host "  Agent installer already exists. Checking if update is needed..."
             $overwrite = Read-Host "Do you want to download a fresh copy? [Y/N] (default: N)"
             if ($overwrite.ToUpper() -eq 'Y') {
                 Remove-Item $agentPath -Force
-                Write-Host "  Existing installer removed" -ForegroundColor Gray
+                Write-Host "  Existing installer removed"
             } else {
-                Write-Host " Using existing Azure Connected Machine Agent installer" -ForegroundColor Green
+                Write-Host " Using existing Azure Connected Machine Agent installer"
             }
         }
 
         if (-not (Test-Path $agentPath)) {
             $downloadUrl = "https://aka.ms/AzureConnectedMachineAgent"
-            Write-Host " Downloading from: $downloadUrl" -ForegroundColor Gray
+            Write-Host " Downloading from: $downloadUrl"
 
             # Download with progress indication
             $webClient = New-Object System.Net.WebClient
@@ -321,20 +321,20 @@ function New-AzureArcDevice {
             # Verify download
             if (Test-Path $agentPath) {
                 $fileSize = (Get-Item $agentPath).Length / 1MB
-                Write-Host " Azure Connected Machine Agent downloaded successfully" -ForegroundColor Green
-                Write-Host " File size: $([math]::Round($fileSize, 2)) MB" -ForegroundColor Gray
+                Write-Host " Azure Connected Machine Agent downloaded successfully"
+                Write-Host " File size: $([math]::Round($fileSize, 2)) MB" -ForegroundColor Green
             } else {
                 throw "Download completed but file not found"
             }
         }
     }
     catch {
-        Write-Host " Failed to download Azure Connected Machine Agent: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host " Failed to download Azure Connected Machine Agent: $($_.Exception.Message)"
         throw
     }
 
     # Get the latest ArcEnabledServersGroupPolicy release
-    Write-Host "Fetching latest ArcEnabledServersGroupPolicy release information..." -ForegroundColor Yellow
+    Write-Host "Fetching latest ArcEnabledServersGroupPolicy release information..."
     try {
         # Get latest release information from GitHub API
         $releaseApiUrl = "https://api.github.com/repos/Azure/ArcEnabledServersGroupPolicy/releases/latest"
@@ -351,17 +351,17 @@ function New-AzureArcDevice {
         $downloadUrl = $zipAsset.browser_download_url
         $fileName = $zipAsset.name
 
-        Write-Host " Latest version found: $latestVersion" -ForegroundColor Green
-        Write-Host " File: $fileName" -ForegroundColor Gray
+        Write-Host " Latest version found: $latestVersion"
+        Write-Host " File: $fileName"
 
         # Download the latest version
-        Write-Host "Downloading $fileName..." -ForegroundColor Yellow
+        Write-Host "Downloading $fileName..."
         $localFilePath = "$path\$fileName"
         Invoke-WebRequest -Uri $downloadUrl -OutFile $localFilePath
-        Write-Host " ArcEnabledServersGroupPolicy downloaded successfully" -ForegroundColor Green
+        Write-Host " ArcEnabledServersGroupPolicy downloaded successfully"
 
         # Extract the archive
-        Write-Host "Extracting $fileName..." -ForegroundColor Yellow
+        Write-Host "Extracting $fileName..."
 
         # Remove file extension to get folder name
         $extractFolderName = [System.IO.Path]::GetFileNameWithoutExtension($fileName)
@@ -370,20 +370,20 @@ function New-AzureArcDevice {
         # Remove existing extraction folder if it exists
         if (Test-Path $extractPath) {
             Remove-Item $extractPath -Recurse -Force
-            Write-Host "  Removed existing extraction folder" -ForegroundColor Gray
+            Write-Host "  Removed existing extraction folder"
         }
 
         Expand-Archive -LiteralPath $localFilePath -DestinationPath $path -Force
-        Write-Host " Archive extracted successfully" -ForegroundColor Green
+        Write-Host " Archive extracted successfully"
 
         # Set location to the extracted folder
         Set-Location -Path $extractPath
-        Write-Host " Working directory set to: $extractPath" -ForegroundColor Gray
+        Write-Host " Working directory set to: $extractPath"
 
     }
     catch {
-        Write-Host " Failed to download latest ArcEnabledServersGroupPolicy: $($_.Exception.Message)" -ForegroundColor Red
-        Write-Host "  Falling back to hardcoded version 1.0.5..." -ForegroundColor Yellow
+        Write-Host " Failed to download latest ArcEnabledServersGroupPolicy: $($_.Exception.Message)"
+        Write-Host "  Falling back to hardcoded version 1.0.5..."
 
         try {
             # Fallback to hardcoded version
@@ -391,22 +391,22 @@ function New-AzureArcDevice {
             $fallbackFile = "$path\ArcEnabledServersGroupPolicy_v1.0.10.zip"
 
             Invoke-WebRequest -Uri $fallbackUrl -OutFile $fallbackFile
-            Write-Host " Fallback version downloaded successfully" -ForegroundColor Green
+            Write-Host " Fallback version downloaded successfully"
 
             Expand-Archive -LiteralPath $fallbackFile -DestinationPath $path -Force
             Set-Location -Path "$path\ArcEnabledServersGroupPolicy_v1.0.10"
-            Write-Host " Fallback archive extracted successfully" -ForegroundColor Green
+            Write-Host " Fallback archive extracted successfully"
         }
         catch {
-            Write-Host " Fallback download also failed: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host " Fallback download also failed: $($_.Exception.Message)"
             throw "Failed to download ArcEnabledServersGroupPolicy from both latest and fallback sources"
         }
     }
 
     # 5. Create a service principal for the Azure Connected Machine Agent (enhanced functionality)
-    Write-Host "`n Creating Service Principal" -ForegroundColor Cyan
-    Write-Host "" -ForegroundColor Cyan
-    Write-Host "Creating Azure Arc service principal for onboarding..." -ForegroundColor Yellow
+    Write-Host "`n Creating Service Principal"
+    Write-Host ""
+    Write-Host "Creating Azure Arc service principal for onboarding..."
 
     $date = Get-Date
     $ArcServerOnboardingDetail = New-Item -ItemType File -Path "$path\ArcServerOnboarding.txt"
@@ -419,18 +419,18 @@ function New-AzureArcDevice {
         $expirationDate = $date.AddDays(30)  # Longer expiration period
         $scope = "/subscriptions/$subId/resourceGroups/$resourceGroup"
 
-        Write-Host " Service Principal Configuration:" -ForegroundColor Yellow
-        Write-Host "  Display Name: $displayName" -ForegroundColor Gray
-        Write-Host "  Scope: $scope" -ForegroundColor Gray
-        Write-Host "  Expiration: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor Gray
+        Write-Host " Service Principal Configuration:"
+        Write-Host "  Display Name: $displayName"
+        Write-Host "  Scope: $scope"
+        Write-Host "  Expiration: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))"
 
         # Create the service principal with enhanced error handling
-        Write-Host " Creating service principal..." -ForegroundColor Yellow
+        Write-Host " Creating service principal..."
         $ServicePrincipal = New-AzADServicePrincipal -DisplayName $displayName -EndDate $expirationDate
 
         if ($ServicePrincipal) {
-            Write-Host " Service principal created successfully!" -ForegroundColor Green
-            Write-Host " Waiting for Azure propagation..." -ForegroundColor Yellow
+            Write-Host " Service principal created successfully!"
+            Write-Host " Waiting for Azure propagation..."
             Start-Sleep -Seconds 10  # Wait for Azure to propagate the service principal
 
             # Assign the role with retry logic
@@ -441,20 +441,20 @@ function New-AzureArcDevice {
             while (-not $roleAssigned -and $retryCount -lt $maxRetries) {
                 try {
                     $retryCount++
-                    Write-Host " Attempting role assignment (attempt $retryCount of $maxRetries)..." -ForegroundColor Yellow
+                    Write-Host " Attempting role assignment (attempt $retryCount of $maxRetries)..."
 
                     New-AzRoleAssignment -ObjectId $ServicePrincipal.Id -RoleDefinitionName "Azure Connected Machine Onboarding" -Scope $scope -ErrorAction Stop
                     $roleAssigned = $true
-                    Write-Host " Role assignment completed successfully!" -ForegroundColor Green
+                    Write-Host " Role assignment completed successfully!"
                 }
                 catch {
-                    Write-Host "  Role assignment attempt $retryCount failed: $($_.Exception.Message)" -ForegroundColor Yellow
+                    Write-Host "  Role assignment attempt $retryCount failed: $($_.Exception.Message)"
                     if ($retryCount -lt $maxRetries) {
-                        Write-Host "  Waiting 15 seconds before retry..." -ForegroundColor Gray
+                        Write-Host "  Waiting 15 seconds before retry..."
                         Start-Sleep -Seconds 15
                     } else {
-                        Write-Host " All role assignment attempts failed. Service principal created but role not assigned." -ForegroundColor Red
-                        Write-Host " You may need to manually assign the 'Azure Connected Machine Onboarding' role to the service principal." -ForegroundColor Yellow
+                        Write-Host " All role assignment attempts failed. Service principal created but role not assigned."
+                        Write-Host " You may need to manually assign the 'Azure Connected Machine Onboarding' role to the service principal."
                     }
                 }
             }
@@ -476,22 +476,22 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
             $AppId = $ServicePrincipal.AppId
             $Secret = $ServicePrincipal.PasswordCredentials.SecretText
 
-            Write-Host " Service principal details saved to: $($ArcServerOnboardingDetail.FullName)" -ForegroundColor Green
-            Write-Host " Application ID: $AppId" -ForegroundColor Gray
-            Write-Host "  Secret: [HIDDEN FOR SECURITY - Use from memory during deployment]" -ForegroundColor Yellow
-            Write-Host " Secret expires: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor Gray
+            Write-Host " Service principal details saved to: $($ArcServerOnboardingDetail.FullName)"
+            Write-Host " Application ID: $AppId"
+            Write-Host "  Secret: [HIDDEN FOR SECURITY - Use from memory during deployment]"
+            Write-Host " Secret expires: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))"
 
-            Write-Host "`n  IMPORTANT SECURITY NOTES:" -ForegroundColor Red
-            Write-Host "   Store the client secret securely - it cannot be retrieved again" -ForegroundColor Yellow
-            Write-Host "   The secret expires on $($expirationDate.ToString('yyyy-MM-dd'))" -ForegroundColor Yellow
-            Write-Host "   Limit access to these credentials to authorized personnel only" -ForegroundColor Yellow
+            Write-Host "`n  IMPORTANT SECURITY NOTES:" -ForegroundColor Yellow
+            Write-Host "   Store the client secret securely - it cannot be retrieved again"
+            Write-Host "   The secret expires on $($expirationDate.ToString('yyyy-MM-dd'))"
+            Write-Host "   Limit access to these credentials to authorized personnel only"
         } else {
-            Write-Host " Failed to create service principal" -ForegroundColor Red
+            Write-Host " Failed to create service principal"
             throw "Service principal creation failed"
         }
     }
     catch {
-        Write-Host " Failed to create service principal: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host " Failed to create service principal: $($_.Exception.Message)"
         throw
     }
 
@@ -502,12 +502,12 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
         $ReportServerFQDN = $DC.HostName
     }
     catch {
-        Write-Host " Unable to retrieve Active Directory domain controller information." -ForegroundColor Red
+        Write-Host " Unable to retrieve Active Directory domain controller information."
         throw
     }
 
-    Write-Host "`n Deploying Group Policy Object" -ForegroundColor Cyan
-    Write-Host "" -ForegroundColor Cyan
+    Write-Host "`n Deploying Group Policy Object"
+    Write-Host ""
 
     # Check if DeployGPO.ps1 exists with enhanced validation
     $deployGPOFound = $false
@@ -517,15 +517,15 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
     if (Test-Path $deployGPOPath) {
         $deployGPOValidation = Test-ValidPath -Path $deployGPOPath -PathType File -RequireExists
         if ($deployGPOValidation.IsValid) {
-            Write-Host " Found DeployGPO.ps1 in current directory" -ForegroundColor Green
+            Write-Host " Found DeployGPO.ps1 in current directory"
             $deployGPOFound = $true
         }
     }
 
     # If not found, search in the path directory
     if (-not $deployGPOFound) {
-        Write-Host " DeployGPO.ps1 not found in current directory: $(Get-Location)" -ForegroundColor Yellow
-        Write-Host " Searching in extracted ArcEnabledServersGroupPolicy folder..." -ForegroundColor Yellow
+        Write-Host " DeployGPO.ps1 not found in current directory: $(Get-Location)"
+        Write-Host " Searching in extracted ArcEnabledServersGroupPolicy folder..."
 
         try {
             $foundPath = Get-ChildItem -Path $path -Recurse -Name "DeployGPO.ps1" -ErrorAction Stop | Select-Object -First 1
@@ -534,35 +534,35 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
                 $deployGPOValidation = Test-ValidPath -Path $fullDeployGPOPath -PathType File -RequireExists
 
                 if ($deployGPOValidation.IsValid) {
-                    Write-Host " Found DeployGPO.ps1 at: $fullDeployGPOPath" -ForegroundColor Green
+                    Write-Host " Found DeployGPO.ps1 at: $fullDeployGPOPath"
                     $parentDir = Split-Path $fullDeployGPOPath -Parent
 
                     # Validate we can access the parent directory
                     $parentDirValidation = Test-ValidPath -Path $parentDir -PathType Directory -RequireExists
                     if ($parentDirValidation.IsValid) {
                         Set-Location $parentDir
-                        Write-Host " Changed working directory to: $parentDir" -ForegroundColor Green
+                        Write-Host " Changed working directory to: $parentDir"
                         $deployGPOFound = $true
                     } else {
-                        Write-Host " Cannot access directory containing DeployGPO.ps1: $($parentDirValidation.Error)" -ForegroundColor Red
+                        Write-Host " Cannot access directory containing DeployGPO.ps1: $($parentDirValidation.Error)"
                     }
                 }
             }
         } catch {
-            Write-Host " Error searching for DeployGPO.ps1: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host " Error searching for DeployGPO.ps1: $($_.Exception.Message)"
         }
     }
 
     # Final validation
     if (-not $deployGPOFound) {
-        Write-Host " Could not locate DeployGPO.ps1 in any accessible directory" -ForegroundColor Red
-        Write-Host " Please ensure the ArcEnabledServersGroupPolicy archive was properly extracted" -ForegroundColor Yellow
+        Write-Host " Could not locate DeployGPO.ps1 in any accessible directory"
+        Write-Host " Please ensure the ArcEnabledServersGroupPolicy archive was properly extracted"
         throw "DeployGPO.ps1 script not found or not accessible"
     }
 
     # Get GPO count before deployment to identify the new GPO
     $gpoCountBefore = (Get-GPO -All -Domain $DomainFQDN).Count
-    Write-Host "Current GPO count: $gpoCountBefore" -ForegroundColor Gray
+    Write-Host "Current GPO count: $gpoCountBefore"
 
     try {
         .\DeployGPO.ps1 -DomainFQDN $DomainFQDN `
@@ -575,19 +575,19 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
             -Location $location `
             -TenantId $TenantId *>&1 | Out-Null
 
-        Write-Host " Group Policy deployment completed" -ForegroundColor Green
+        Write-Host " Group Policy deployment completed"
     }
     catch {
-        Write-Host " Failed to deploy Group Policy: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host " Failed to deploy Group Policy: $($_.Exception.Message)"
         throw
     }
 
     # Identify the newly created GPO
-    Write-Host "Identifying the newly created Azure Arc GPO..." -ForegroundColor Yellow
+    Write-Host "Identifying the newly created Azure Arc GPO..."
     Start-Sleep -Seconds 2  # Give time for GPO creation to complete
 
     $gpoCountAfter = (Get-GPO -All -Domain $DomainFQDN).Count
-    Write-Host "GPO count after deployment: $gpoCountAfter" -ForegroundColor Gray
+    Write-Host "GPO count after deployment: $gpoCountAfter"
 
     # Try multiple methods to find the correct GPO
     $GPOName = $null
@@ -598,13 +598,13 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
         $newestGPO = $allGPOs | Where-Object { $_.DisplayName -like "*Azure*" -or $_.DisplayName -like "*Arc*" -or $_.DisplayName -like "*MSFT*" } | Select-Object -First 1
         if ($newestGPO) {
             $GPOName = $newestGPO.DisplayName
-            Write-Host " Found newly created GPO: $GPOName" -ForegroundColor Green
+            Write-Host " Found newly created GPO: $GPOName"
         }
     }
 
     # Method 2: Fallback to specific Azure Arc related patterns
     if (-not $GPOName) {
-        Write-Host "  Attempting to find GPO using pattern matching..." -ForegroundColor Yellow
+        Write-Host "  Attempting to find GPO using pattern matching..."
         $arcGPOs = Get-GPO -All -Domain $DomainFQDN | Where-Object {
             $_.DisplayName -like "*Azure Arc*" -or
             $_.DisplayName -like "*ArcEnabled*" -or
@@ -616,46 +616,46 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
             } else {
                 $GPOName = $arcGPOs.DisplayName
             }
-            Write-Host " Found Azure Arc GPO: $GPOName" -ForegroundColor Green
+            Write-Host " Found Azure Arc GPO: $GPOName"
         }
     }
 
     # Method 3: Final fallback to MSFT pattern (original method)
     if (-not $GPOName) {
-        Write-Host "  Using fallback pattern matching for MSFT..." -ForegroundColor Yellow
+        Write-Host "  Using fallback pattern matching for MSFT..."
         $msftGPO = Get-GPO -All -Domain $DomainFQDN | Where-Object { $_.DisplayName -Like "*MSFT*" } | Sort-Object CreationTime -Descending | Select-Object -First 1
         if ($msftGPO) {
             $GPOName = $msftGPO.DisplayName
-            Write-Host "  Found MSFT GPO: $GPOName" -ForegroundColor Yellow
-            Write-Host " Note: This may not be the correct Azure Arc GPO if multiple MSFT GPOs exist" -ForegroundColor Yellow
+            Write-Host "  Found MSFT GPO: $GPOName"
+            Write-Host " Note: This may not be the correct Azure Arc GPO if multiple MSFT GPOs exist"
         }
     }
 
     # Validate we found a GPO
     if (-not $GPOName) {
-        Write-Host " Could not identify the Azure Arc GPO. Please check the DeployGPO.ps1 output." -ForegroundColor Red
+        Write-Host " Could not identify the Azure Arc GPO. Please check the DeployGPO.ps1 output."
         Write-Host " Available GPOs in domain:" -ForegroundColor Yellow
         Get-GPO -All -Domain $DomainFQDN | Sort-Object DisplayName | ForEach-Object {
-            Write-Host "   $($_.DisplayName)" -ForegroundColor Gray
+            Write-Host "   $($_.DisplayName)"
         }
         return
     }
 
-    Write-Host " Using GPO for OU linking: $GPOName" -ForegroundColor Cyan
+    Write-Host " Using GPO for OU linking: $GPOName"
 
     # Prompt user for OU configuration
-    Write-Host "`n Organizational Units Configuration" -ForegroundColor Cyan
-    Write-Host "" -ForegroundColor Cyan
-    Write-Host " You can create a file containing the list of Organizational Units (OUs)" -ForegroundColor Yellow
-    Write-Host " for future GPO linking. This file will be stored in the working folder." -ForegroundColor Yellow
+    Write-Host "`n Organizational Units Configuration"
+    Write-Host ""
+    Write-Host " You can create a file containing the list of Organizational Units (OUs)"
+    Write-Host " for future GPO linking. This file will be stored in the working folder."
 
     # Use the standardized OU file from environment initialization
     $ouFileFullPath = $orgUnitsFile
     $ouFileName = [System.IO.Path]::GetFileName($ouFileFullPath)
 
     Write-Host "`nChoose OU configuration method:" -ForegroundColor Yellow
-    Write-Host " 1. Create/edit OU file: $ouFileName" -ForegroundColor Gray
-    Write-Host " 2. Skip OU file creation (link GPO manually later)" -ForegroundColor Gray
+    Write-Host " 1. Create/edit OU file: $ouFileName"
+    Write-Host " 2. Skip OU file creation (link GPO manually later)"
 
     if (-not $Force) {
         $defaultChoice = "1"
@@ -664,7 +664,7 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
         # Use default if user pressed Enter without input
         if ([string]::IsNullOrWhiteSpace($configChoice)) {
             $configChoice = $defaultChoice
-            Write-Host " Using default choice: Create/edit OU file" -ForegroundColor Green
+            Write-Host " Using default choice: Create/edit OU file"
         }
     } else {
         $configChoice = "1"
@@ -675,11 +675,11 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
     switch ($configChoice) {
         "2" {
             $createOUFile = $false
-            Write-Host " Skipping OU file creation. You can link the GPO manually later." -ForegroundColor Yellow
+            Write-Host " Skipping OU file creation. You can link the GPO manually later."
             "OU file creation skipped by user choice" | Out-File -FilePath $logFile -Append
         }
         default {
-            Write-Host " Using default OU file: $defaultOUFile" -ForegroundColor Green
+            Write-Host " Using default OU file: $defaultOUFile"
         }
     }
 
@@ -689,17 +689,17 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
             $domainInfo = Get-ADDomain
             $domainDN = $domainInfo.DistinguishedName
             $domainNetBIOS = $domainInfo.NetBIOSName
-            Write-Host " Domain: $($domainInfo.DNSRoot) ($domainNetBIOS)" -ForegroundColor Gray
+            Write-Host " Domain: $($domainInfo.DNSRoot) ($domainNetBIOS)"
         }
         catch {
-            Write-Host " Could not retrieve domain information" -ForegroundColor Yellow
+            Write-Host " Could not retrieve domain information"
             $domainDN = "DC=domain,DC=com"
         }
 
         # Check if file already exists
         if (Test-Path $ouFileFullPath) {
-            Write-Host " OU file '$(Split-Path $ouFileFullPath -Leaf)' already exists." -ForegroundColor Green
-            Write-Host "  File location: $ouFileFullPath" -ForegroundColor Gray
+            Write-Host " OU file '$(Split-Path $ouFileFullPath -Leaf)' already exists."
+            Write-Host "  File location: $ouFileFullPath"
 
             if (-not $Force) {
                 $editChoice = Read-Host "Do you want to (E)dit the existing file or (C)reate a new one? [E/C] (default: E)"
@@ -708,18 +708,18 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
                 }
 
                 if ($editChoice.ToUpper() -eq "C") {
-                    Write-Host " Creating new OU file (overwriting existing)..." -ForegroundColor Yellow
+                    Write-Host " Creating new OU file (overwriting existing)..."
                     $createNewFile = $true
                 } else {
-                    Write-Host " Will edit existing file" -ForegroundColor Green
+                    Write-Host " Will edit existing file"
                     $createNewFile = $false
                 }
             } else {
                 $createNewFile = $false
             }
         } else {
-            Write-Host " OU file '$(Split-Path $ouFileFullPath -Leaf)' does not exist." -ForegroundColor Yellow
-            Write-Host " Creating new OU file..." -ForegroundColor Yellow
+            Write-Host " OU file '$(Split-Path $ouFileFullPath -Leaf)' does not exist."
+            Write-Host " Creating new OU file..."
             $createNewFile = $true
         }
 
@@ -780,32 +780,32 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
             # Validate the file was created successfully
             $ouFileValidation = Test-ValidPath -Path $ouFileFullPath -PathType File -RequireExists
             if (-not $ouFileValidation.IsValid) {
-                Write-Host " Failed to create OU file: $($ouFileValidation.Error)" -ForegroundColor Red
+                Write-Host " Failed to create OU file: $($ouFileValidation.Error)"
                 throw "Failed to create OU configuration file"
             }
 
-            Write-Host " Created OU file template: $(Split-Path $ouFileFullPath -Leaf)" -ForegroundColor Green
+            Write-Host " Created OU file template: $(Split-Path $ouFileFullPath -Leaf)"
         }
 
         # Always open file for editing (mandatory user interaction)
-        Write-Host "`n Opening OU file for editing..." -ForegroundColor Cyan
-        Write-Host " File location: $ouFileFullPath" -ForegroundColor Gray
-        Write-Host "" -ForegroundColor Yellow
+        Write-Host "`n Opening OU file for editing..."
+        Write-Host " File location: $ouFileFullPath"
+        Write-Host ""
         Write-Host " INSTRUCTIONS:" -ForegroundColor Yellow
-        Write-Host "  1. Add the names of OUs where you want to link the Azure Arc GPO" -ForegroundColor White
-        Write-Host "  2. Use simple OU names (e.g., 'Servers', 'Workstations')" -ForegroundColor White
-        Write-Host "  3. Use 'DOMAIN' to apply to the entire domain" -ForegroundColor White
-        Write-Host "  4. Save the file and close Notepad to continue" -ForegroundColor White
-        Write-Host "" -ForegroundColor Yellow
+        Write-Host "  1. Add the names of OUs where you want to link the Azure Arc GPO"
+        Write-Host "  2. Use simple OU names (e.g., 'Servers', 'Workstations')"
+        Write-Host "  3. Use 'DOMAIN' to apply to the entire domain"
+        Write-Host "  4. Save the file and close Notepad to continue"
+        Write-Host ""
 
         try {
-            Write-Host " Opening Notepad..." -ForegroundColor Yellow
+            Write-Host " Opening Notepad..."
             Start-Process notepad.exe -ArgumentList $ouFileFullPath -Wait
-            Write-Host " Notepad closed. Continuing with deployment..." -ForegroundColor Green
+            Write-Host " Notepad closed. Continuing with deployment..."
         }
         catch {
-            Write-Host " Could not open Notepad automatically." -ForegroundColor Red
-            Write-Host " Please edit the file manually: $ouFileFullPath" -ForegroundColor Yellow
+            Write-Host " Could not open Notepad automatically."
+            Write-Host " Please edit the file manually: $ouFileFullPath"
             if (-not $Force) {
                 Read-Host "Press Enter when you have finished editing the file"
             }
@@ -814,7 +814,7 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
         # Verify file exists and validate accessibility
         $ouFileValidation = Test-ValidPath -Path $ouFileFullPath -PathType File -RequireExists
         if ($ouFileValidation.IsValid) {
-            Write-Host " OU file ready: $(Split-Path $ouFileFullPath -Leaf)" -ForegroundColor Green
+            Write-Host " OU file ready: $(Split-Path $ouFileFullPath -Leaf)"
 
             # Show file contents for confirmation and prepare for linking
             try {
@@ -827,8 +827,8 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
                 } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
                 if ($ouNames.Count -gt 0) {
-                    Write-Host " OU file contains $($ouNames.Count) target(s):" -ForegroundColor Gray
-                    $ouNames | ForEach-Object { Write-Host "   '$_'" -ForegroundColor Gray }
+                    Write-Host " OU file contains $($ouNames.Count) target(s):"
+                    $ouNames | ForEach-Object { Write-Host "   '$_'" }
 
                     # Ask user if they want to link the GPO now
                     if (-not $Force) {
@@ -841,17 +841,17 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
                     }
 
                     if ($linkChoice.ToUpper() -eq "Y") {
-                        Write-Host "`n Linking GPO to Organizational Units" -ForegroundColor Cyan
-                        Write-Host "" -ForegroundColor Cyan
+                        Write-Host "`n Linking GPO to Organizational Units"
+                        Write-Host ""
 
                         # Get domain information for better OU resolution
                         try {
                             $domainInfo = Get-ADDomain
                             $domainDN = $domainInfo.DistinguishedName
-                            Write-Host " Domain DN: $domainDN" -ForegroundColor Gray
+                            Write-Host " Domain DN: $domainDN"
                         }
                         catch {
-                            Write-Host " Could not retrieve domain information" -ForegroundColor Red
+                            Write-Host " Could not retrieve domain information"
                             $domainDN = $null
                         }
 
@@ -861,157 +861,163 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
                         foreach ($ouName in $ouNames) {
                             # Ensure no leading/trailing spaces
                             $cleanOUName = $ouName.Trim()
-                            Write-Host " Processing OU: '$cleanOUName'" -ForegroundColor Yellow
+                            Write-Host " Processing OU: '$cleanOUName'"
 
                             try {
                                 # Handle special keyword 'DOMAIN' for domain root
                                 if ($cleanOUName.ToUpper() -eq "DOMAIN") {
                                     if ($domainDN) {
                                         $validTargets += $domainDN
-                                        Write-Host "   Resolved to domain root: $domainDN" -ForegroundColor Green
+                                        Write-Host "   Resolved to domain root: $domainDN"
                                     } else {
-                                        Write-Host "   ERROR: Could not determine domain DN" -ForegroundColor Red
+                                        Write-Host "   ERROR: Could not determine domain DN"
                                         $skippedTargets += @{Name = $cleanOUName; Reason = "Could not determine domain DN"}
                                     }
                                 }
                                 # Skip known container names that can't have GPOs linked
                                 elseif (@("Computers", "Users", "Builtin") -contains $cleanOUName) {
-                                    Write-Host "   SKIPPED: '$cleanOUName' is a container, not an OU" -ForegroundColor Red
-                                    Write-Host "   REASON: GPOs cannot be linked to built-in containers" -ForegroundColor Yellow
+                                    Write-Host "   SKIPPED: '$cleanOUName' is a container, not an OU"
+                                    Write-Host "   REASON: GPOs cannot be linked to built-in containers"
                                     $skippedTargets += @{Name = $cleanOUName; Reason = "Built-in container - GPOs cannot be linked to containers"}
                                 }
                                 # Look up actual OU by name
                                 else {
-                                    Write-Host "   Searching for OU name: '$cleanOUName'" -ForegroundColor Gray
+                                    Write-Host "   Searching for OU name: '$cleanOUName'"
 
                                     # Search for OU by name across the entire domain
                                     $ou = Get-ADOrganizationalUnit -Filter "Name -eq '$cleanOUName'" -ErrorAction SilentlyContinue
                                     if ($ou) {
                                         if ($ou -is [array]) {
                                             # Multiple OUs with same name found
-                                            Write-Host "   WARNING: Multiple OUs found with name '$cleanOUName':" -ForegroundColor Yellow
-                                            $ou | ForEach-Object { Write-Host "      - $($_.DistinguishedName)" -ForegroundColor Gray }
+                                            Write-Host "   WARNING: Multiple OUs found with name '$cleanOUName':"
+                                            $ou | ForEach-Object { Write-Host "      - $($_.DistinguishedName)" }
                                             $selectedOU = $ou[0].DistinguishedName  # Use first one
-                                            Write-Host "   Using first match: $selectedOU" -ForegroundColor Green
+                                            Write-Host "   Using first match: $selectedOU"
                                             $validTargets += $selectedOU
                                         } else {
-                                            Write-Host "   Found OU: $($ou.DistinguishedName)" -ForegroundColor Green
+                                            Write-Host "   Found OU: $($ou.DistinguishedName)"
                                             $validTargets += $ou.DistinguishedName
                                         }
                                     } else {
-                                        Write-Host "   ERROR: OU '$cleanOUName' not found in domain" -ForegroundColor Red
+                                        Write-Host "   ERROR: OU '$cleanOUName' not found in domain"
                                         $skippedTargets += @{Name = $cleanOUName; Reason = "OU not found in domain"}
 
                                         # Show available OUs as suggestion
                                         try {
                                             $availableOUs = Get-ADOrganizationalUnit -Filter * | Select-Object -First 10 Name | Sort-Object Name
                                             if ($availableOUs.Count -gt 0) {
-                                                Write-Host "   Available OUs (first 10):" -ForegroundColor Gray
-                                                $availableOUs | ForEach-Object { Write-Host "      $($_.Name)" -ForegroundColor Gray }
+                                                Write-Host "   Available OUs (first 10):"
+                                                $availableOUs | ForEach-Object { Write-Host "      $($_.Name)" }
                                             }
                                         }
                                         catch {
-                                            Write-Host "   Could not retrieve available OUs" -ForegroundColor Gray
+                                            Write-Host "   Could not retrieve available OUs"
                                         }
                                     }
                                 }
                             }
                             catch {
-                                Write-Host "   ERROR: Failed to process OU '$cleanOUName': $($_.Exception.Message)" -ForegroundColor Red
+                                Write-Host "   ERROR: Failed to process OU '$cleanOUName': $($_.Exception.Message)"
                                 $skippedTargets += @{Name = $cleanOUName; Reason = "Processing error: $($_.Exception.Message)"}
                             }
                         }
 
                         # Show summary of targets
                         if ($validTargets.Count -gt 0) {
-                            Write-Host "`n Valid targets for GPO linking ($($validTargets.Count)):" -ForegroundColor Green
-                            $validTargets | ForEach-Object { Write-Host "   $_" -ForegroundColor Gray }
+                            Write-Host "`n Valid targets for GPO linking ($($validTargets.Count)):"
+                            $validTargets | ForEach-Object { Write-Host "   $_" }
                         }
 
                         if ($skippedTargets.Count -gt 0) {
-                            Write-Host "`n Skipped targets ($($skippedTargets.Count)):" -ForegroundColor Yellow
+                            Write-Host "`n Skipped targets ($($skippedTargets.Count)):"
                             $skippedTargets | ForEach-Object {
-                                Write-Host "   $($_.Name): $($_.Reason)" -ForegroundColor Red
+                                Write-Host "   $($_.Name): $($_.Reason)"
                             }
                         }
 
                         # Proceed with linking if we have valid targets
                         if ($validTargets.Count -gt 0) {
-                            Write-Host "`n Proceeding with GPO linking..." -ForegroundColor Cyan
+                            Write-Host "`n Proceeding with GPO linking..."
                             $successCount = 0
                             $failureCount = 0
 
                             foreach ($target in $validTargets) {
                                 try {
-                                    Write-Host " Linking GPO '$GPOName' to: $target" -ForegroundColor Yellow
+                                    Write-Host " Linking GPO '$GPOName' to: $target"
                                     New-GPLink -Name $GPOName -Target $target -ErrorAction Stop | Out-Null
-                                    Write-Host "   SUCCESS: GPO linked successfully" -ForegroundColor Green
+                                    Write-Host "   SUCCESS: GPO linked successfully"
                                     $successCount++
                                 }
                                 catch {
                                     if ($_.Exception.Message -match "already linked") {
-                                        Write-Host "   INFO: GPO already linked to this target" -ForegroundColor Yellow
+                                        Write-Host "   INFO: GPO already linked to this target"
                                         $successCount++  # Count as success since it's already linked
                                     } else {
-                                        Write-Host "   ERROR: Failed to link GPO" -ForegroundColor Red
-                                        Write-Host "   REASON: $($_.Exception.Message)" -ForegroundColor Red
+                                        Write-Host "   ERROR: Failed to link GPO"
+                                        Write-Host "   REASON: $($_.Exception.Message)"
                                         $failureCount++
                                     }
                                 }
                             }
 
                             # Show final linking summary
-                            Write-Host "`n GPO Linking Summary:" -ForegroundColor Cyan
-                            Write-Host "   Successful links: $successCount" -ForegroundColor Green
+                            Write-Host "`n GPO Linking Summary:" -ForegroundColor Yellow
+                            Write-Host "   Successful links: $successCount"
                             Write-Host "   Failed links: $failureCount" -ForegroundColor $(if ($failureCount -gt 0) { "Red" } else { "Gray" })
                             Write-Host "   Skipped targets: $($skippedTargets.Count)" -ForegroundColor $(if ($skippedTargets.Count -gt 0) { "Yellow" } else { "Gray" })
 
                         } else {
-                            Write-Host "`n No valid targets found for GPO linking." -ForegroundColor Red
-                            Write-Host " Please review the OU names in the file and ensure they exist in your domain." -ForegroundColor Yellow
+                            Write-Host "`n No valid targets found for GPO linking."
+                            Write-Host " Please review the OU names in the file and ensure they exist in your domain."
                         }
                     } else {
-                        Write-Host " GPO linking skipped by user choice." -ForegroundColor Yellow
+                        Write-Host " GPO linking skipped by user choice."
                     }
                 } else {
-                    Write-Host " OU file is empty (no targets specified)" -ForegroundColor Yellow
-                    Write-Host " You can manually link the GPO '$GPOName' later using Group Policy Management Console" -ForegroundColor Gray
+                    Write-Host " OU file is empty (no targets specified)"
+                    Write-Host " You can manually link the GPO '$GPOName' later using Group Policy Management Console"
                 }
             }
             catch {
-                Write-Host " Could not read OU file contents: $($_.Exception.Message)" -ForegroundColor Red
-                Write-Host " File may be corrupted or inaccessible" -ForegroundColor Yellow
+                Write-Host " Could not read OU file contents: $($_.Exception.Message)"
+                Write-Host " File may be corrupted or inaccessible"
             }
         } else {
-            Write-Host " Error accessing OU file: $($ouFileValidation.Error)" -ForegroundColor Red
-            Write-Host " OU file validation failed - GPO linking cannot proceed automatically" -ForegroundColor Yellow
-            Write-Host " You can manually link the GPO '$GPOName' later using Group Policy Management Console" -ForegroundColor Gray
+            Write-Host " Error accessing OU file: $($ouFileValidation.Error)"
+            Write-Host " OU file validation failed - GPO linking cannot proceed automatically"
+            Write-Host " You can manually link the GPO '$GPOName' later using Group Policy Management Console"
         }
     }
 
 
-    Write-Host "`n Azure Arc deployment completed successfully!" -ForegroundColor Green
-    Write-Host " Service principal details saved to: $($ArcServerOnboardingDetail.FullName)" -ForegroundColor Gray
-    Write-Host "  Note: Service principal secret was not saved to file for security reasons." -ForegroundColor Yellow
-    Write-Host " Remote share created: \\$env:COMPUTERNAME\$RemoteShare" -ForegroundColor Gray
-    Write-Host " GPO '$GPOName' created and ready" -ForegroundColor Gray
+    Write-Host "`n Azure Arc deployment completed successfully!"
+    Write-Host " Service principal details saved to: $($ArcServerOnboardingDetail.FullName)"
+    Write-Host "  Note: Service principal secret was not saved to file for security reasons."
+    Write-Host " Remote share created: \\$env:COMPUTERNAME\$RemoteShare"
+    Write-Host " GPO '$GPOName' created and ready"
 
     if ($createOUFile -and (Test-Path $ouFileFullPath)) {
-        Write-Host " OU configuration file: $(Split-Path $ouFileFullPath -Leaf)" -ForegroundColor Gray
-        Write-Host "  File location: $ouFileFullPath" -ForegroundColor Gray
+        Write-Host " OU configuration file: $(Split-Path $ouFileFullPath -Leaf)"
+        Write-Host "  File location: $ouFileFullPath"
     }
 
     Write-Host
-    Write-Host " Next Steps:" -ForegroundColor Cyan
-    Write-Host "  1. Verify GPO settings and linking in Group Policy Management Console" -ForegroundColor White
+    Write-Host " Next Steps:" -ForegroundColor Yellow
+    Write-Host "  1. Verify GPO settings and linking in Group Policy Management Console"
     if ($createOUFile) {
-        Write-Host "     - Check if GPO '$GPOName' is properly linked to your desired OUs" -ForegroundColor White
+        Write-Host "     - Check if GPO '$GPOName' is properly linked to your desired OUs"
     }
-    Write-Host "  2. Run 'gpupdate /force' on target devices or wait for automatic refresh" -ForegroundColor White
-    Write-Host "  3. Monitor Azure Arc onboarding in Azure portal" -ForegroundColor White
-    Write-Host "  4. Check device compliance in Microsoft Defender for Cloud" -ForegroundColor White
+    Write-Host "  2. Run 'gpupdate /force' on target devices or wait for automatic refresh"
+    Write-Host "  3. Monitor Azure Arc onboarding in Azure portal"
+    Write-Host "  4. Check device compliance in Microsoft Defender for Cloud"
     Write-Host
 }
+
+
+
+
+
+
 
 
 

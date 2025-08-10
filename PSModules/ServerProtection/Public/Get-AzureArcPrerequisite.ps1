@@ -115,11 +115,11 @@ function Get-AzureArcPrerequisite {
         Write-Host " Using provided device list parameter: $DeviceListPath"
 
         if (-not (Test-Path -Path $DeviceListPath -PathType Leaf)) {
-            Write-Host " [WARN] Provided device list file not found: $DeviceListPath"
+            Write-Host " [WARN] Provided device list file not found: $DeviceListPath" -ForegroundColor Green
             Write-Host " Continuing without device list..."
             $DeviceListPath = $null
         } else {
-            Write-Host " [OK] Device list file verified"
+            Write-Host " [OK] Device list file verified" -ForegroundColor Green
         }
     }
 
@@ -160,11 +160,11 @@ function Get-AzureArcPrerequisite {
                 } | ForEach-Object { $_.Trim() }
 
                 if ($devicesToTest.Count -eq 0) {
-                    Write-Host "   [WARN] No valid device names found in device list"
+                    Write-Host "   [WARN] No valid device names found in device list" -ForegroundColor Green
                     Write-Host "   Testing local machine only..."
                     $devicesToTest = @($env:COMPUTERNAME)
                 } else {
-                    Write-Host "   [OK] Found $($devicesToTest.Count) device(s) to test"
+                    Write-Host "   [OK] Found $($devicesToTest.Count) device(s) to test" -ForegroundColor Green
                     $devicesToTest | ForEach-Object { Write-Host "     - $_" }
                 }
 
@@ -176,7 +176,7 @@ function Get-AzureArcPrerequisite {
                 "" | Out-File -FilePath $script:globalLogFile -Append
 
             } catch {
-                Write-Host "   [FAIL] Failed to read device list: $($_.Exception.Message)"
+                Write-Host "   [FAIL] Failed to read device list: $($_.Exception.Message)" -ForegroundColor Green
                 Write-Host "   Testing local machine only..."
                 $devicesToTest = @($env:COMPUTERNAME)
 
@@ -207,7 +207,7 @@ function Get-AzureArcPrerequisite {
             Write-Host "   Azure authentication is required to register resource providers."
             $authConfirm = Read-Host "   Proceed with Azure authentication? [Y/N] (default: Y)"
             if ($authConfirm -eq "N" -or $authConfirm -eq "n") {
-                Write-Host "     [WARN] Skipping Azure authentication and resource provider registration"
+                Write-Host "     [WARN] Skipping Azure authentication and resource provider registration" -ForegroundColor Green
                 "Azure authentication skipped by user" | Out-File -FilePath $script:globalLogFile -Append
                 "" | Out-File -FilePath $script:globalLogFile -Append
                 $skipAuth = $true
@@ -221,14 +221,14 @@ function Get-AzureArcPrerequisite {
                 # Try to get current context first
                 $currentContext = Get-AzContext -ErrorAction SilentlyContinue
                 if ($currentContext) {
-                    Write-Host "     [OK] Using existing Azure context: $($currentContext.Account)"
+                    Write-Host "     [OK] Using existing Azure context: $($currentContext.Account)" -ForegroundColor Green
                     $script:azureLoginCompleted = $true
                     "SUCCESS: Azure Authentication: Using existing context ($($currentContext.Account))" | Out-File -FilePath $script:globalLogFile -Append
                 } else {
                     # Attempt interactive login
                     Write-Host "     Initiating Azure login..."
                     $null = Connect-AzAccount -ErrorAction Stop
-                    Write-Host "     [OK] Azure authentication successful"
+                    Write-Host "     [OK] Azure authentication successful" -ForegroundColor Green
                     $script:azureLoginCompleted = $true
                     $newContext = Get-AzContext
                     "SUCCESS: Azure Authentication: Successful ($($newContext.Account))" | Out-File -FilePath $script:globalLogFile -Append
@@ -238,7 +238,7 @@ function Get-AzureArcPrerequisite {
                 if ($SubscriptionId) {
                     Write-Host "   Setting Azure subscription context..."
                     $null = Set-AzContext -SubscriptionId $SubscriptionId -ErrorAction Stop
-                    Write-Host "     [OK] Subscription context set: $SubscriptionId"
+                    Write-Host "     [OK] Subscription context set: $SubscriptionId" -ForegroundColor Green
                     "SUCCESS: Subscription Context: Set to $SubscriptionId" | Out-File -FilePath $script:globalLogFile -Append
                 }
 
@@ -261,31 +261,31 @@ function Get-AzureArcPrerequisite {
                             $resourceProvider = Get-AzResourceProvider -ProviderNamespace $provider -ErrorAction SilentlyContinue
 
                             if ($resourceProvider -and $resourceProvider.RegistrationState -eq "Registered") {
-                                Write-Host "     [OK] $provider - Already registered"
+                                Write-Host "     [OK] $provider - Already registered" -ForegroundColor Green
                                 $registrationResults += "SUCCESS: $provider - Already registered"
                                 "  SUCCESS: $provider - Already registered" | Out-File -FilePath $script:globalLogFile -Append
                             } else {
                                 Write-Host "     Registering $provider..."
                                 $null = Register-AzResourceProvider -ProviderNamespace $provider -ErrorAction Stop
-                                Write-Host "     [OK] $provider - Registration initiated"
+                                Write-Host "     [OK] $provider - Registration initiated" -ForegroundColor Green
                                 $registrationResults += "SUCCESS: $provider - Registration initiated"
                                 "  SUCCESS: $provider - Registration initiated" | Out-File -FilePath $script:globalLogFile -Append
                             }
                         } catch {
-                            Write-Host "     [FAIL] $provider - Registration failed: $($_.Exception.Message)"
+                            Write-Host "     [FAIL] $provider - Registration failed: $($_.Exception.Message)" -ForegroundColor Green
                             $registrationResults += "[FAIL] $provider - Registration failed"
                             "  [FAIL] $provider - Registration failed: $($_.Exception.Message)" | Out-File -FilePath $script:globalLogFile -Append
                         }
                     }
 
-                    Write-Host "     Resource provider registration summary:"
+                    Write-Host "     Resource provider registration summary:" -ForegroundColor Yellow
                     foreach ($result in $registrationResults) {
                         Write-Host "       $result"
                     }
                 }
 
             } catch {
-                Write-Host "     [FAIL] Azure authentication failed: $($_.Exception.Message)"
+                Write-Host "     [FAIL] Azure authentication failed: $($_.Exception.Message)" -ForegroundColor Green
                 Write-Host "     Resource provider registration skipped"
                 "[FAIL] Azure Authentication Failed: $($_.Exception.Message)" | Out-File -FilePath $script:globalLogFile -Append
             }
@@ -340,7 +340,7 @@ function Get-AzureArcPrerequisite {
                 $psHost = $PSVersionTable.PSEdition
             } else {
                 # For remote machines, we'd need to use Invoke-Command
-                Write-Host "     [WARN] Remote PowerShell testing not implemented yet"
+                Write-Host "     [WARN] Remote PowerShell testing not implemented yet" -ForegroundColor Green
                 $psVersion = "Unknown (Remote)"
                 $psHost = "Unknown (Remote)"
                 $deviceResult.Warnings += "Remote PowerShell testing not implemented"
@@ -348,7 +348,7 @@ function Get-AzureArcPrerequisite {
 
             if ($psVersion -ne "Unknown (Remote)") {
                 if ($psVersion.Major -ge 5 -and ($psVersion.Major -gt 5 -or $psVersion.Minor -ge 1)) {
-                    Write-Host "     [OK] PowerShell $($psVersion.ToString()) ($psHost) - Compatible"
+                    Write-Host "     [OK] PowerShell $($psVersion.ToString()) ($psHost) - Compatible" -ForegroundColor Green
                     $deviceResult.TestResults.PowerShellVersion = @{
                         Status = "Pass"
                         Version = $psVersion.ToString()
@@ -357,7 +357,7 @@ function Get-AzureArcPrerequisite {
                     }
                     "SUCCESS: PowerShell Version: $($psVersion.ToString()) ($psHost) - Compatible" | Out-File -FilePath $script:globalLogFile -Append
                 } else {
-                    Write-Host "     [FAIL] PowerShell $($psVersion.ToString()) - Requires 5.1 or higher"
+                    Write-Host "     [FAIL] PowerShell $($psVersion.ToString()) - Requires 5.1 or higher" -ForegroundColor Green
                     $deviceResult.TestResults.PowerShellVersion = @{
                         Status = "Fail"
                         Version = $psVersion.ToString()
@@ -378,7 +378,7 @@ function Get-AzureArcPrerequisite {
                 "[WARN] PowerShell Version: Unknown (Remote testing not implemented)" | Out-File -FilePath $script:globalLogFile -Append
             }
         } catch {
-            Write-Host "     [FAIL] Failed to check PowerShell version: $($_.Exception.Message)"
+            Write-Host "     [FAIL] Failed to check PowerShell version: $($_.Exception.Message)" -ForegroundColor Green
             $deviceResult.TestResults.PowerShellVersion = @{
                 Status = "Error"
                 Version = "Unknown"
@@ -401,7 +401,7 @@ function Get-AzureArcPrerequisite {
 
             $compatiblePolicies = @("RemoteSigned", "Unrestricted", "Bypass")
             if ($execPolicy -in $compatiblePolicies) {
-                Write-Host "     [OK] Execution Policy: $execPolicy - Compatible"
+                Write-Host "     [OK] Execution Policy: $execPolicy - Compatible" -ForegroundColor Green
                 $deviceResult.TestResults.ExecutionPolicy = @{
                     Status = "Pass"
                     Policy = $execPolicy
@@ -409,7 +409,7 @@ function Get-AzureArcPrerequisite {
                 }
                 "SUCCESS: Execution Policy: $execPolicy - Compatible" | Out-File -FilePath $script:globalLogFile -Append
             } elseif ($execPolicy -eq "Unknown (Remote)") {
-                Write-Host "     [WARN] Execution Policy: Unknown (Remote)"
+                Write-Host "     [WARN] Execution Policy: Unknown (Remote)" -ForegroundColor Green
                 $deviceResult.TestResults.ExecutionPolicy = @{
                     Status = "Warning"
                     Policy = "Unknown"
@@ -417,7 +417,7 @@ function Get-AzureArcPrerequisite {
                 }
                 "[WARN] Execution Policy: Unknown (Remote testing not implemented)" | Out-File -FilePath $script:globalLogFile -Append
             } else {
-                Write-Host "     [WARN] Execution Policy: $execPolicy - May block Azure Arc scripts"
+                Write-Host "     [WARN] Execution Policy: $execPolicy - May block Azure Arc scripts" -ForegroundColor Green
                 Write-Host "       Consider running: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser"
                 $deviceResult.TestResults.ExecutionPolicy = @{
                     Status = "Warning"
@@ -430,7 +430,7 @@ function Get-AzureArcPrerequisite {
                 "  Recommendation: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser" | Out-File -FilePath $script:globalLogFile -Append
             }
         } catch {
-            Write-Host "     [FAIL] Failed to check execution policy: $($_.Exception.Message)"
+            Write-Host "     [FAIL] Failed to check execution policy: $($_.Exception.Message)" -ForegroundColor Green
             $deviceResult.TestResults.ExecutionPolicy = @{
                 Status = "Error"
                 Policy = "Unknown"
@@ -462,7 +462,7 @@ function Get-AzureArcPrerequisite {
 
             # Check Az.Accounts
             if ($azAccountsModule) {
-                Write-Host "     [OK] Az.Accounts module found - Version $($azAccountsModule.Version)"
+                Write-Host "     [OK] Az.Accounts module found - Version $($azAccountsModule.Version)" -ForegroundColor Green
                 $deviceResult.TestResults.AzAccountsModule = @{
                     Status = "Pass"
                     Version = $azAccountsModule.Version.ToString()
@@ -470,7 +470,7 @@ function Get-AzureArcPrerequisite {
                 }
                 "[OK] Az.Accounts Module: Version $($azAccountsModule.Version) - Available" | Out-File -FilePath $script:globalLogFile -Append
             } elseif ($isLocalMachine) {
-                Write-Host "     [WARN] Az.Accounts module not found - Will be installed if needed"
+                Write-Host "     [WARN] Az.Accounts module not found - Will be installed if needed" -ForegroundColor Green
                 $deviceResult.TestResults.AzAccountsModule = @{
                     Status = "Warning"
                     Version = "Not Installed"
@@ -491,7 +491,7 @@ function Get-AzureArcPrerequisite {
 
             # Check Az.Resources
             if ($azResourcesModule) {
-                Write-Host "     [OK] Az.Resources module found - Version $($azResourcesModule.Version)"
+                Write-Host "     [OK] Az.Resources module found - Version $($azResourcesModule.Version)" -ForegroundColor Green
                 $deviceResult.TestResults.AzResourcesModule = @{
                     Status = "Pass"
                     Version = $azResourcesModule.Version.ToString()
@@ -499,7 +499,7 @@ function Get-AzureArcPrerequisite {
                 }
                 "[OK] Az.Resources Module: Version $($azResourcesModule.Version) - Available" | Out-File -FilePath $script:globalLogFile -Append
             } elseif ($isLocalMachine) {
-                Write-Host "     [WARN] Az.Resources module not found - Will be installed if needed"
+                Write-Host "     [WARN] Az.Resources module not found - Will be installed if needed" -ForegroundColor Green
                 $deviceResult.TestResults.AzResourcesModule = @{
                     Status = "Warning"
                     Version = "Not Installed"
@@ -518,7 +518,7 @@ function Get-AzureArcPrerequisite {
                 "[WARN] Az.Resources Module: Unknown (Remote testing not implemented)" | Out-File -FilePath $script:globalLogFile -Append
             }
         } catch {
-            Write-Host "     [FAIL] Failed to check Azure modules: $($_.Exception.Message)"
+            Write-Host "     [FAIL] Failed to check Azure modules: $($_.Exception.Message)" -ForegroundColor Green
             $deviceResult.TestResults.AzureModules = @{
                 Status = "Error"
                 Message = $_.Exception.Message
@@ -557,7 +557,7 @@ function Get-AzureArcPrerequisite {
 
                 # Basic OS compatibility check
                 if ($os.ProductType -eq 1) {
-                    Write-Host "     [WARN] Client OS detected - Azure Arc is designed for servers"
+                    Write-Host "     [WARN] Client OS detected - Azure Arc is designed for servers" -ForegroundColor Green
                     $deviceResult.TestResults.OperatingSystem = @{
                         Status = "Warning"
                         Name = $osName
@@ -572,7 +572,7 @@ function Get-AzureArcPrerequisite {
                     "  OS Version: $($os.Version) (Build $($os.BuildNumber))" | Out-File -FilePath $script:globalLogFile -Append
                     "  Recommendation: Use server OS for production deployments" | Out-File -FilePath $script:globalLogFile -Append
                 } elseif ($osVersion.Build -ge 9600) {
-                    Write-Host "     [OK] Server OS version is compatible with Azure Arc"
+                    Write-Host "     [OK] Server OS version is compatible with Azure Arc" -ForegroundColor Green
                     $deviceResult.TestResults.OperatingSystem = @{
                         Status = "Pass"
                         Name = $osName
@@ -584,7 +584,7 @@ function Get-AzureArcPrerequisite {
                     "[OK] Operating System: $osName - COMPATIBLE" | Out-File -FilePath $script:globalLogFile -Append
                     "  OS Version: $($os.Version) (Build $($os.BuildNumber))" | Out-File -FilePath $script:globalLogFile -Append
                 } else {
-                    Write-Host "     [FAIL] OS version may not be fully supported"
+                    Write-Host "     [FAIL] OS version may not be fully supported" -ForegroundColor Green
                     $deviceResult.TestResults.OperatingSystem = @{
                         Status = "Fail"
                         Name = $osName
@@ -612,7 +612,7 @@ function Get-AzureArcPrerequisite {
                 "[WARN] Operating System: Unknown (Remote testing not implemented)" | Out-File -FilePath $script:globalLogFile -Append
             }
         } catch {
-            Write-Host "     [FAIL] Failed to check OS: $($_.Exception.Message)"
+            Write-Host "     [FAIL] Failed to check OS: $($_.Exception.Message)" -ForegroundColor Green
             $deviceResult.TestResults.OperatingSystem = @{
                 Status = "Error"
                 Message = $_.Exception.Message
@@ -640,7 +640,7 @@ function Get-AzureArcPrerequisite {
 
             if ($processor) {
                 if ($processor.Architecture -in @(9, 12)) {
-                    Write-Host "     [OK] Architecture: $architecture - Supported"
+                    Write-Host "     [OK] Architecture: $architecture - Supported" -ForegroundColor Green
                     $deviceResult.TestResults.ProcessorArchitecture = @{
                         Status = "Pass"
                         Architecture = $architecture
@@ -649,7 +649,7 @@ function Get-AzureArcPrerequisite {
                     }
                     "[OK] Processor Architecture: $architecture - SUPPORTED" | Out-File -FilePath $script:globalLogFile -Append
                 } else {
-                    Write-Host "     [FAIL] Architecture: $architecture - Not supported"
+                    Write-Host "     [FAIL] Architecture: $architecture - Not supported" -ForegroundColor Green
                     $deviceResult.TestResults.ProcessorArchitecture = @{
                         Status = "Fail"
                         Architecture = $architecture
@@ -670,7 +670,7 @@ function Get-AzureArcPrerequisite {
                 "[WARN] Processor Architecture: Unknown (Remote testing not implemented)" | Out-File -FilePath $script:globalLogFile -Append
             }
         } catch {
-            Write-Host "     [FAIL] Failed to check processor: $($_.Exception.Message)"
+            Write-Host "     [FAIL] Failed to check processor: $($_.Exception.Message)" -ForegroundColor Green
             $deviceResult.TestResults.ProcessorArchitecture = @{
                 Status = "Error"
                 Message = $_.Exception.Message
@@ -691,7 +691,7 @@ function Get-AzureArcPrerequisite {
 
             if ($totalMemoryGB -gt 0) {
                 if ($totalMemoryGB -ge 2) {
-                    Write-Host "     [OK] Memory: $totalMemoryGB GB - Adequate"
+                    Write-Host "     [OK] Memory: $totalMemoryGB GB - Adequate" -ForegroundColor Green
                     $deviceResult.TestResults.SystemMemory = @{
                         Status = "Pass"
                         MemoryGB = $totalMemoryGB
@@ -699,7 +699,7 @@ function Get-AzureArcPrerequisite {
                     }
                     "[OK] System Memory: $totalMemoryGB GB - ADEQUATE" | Out-File -FilePath $script:globalLogFile -Append
                 } else {
-                    Write-Host "     [WARN] Memory: $totalMemoryGB GB - Below recommended 2GB"
+                    Write-Host "     [WARN] Memory: $totalMemoryGB GB - Below recommended 2GB" -ForegroundColor Green
                     $deviceResult.TestResults.SystemMemory = @{
                         Status = "Warning"
                         MemoryGB = $totalMemoryGB
@@ -719,7 +719,7 @@ function Get-AzureArcPrerequisite {
                 "[WARN] System Memory: Unknown (Remote testing not implemented)" | Out-File -FilePath $script:globalLogFile -Append
             }
         } catch {
-            Write-Host "     [FAIL] Failed to check memory: $($_.Exception.Message)"
+            Write-Host "     [FAIL] Failed to check memory: $($_.Exception.Message)" -ForegroundColor Green
             $deviceResult.TestResults.SystemMemory = @{
                 Status = "Error"
                 Message = $_.Exception.Message
@@ -756,7 +756,7 @@ function Get-AzureArcPrerequisite {
                 }
 
                 if ($serviceStatus -and $serviceStatus.Status -eq "Running") {
-                    Write-Host "     [OK] $($service.DisplayName) - Running"
+                    Write-Host "     [OK] $($service.DisplayName) - Running" -ForegroundColor Green
                     $deviceResult.TestResults.Services[$service.Name] = @{
                         Status = "Pass"
                         ServiceStatus = "Running"
@@ -765,7 +765,7 @@ function Get-AzureArcPrerequisite {
                     }
                     "[OK] Service: $($service.DisplayName) - RUNNING" | Out-File -FilePath $script:globalLogFile -Append
                 } elseif ($serviceStatus) {
-                    Write-Host "     [WARN] $($service.DisplayName) - $($serviceStatus.Status)"
+                    Write-Host "     [WARN] $($service.DisplayName) - $($serviceStatus.Status)" -ForegroundColor Green
                     $deviceResult.TestResults.Services[$service.Name] = @{
                         Status = "Warning"
                         ServiceStatus = $serviceStatus.Status
@@ -777,7 +777,7 @@ function Get-AzureArcPrerequisite {
                     "[WARN] Service: $($service.DisplayName) - $($serviceStatus.Status.ToUpper())" | Out-File -FilePath $script:globalLogFile -Append
                     "  Recommendation: Start-Service -Name $($service.Name)" | Out-File -FilePath $script:globalLogFile -Append
                 } elseif ($isLocalMachine) {
-                    Write-Host "     [FAIL] $($service.DisplayName) - Not found"
+                    Write-Host "     [FAIL] $($service.DisplayName) - Not found" -ForegroundColor Green
                     $deviceResult.TestResults.Services[$service.Name] = @{
                         Status = "Fail"
                         ServiceStatus = "Not Found"
@@ -798,7 +798,7 @@ function Get-AzureArcPrerequisite {
                     "[WARN] Service: $($service.DisplayName) - Unknown (Remote testing not implemented)" | Out-File -FilePath $script:globalLogFile -Append
                 }
             } catch {
-                Write-Host "     [FAIL] Failed to check $($service.DisplayName): $($_.Exception.Message)"
+                Write-Host "     [FAIL] Failed to check $($service.DisplayName): $($_.Exception.Message)" -ForegroundColor Green
                 $deviceResult.TestResults.Services[$service.Name] = @{
                     Status = "Error"
                     ServiceStatus = "Error"
@@ -874,7 +874,7 @@ function Get-AzureArcPrerequisite {
                 }
 
                 if ($result) {
-                    Write-Host "     [OK] $($endpoint.Url):$($endpoint.Port) - Reachable"
+                    Write-Host "     [OK] $($endpoint.Url):$($endpoint.Port) - Reachable" -ForegroundColor Green
                     $deviceResult.TestResults.NetworkConnectivity[$endpoint.Url] = @{
                         Status = "Pass"
                         Url = $endpoint.Url
@@ -884,7 +884,7 @@ function Get-AzureArcPrerequisite {
                     }
                     "[OK] Network: $($endpoint.Name) ($($endpoint.Url):$($endpoint.Port)) - REACHABLE" | Out-File -FilePath $script:globalLogFile -Append
                 } elseif ($isLocalMachine) {
-                    Write-Host "     [FAIL] $($endpoint.Url):$($endpoint.Port) - Not reachable"
+                    Write-Host "     [FAIL] $($endpoint.Url):$($endpoint.Port) - Not reachable" -ForegroundColor Green
                     $deviceResult.TestResults.NetworkConnectivity[$endpoint.Url] = @{
                         Status = "Fail"
                         Url = $endpoint.Url
@@ -907,7 +907,7 @@ function Get-AzureArcPrerequisite {
                     "[WARN] Network: $($endpoint.Name) ($($endpoint.Url):$($endpoint.Port)) - Unknown (Remote testing not implemented)" | Out-File -FilePath $script:globalLogFile -Append
                 }
             } catch {
-                Write-Host "     [FAIL] $($endpoint.Url):$($endpoint.Port) - Connection failed"
+                Write-Host "     [FAIL] $($endpoint.Url):$($endpoint.Port) - Connection failed" -ForegroundColor Green
                 $deviceResult.TestResults.NetworkConnectivity[$endpoint.Url] = @{
                     Status = "Error"
                     Url = $endpoint.Url
@@ -995,7 +995,7 @@ function Get-AzureArcPrerequisite {
         "" | Out-File -FilePath $script:globalLogFile -Append
 
         # Display device summary
-        Write-Host " DEVICE READINESS SUMMARY:"
+        Write-Host " DEVICE READINESS SUMMARY:" -ForegroundColor Yellow
         Write-Host ""
 
         $readyDevices = 0
@@ -1013,17 +1013,17 @@ function Get-AzureArcPrerequisite {
 
             switch ($status) {
                 "Ready" {
-                    Write-Host "   [OK] $device - READY FOR AZURE ARC"
+                    Write-Host "   [OK] $device - READY FOR AZURE ARC" -ForegroundColor Green
                     $readyDevices++
                     "$device - READY FOR AZURE ARC" | Out-File -FilePath $script:globalLogFile -Append
                 }
                 "Ready with Warnings" {
-                    Write-Host "   [WARN] $device - READY WITH WARNINGS ($warningCount warnings)"
+                    Write-Host "   [WARN] $device - READY WITH WARNINGS ($warningCount warnings)" -ForegroundColor Green
                     $readyWithWarningsDevices++
                     "$device - READY WITH WARNINGS ($warningCount warnings)" | Out-File -FilePath $script:globalLogFile -Append
                 }
                 "Not Ready" {
-                    Write-Host "   [FAIL] $device - NOT READY ($errorCount errors, $warningCount warnings)"
+                    Write-Host "   [FAIL] $device - NOT READY ($errorCount errors, $warningCount warnings)" -ForegroundColor Green
                     $notReadyDevices++
                     "$device - NOT READY ($errorCount errors, $warningCount warnings)" | Out-File -FilePath $script:globalLogFile -Append
                 }
@@ -1031,7 +1031,7 @@ function Get-AzureArcPrerequisite {
         }
 
         Write-Host ""
-        Write-Host " OVERALL STATISTICS:"
+        Write-Host " OVERALL STATISTICS:" -ForegroundColor Yellow
         Write-Host "   Ready: $readyDevices device(s)"
         Write-Host "   Ready with Warnings: $readyWithWarningsDevices device(s)"
         Write-Host "   Not Ready: $notReadyDevices device(s)"
@@ -1047,26 +1047,26 @@ function Get-AzureArcPrerequisite {
 
         # Show Azure authentication status
         if ($script:azureLoginCompleted) {
-            Write-Host " AZURE INTEGRATION:"
-            Write-Host "   [OK] Azure authentication completed"
-            Write-Host "   [OK] Resource providers processed"
+            Write-Host " AZURE INTEGRATION:" -ForegroundColor Yellow
+            Write-Host "   [OK] Azure authentication completed" -ForegroundColor Green
+            Write-Host "   [OK] Resource providers processed" -ForegroundColor Green
             "Azure authentication: Completed" | Out-File -FilePath $script:globalLogFile -Append
             "Resource providers: Processed" | Out-File -FilePath $script:globalLogFile -Append
         } else {
-            Write-Host " AZURE INTEGRATION:"
-            Write-Host "   [WARN] Azure authentication skipped"
+            Write-Host " AZURE INTEGRATION:" -ForegroundColor Yellow
+            Write-Host "   [WARN] Azure authentication skipped" -ForegroundColor Green
             "Azure authentication: Skipped" | Out-File -FilePath $script:globalLogFile -Append
         }
 
         Write-Host ""
-        Write-Host " FILES CREATED:"
+        Write-Host " FILES CREATED:" -ForegroundColor Yellow
         Write-Host "   Log file: $script:globalLogFile"
         if ($DeviceListPath) {
             Write-Host "   Device list: $DeviceListPath"
         }
 
         Write-Host ""
-        Write-Host " NEXT STEPS:"
+        Write-Host " NEXT STEPS:" -ForegroundColor Yellow
         if ($notReadyDevices -gt 0) {
             Write-Host "   1. Address critical issues on devices marked as 'Not Ready'"
             Write-Host "   2. Review detailed recommendations in the log file"
@@ -1122,10 +1122,10 @@ function Get-AzureArcPrerequisite {
 
     } catch {
         Write-Host ""
-        Write-Host " [FAIL] PREREQUISITES TESTING FAILED"
+        Write-Host " [FAIL] PREREQUISITES TESTING FAILED" -ForegroundColor Green
         Write-Host "   Error: $($_.Exception.Message)"
         Write-Host ""
-        Write-Host " FILES CREATED:"
+        Write-Host " FILES CREATED:" -ForegroundColor Yellow
         Write-Host "   Log file: $script:globalLogFile"
         Write-Host ""
 
@@ -1139,6 +1139,10 @@ function Get-AzureArcPrerequisite {
         return $false
     }
 }
+
+
+
+
 
 
 

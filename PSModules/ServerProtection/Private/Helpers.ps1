@@ -59,17 +59,17 @@ function Get-StandardizedOutputDirectory {
     Clear-Host
     Write-Host ""
     Write-Host " FOLDER SELECTION"
-    Write-Host " ================"
+    Write-Host " ================" -ForegroundColor Green
     Write-Host ""
     Write-Host " Please select where to store all files:"
     Write-Host ""
-    Write-Host "   [1] All file(s) will be stored in: C:\Users\$userName\Desktop\AzureArc_$timestamp"
+    Write-Host "   [1] All file(s) will be stored in: C:\Users\$userName\Desktop\AzureArc_$timestamp" -ForegroundColor Green
     Write-Host "       (Default recommended location with timestamp to avoid conflicts)"
     Write-Host ""
-    Write-Host "   [2] Custom folder: Provide your own folder location"
+    Write-Host "   [2] Custom folder: Provide your own folder location" -ForegroundColor Green
     Write-Host "       (Supports various path formats)"
     Write-Host ""
-    Write-Host "   [3] Quit the script and return to the main menu located under 'Start-ServerProtection.ps1'"
+    Write-Host "   [3] Quit the script and return to the main menu located under 'Start-ServerProtection.ps1'" -ForegroundColor Green
     Write-Host "       (Returns to the interactive menu system)"
     Write-Host ""
 
@@ -83,18 +83,18 @@ function Get-StandardizedOutputDirectory {
                     try {
                         New-Item -ItemType Directory -Path $defaultFolder -Force | Out-Null
                         Write-Host ""
-                        Write-Host " [SUCCESS] Created default folder: C:\Users\$userName\Desktop\AzureArc_$timestamp"
+                        Write-Host " [SUCCESS] Created default folder: C:\Users\$userName\Desktop\AzureArc_$timestamp" -ForegroundColor Green
                     }
                     catch {
                         Write-Host ""
-                        Write-Host " [FAIL] Could not create default folder: $($_.Exception.Message)"
+                        Write-Host " [FAIL] Could not create default folder: $($_.Exception.Message)" -ForegroundColor Green
                         Write-Host " Please try a custom folder location."
                         Write-Host ""
                         continue
                     }
                 } else {
                     Write-Host ""
-                    Write-Host " [SUCCESS] Using existing folder: C:\Users\$userName\Desktop\AzureArc_$timestamp"
+                    Write-Host " [SUCCESS] Using existing folder: C:\Users\$userName\Desktop\AzureArc_$timestamp" -ForegroundColor Green
                 }
                 Write-Host ""
                 return $defaultFolder
@@ -114,7 +114,7 @@ function Get-StandardizedOutputDirectory {
                 $customPath = Read-Host " Enter custom folder path"
 
                 if ([string]::IsNullOrWhiteSpace($customPath)) {
-                    Write-Host " [FAIL] Empty path provided. Please try again."
+                    Write-Host " [FAIL] Empty path provided. Please try again." -ForegroundColor Green
                     Write-Host ""
                     continue
                 }
@@ -129,12 +129,12 @@ function Get-StandardizedOutputDirectory {
 
                     # Check if directory exists - must exist before proceeding
                     if (-not (Test-Path -PathType Container $resolvedPath)) {
-                        Write-Host " [FAIL] Folder does not exist: $resolvedPath"
+                        Write-Host " [FAIL] Folder does not exist: $resolvedPath" -ForegroundColor Green
                         Write-Host " Please create the folder first or choose an existing folder."
                         Write-Host ""
                         continue
                     } else {
-                        Write-Host " [SUCCESS] Using existing folder: $resolvedPath"
+                        Write-Host " [SUCCESS] Using existing folder: $resolvedPath" -ForegroundColor Green
                     }
 
                     # Verify we can write to the directory
@@ -142,10 +142,10 @@ function Get-StandardizedOutputDirectory {
                     try {
                         "test" | Out-File -FilePath $testFile -Force
                         Remove-Item -Path $testFile -Force
-                        Write-Host " [SUCCESS] Folder is writable"
+                        Write-Host " [SUCCESS] Folder is writable" -ForegroundColor Green
                     }
                     catch {
-                        Write-Host " [FAIL] Cannot write to folder: $($_.Exception.Message)"
+                        Write-Host " [FAIL] Cannot write to folder: $($_.Exception.Message)" -ForegroundColor Green
                         Write-Host ""
                         continue
                     }
@@ -154,7 +154,7 @@ function Get-StandardizedOutputDirectory {
                     return $resolvedPath
                 }
                 catch {
-                    Write-Host " [FAIL] Invalid folder path: $($_.Exception.Message)"
+                    Write-Host " [FAIL] Invalid folder path: $($_.Exception.Message)" -ForegroundColor Green
                     Write-Host " Please provide a valid folder path in one of the supported formats."
                     Write-Host ""
                     continue
@@ -170,7 +170,7 @@ function Get-StandardizedOutputDirectory {
             }
 
             default {
-                Write-Host " [FAIL] Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
+                Write-Host " [FAIL] Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Green
                 Write-Host ""
             }
         }
@@ -296,7 +296,7 @@ function Initialize-StandardizedEnvironment {
     # Log the successful initialization with specific folder path
     Write-Host ""
     Write-Host " ENVIRONMENT READY"
-    Write-Host " ================="
+    Write-Host " =================" -ForegroundColor Green
     Write-Host ""
     Write-Host " Working folder: $folderPath"
     if ($RequiredFileTypes.Count -gt 0) {
@@ -342,14 +342,14 @@ function Get-DeviceFileSelection {
     do {
         Write-Host ""
         Write-Host " DEVICE FILE SELECTION"
-        Write-Host " ===================="
+        Write-Host " ====================" -ForegroundColor Green
         Write-Host ""
-        Write-Host " Please select your device list option:"
+        Write-Host " Please select your device list option:" -ForegroundColor Yellow
         Write-Host ""
-        Write-Host "   [1] Use default device list with local hostname"
+        Write-Host "   [1] Use default device list with local hostname" -ForegroundColor Green
         Write-Host "       (Creates a device list with current computer name and opens for editing)"
         Write-Host ""
-        Write-Host "   [2] Provide existing device list file"
+        Write-Host "   [2] Provide existing device list file" -ForegroundColor Green
         Write-Host "       (Copy your existing device list to the working directory)"
         Write-Host ""
 
@@ -376,7 +376,7 @@ $env:COMPUTERNAME
 
                 try {
                     $defaultContent | Out-File -FilePath $DefaultDeviceFile -Encoding UTF8
-                    Write-Host " [OK] Default device list created: $DefaultDeviceFile"
+                    Write-Host " [OK] Default device list created: $DefaultDeviceFile" -ForegroundColor Green
 
                     Write-Host ""
                     Write-Host " Opening device list in Notepad for editing..."
@@ -387,16 +387,16 @@ $env:COMPUTERNAME
                     try {
                         $notepadProcess = Start-Process -FilePath "notepad.exe" -ArgumentList $DefaultDeviceFile -PassThru
                         $notepadProcess.WaitForExit()
-                        Write-Host " [OK] Device list editing completed"
+                        Write-Host " [OK] Device list editing completed" -ForegroundColor Green
                     } catch {
-                        Write-Host " [WARN] Could not open Notepad: $($_.Exception.Message)"
+                        Write-Host " [WARN] Could not open Notepad: $($_.Exception.Message)" -ForegroundColor Green
                         Write-Host " Continuing with default device list..."
                     }
 
                     return $DefaultDeviceFile
 
                 } catch {
-                    Write-Host " [FAIL] Failed to create device list file: $($_.Exception.Message)"
+                    Write-Host " [FAIL] Failed to create device list file: $($_.Exception.Message)" -ForegroundColor Green
                     Write-Host " Please try again."
                     Write-Host ""
                     continue
@@ -413,7 +413,7 @@ $env:COMPUTERNAME
                 $deviceFileInput = Read-Host " Enter device list file path"
 
                 if ([string]::IsNullOrWhiteSpace($deviceFileInput)) {
-                    Write-Host " [FAIL] Empty path provided. Please try again."
+                    Write-Host " [FAIL] Empty path provided. Please try again." -ForegroundColor Green
                     Write-Host ""
                     continue
                 }
@@ -423,7 +423,7 @@ $env:COMPUTERNAME
 
                 # Validate the file exists
                 if (-not (Test-Path -Path $deviceFileInput -PathType Leaf)) {
-                    Write-Host " [FAIL] File does not exist: $deviceFileInput"
+                    Write-Host " [FAIL] File does not exist: $deviceFileInput" -ForegroundColor Green
                     Write-Host " Please check the path and try again."
                     Write-Host ""
                     continue
@@ -435,13 +435,13 @@ $env:COMPUTERNAME
                     $destinationPath = Join-Path $WorkingDirectory $fileName
 
                     Copy-Item -Path $deviceFileInput -Destination $destinationPath -Force
-                    Write-Host " [OK] Device list copied to working directory: $destinationPath"
+                    Write-Host " [OK] Device list copied to working directory: $destinationPath" -ForegroundColor Green
                     Write-Host ""
 
                     return $destinationPath
 
                 } catch {
-                    Write-Host " [FAIL] Failed to copy device list file: $($_.Exception.Message)"
+                    Write-Host " [FAIL] Failed to copy device list file: $($_.Exception.Message)" -ForegroundColor Green
                     Write-Host " Please try again."
                     Write-Host ""
                     continue
@@ -449,7 +449,7 @@ $env:COMPUTERNAME
             }
 
             default {
-                Write-Host " [FAIL] Invalid choice. Please enter 1 or 2."
+                Write-Host " [FAIL] Invalid choice. Please enter 1 or 2." -ForegroundColor Green
                 Write-Host ""
             }
         }
@@ -474,9 +474,9 @@ function Write-Step {
     )
 
     if ($DeviceName) {
-        Write-Host "`n [$DeviceName] $Message..." -ForegroundColor Cyan
+        Write-Host "`n [$DeviceName] $Message..." -ForegroundColor Green
     } else {
-        Write-Host "`n $Message..." -ForegroundColor Cyan
+        Write-Host "`n $Message..."
     }
 }
 
@@ -568,9 +568,9 @@ function Test-Prerequisite {
     $color = switch ($Result) {
         "OK" { "Green" }
         "Warning" { "Yellow" }
-        "Error" { "Red" }
-        "Info" { "Cyan" }
-        default { "White" }
+        "Error" { "Yellow" }
+        "Info" { "Green" }
+        default { "Yellow" }
     }
     Write-Host "    [$Result] $Check - $Details" -ForegroundColor $color
 }
@@ -726,21 +726,21 @@ function Install-AzModule {
     .OUTPUTS
         Boolean indicating success or failure.
     #>
-    Write-Host "`n Installing Az PowerShell module..." -ForegroundColor Yellow
+    Write-Host "`n Installing Az PowerShell module..."
     try {
         # Check if running as administrator
         $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
 
         if ($isAdmin) {
             Install-Module -Name Az -Repository PSGallery -Force -AllowClobber -Scope AllUsers
-            Write-Host " Az module installed successfully for all users" -ForegroundColor Green
+            Write-Host " Az module installed successfully for all users"
         } else {
             Install-Module -Name Az -Repository PSGallery -Force -AllowClobber -Scope CurrentUser
-            Write-Host " Az module installed successfully for current user" -ForegroundColor Green
+            Write-Host " Az module installed successfully for current user"
         }
         return $true
     } catch {
-        Write-Host " Failed to install Az module: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host " Failed to install Az module: $($_.Exception.Message)"
         return $false
     }
 }
@@ -766,15 +766,15 @@ function Confirm-AzureAuthentication {
         # Use the new standardized authentication function
         $authResult = Initialize-AzureAuthenticationAndSubscription
         if ($authResult.Success) {
-            Write-Host "     Azure authentication successful" -ForegroundColor Green
+            Write-Host "     Azure authentication successful"
             return $true
         } else {
-            Write-Host "     Azure authentication failed: $($authResult.Message)" -ForegroundColor Red
+            Write-Host "     Azure authentication failed: $($authResult.Message)"
             return $false
         }
     }
     catch {
-        Write-Host "     Error during Azure authentication: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "     Error during Azure authentication: $($_.Exception.Message)"
         return $false
     }
 }
@@ -1078,7 +1078,7 @@ function Get-ValidatedUserPath {
 
         # Skip validation if still empty
         if ([string]::IsNullOrWhiteSpace($userInput)) {
-            Write-Host "   [WARN] No path provided" -ForegroundColor Yellow
+            Write-Host "   [WARN] No path provided" -ForegroundColor Green
             continue
         }
 
@@ -1096,15 +1096,15 @@ function Get-ValidatedUserPath {
             return $validation.FullPath
         }
         else {
-            Write-Host "   [FAIL] $($validation.Error)" -ForegroundColor Red
+            Write-Host "   [FAIL] $($validation.Error)" -ForegroundColor Green
             if ($attempt -lt $MaxRetries) {
-                Write-Host "   Please try again ($attempt/$MaxRetries attempts)" -ForegroundColor Yellow
+                Write-Host "   Please try again ($attempt/$MaxRetries attempts)"
             }
         }
 
     } while ($attempt -lt $MaxRetries)
 
-    Write-Host "   [FAIL] Maximum retry attempts reached. Path validation failed." -ForegroundColor Red
+    Write-Host "   [FAIL] Maximum retry attempts reached. Path validation failed." -ForegroundColor Green
     return $null
 }
 
@@ -1232,7 +1232,7 @@ function Initialize-AzureAuthenticationAndSubscription {
             $azModule = Get-Module -Name Az.Accounts -ListAvailable | Sort-Object Version -Descending | Select-Object -First 1
             if (-not $azModule) {
                 $result.Message = "Azure PowerShell module (Az.Accounts) is not installed. Please install it with: Install-Module -Name Az -AllowClobber -Scope CurrentUser"
-                Write-Host "`[-`] $($result.Message)" -ForegroundColor Red
+                Write-Host "`[-`] $($result.Message)"
                 return $result
             }
 
@@ -1243,7 +1243,7 @@ function Initialize-AzureAuthenticationAndSubscription {
         }
         catch {
             $result.Message = "Failed to check or load Azure PowerShell module: $($_.Exception.Message)"
-            Write-Host "`[-`] $($result.Message)" -ForegroundColor Red
+            Write-Host "`[-`] $($result.Message)"
             return $result
         }
 
@@ -1315,7 +1315,7 @@ function Initialize-AzureAuthenticationAndSubscription {
             catch {
                 try {
                     # Ultimate fallback: Use Start-Job to isolate authentication completely
-                    Write-Host "`[*`] Authenticating to Azure (please complete authentication in popup)..." -ForegroundColor Yellow
+                    Write-Host "`[*`] Authenticating to Azure (please complete authentication in popup)..."
 
                     $authJob = Start-Job -ScriptBlock {
                         Import-Module Az.Accounts -Force -WarningAction SilentlyContinue
@@ -1348,7 +1348,7 @@ function Initialize-AzureAuthenticationAndSubscription {
                 }
                 catch {
                     $result.Message = "Failed to authenticate to Azure. Error: $($_.Exception.Message). Please ensure you have proper Azure access and try running 'Connect-AzAccount' manually first."
-                    Write-Host "`[-`] $($result.Message)" -ForegroundColor Red
+                    Write-Host "`[-`] $($result.Message)"
                     return $result
                 }
             }
@@ -1360,46 +1360,46 @@ function Initialize-AzureAuthenticationAndSubscription {
         # Validate context but don't show authentication details yet
         if (-not ($context -and $context.Account)) {
             $result.Message = "Authentication completed but no valid context found. Please try running 'Connect-AzAccount' manually."
-            Write-Host "`[-`] $($result.Message)" -ForegroundColor Red
+            Write-Host "`[-`] $($result.Message)"
             return $result
         }
         #endregion
 
         #region Subscription Selection
         # Show authentication success and start subscription selection
-        Write-Host " Authentication completed successfully!" -ForegroundColor Green
-        Write-Host "`[+`] Authenticated as: $($context.Account.Id)" -ForegroundColor Green
-        Write-Host "`[*`] Subscription Selection" -ForegroundColor Cyan
+        Write-Host " Authentication completed successfully!"
+        Write-Host "`[+`] Authenticated as: $($context.Account.Id)"
+        Write-Host "`[*`] Subscription Selection"
 
         $subs = @()
         try {
             # Get subscriptions and suppress only the potential verbose output, not errors
-            Write-Host "`[*`] Retrieving available subscriptions..." -ForegroundColor Yellow
+            Write-Host "`[*`] Retrieving available subscriptions..."
 
             $subs += Get-AzSubscription -WarningAction SilentlyContinue -ErrorAction Stop
 
-            Write-Host "`[+`] Found $($subs.Count) subscription(s)" -ForegroundColor Green
+            Write-Host "`[+`] Found $($subs.Count) subscription(s)"
         }
         catch {
             $result.Message = "Failed to retrieve Azure subscriptions. Please check your authentication and permissions. Error: $($_.Exception.Message)"
-            Write-Host "`[-`] $($result.Message)" -ForegroundColor Red
+            Write-Host "`[-`] $($result.Message)"
 
             # Try to get context again to see if authentication is still valid
             try {
                 $contextCheck = Get-AzContext -ErrorAction Stop
                 if (-not $contextCheck) {
-                    Write-Host "`[-`] Azure context is no longer valid. Please restart and authenticate again." -ForegroundColor Red
+                    Write-Host "`[-`] Azure context is no longer valid. Please restart and authenticate again."
                 }
             }
             catch {
-                Write-Host "`[-`] Azure context check failed. Please restart and authenticate again." -ForegroundColor Red
+                Write-Host "`[-`] Azure context check failed. Please restart and authenticate again."
             }
             return $result
         }
 
         if ($subs.Count -eq 0) {
             $result.Message = "No accessible subscriptions found. Please check your Azure account permissions or contact your Azure administrator."
-            Write-Host "`[-`] $($result.Message)" -ForegroundColor Red
+            Write-Host "`[-`] $($result.Message)"
             return $result
         }
 
@@ -1408,13 +1408,13 @@ function Initialize-AzureAuthenticationAndSubscription {
         if ($SubscriptionId) {
             $selectedSub = $subs | Where-Object { $_.Id -eq $SubscriptionId }
             if (-not $selectedSub) {
-                Write-Host "`[-`] Subscription ID '$SubscriptionId' not found. Please check and try again." -ForegroundColor Red
+                Write-Host "`[-`] Subscription ID '$SubscriptionId' not found. Please check and try again."
                 # Fall through to subscription selection prompt
                 $SubscriptionId = $null
             } else {
                 $subName = $selectedSub.Name
                 $subId = $selectedSub.Id
-                Write-Host "`[+`] Using provided subscription: $subName" -ForegroundColor Green
+                Write-Host "`[+`] Using provided subscription: $subName"
             }
         }
 
@@ -1422,9 +1422,9 @@ function Initialize-AzureAuthenticationAndSubscription {
         if (-not $SubscriptionId) {
             # Display available subscriptions - show only subscription names (no sensitive info)
             Write-Host ""
-            Write-Host "`[*`] Available subscription(s):" -ForegroundColor Green
+            Write-Host "`[*`] Available subscription(s):"
             for ($i = 0; $i -lt $subs.Count; $i++) {
-                Write-Host "[$($i+1)] $($subs[$i].Name)" -ForegroundColor White
+                Write-Host "[$($i+1)] $($subs[$i].Name)" -ForegroundColor Green
             }
             Write-Host ""
 
@@ -1438,14 +1438,14 @@ function Initialize-AzureAuthenticationAndSubscription {
                     try {
                         $subRank = [int]$subRank
                     } catch {
-                        Write-Host "`[-`] Please enter a valid number." -ForegroundColor Yellow
+                        Write-Host "`[-`] Please enter a valid number."
                         $subRank = 0  # Force retry
                         continue
                     }
                 }
 
                 if ($subRank -lt 1 -or $subRank -gt $subs.Count) {
-                    Write-Host "`[-`] Enter a valid number between 1 and $($subs.Count)" -ForegroundColor Yellow
+                    Write-Host "`[-`] Enter a valid number between 1 and $($subs.Count)"
                 }
             } while ($subRank -lt 1 -or $subRank -gt $subs.Count)
 
@@ -1455,32 +1455,32 @@ function Initialize-AzureAuthenticationAndSubscription {
         }
 
         # Set the Azure context to the selected subscription
-        Write-Host "`[*`] Setting Azure context to selected subscription..." -ForegroundColor Yellow
+        Write-Host "`[*`] Setting Azure context to selected subscription..."
         try {
             $setContextResult = Set-AzContext -SubscriptionId $subId -WarningAction SilentlyContinue -ErrorAction Stop
 
             if ($setContextResult) {
                 $context = Get-AzContext -ErrorAction Stop
-                Write-Host "`[+`] Successfully set context to subscription: $subName" -ForegroundColor Green
+                Write-Host "`[+`] Successfully set context to subscription: $subName"
             } else {
                 throw "Set-AzContext returned null"
             }
         }
         catch {
             $result.Message = "Failed to set Azure context to subscription '$subName'. Error: $($_.Exception.Message). Please verify you have access to this subscription."
-            Write-Host "`[-`] $($result.Message)" -ForegroundColor Red
+            Write-Host "`[-`] $($result.Message)"
 
             # Try to list current context for debugging
             try {
                 $currentContext = Get-AzContext -ErrorAction SilentlyContinue
                 if ($currentContext) {
-                    Write-Host "`[-`] Current context is set to: $($currentContext.Subscription.Name)" -ForegroundColor Yellow
+                    Write-Host "`[-`] Current context is set to: $($currentContext.Subscription.Name)"
                 } else {
-                    Write-Host "`[-`] No current Azure context found" -ForegroundColor Yellow
+                    Write-Host "`[-`] No current Azure context found"
                 }
             }
             catch {
-                Write-Host "`[-`] Unable to retrieve current context" -ForegroundColor Yellow
+                Write-Host "`[-`] Unable to retrieve current context"
             }
             return $result
         }
@@ -1495,7 +1495,7 @@ function Initialize-AzureAuthenticationAndSubscription {
 
         # Final validation (silent)
         if ($context.Subscription.Id -ne $subId) {
-            Write-Host "`[!`] Warning: Context subscription ID doesn't match selected subscription" -ForegroundColor Yellow
+            Write-Host "`[!`] Warning: Context subscription ID doesn't match selected subscription" -ForegroundColor Green
         }
 
         Write-Host ""
@@ -1522,10 +1522,16 @@ function Initialize-AzureAuthenticationAndSubscription {
         if ($env:AZURE_CORE_OUTPUT) { Remove-Item -Path "env:AZURE_CORE_OUTPUT" -ErrorAction SilentlyContinue }
 
         $result.Message = "Error during Azure authentication: $($_.Exception.Message)"
-        Write-Host "`[-`] $($result.Message)" -ForegroundColor Red
+        Write-Host "`[-`] $($result.Message)"
         return $result
     }
 }
+
+
+
+
+
+
 
 
 

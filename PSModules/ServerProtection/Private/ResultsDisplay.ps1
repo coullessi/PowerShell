@@ -49,7 +49,7 @@ function Write-ConsolidatedResults {
         Write-Host ""
 
         # Device-specific summaries
-        Write-Host "`n Per-Device Summary:"
+        Write-Host "`n Per-Device Summary:" -ForegroundColor Yellow
         foreach ($deviceName in $script:allResults.Keys | Sort-Object) {
             $deviceResults = $script:allResults[$deviceName]
             $deviceOK = ($deviceResults | Where-Object { $_.Result -eq "OK" }).Count
@@ -60,7 +60,7 @@ function Write-ConsolidatedResults {
             $osVersion = if ($script:deviceOSVersions[$deviceName]) { $script:deviceOSVersions[$deviceName] } else { "Unknown OS" }
             $status = if ($deviceErrors -gt 0) { " Errors" } elseif ($deviceWarnings -gt 0) { " Warnings" } else { " Ready" }
 
-            Write-Host "   $deviceName [$osVersion]: $status (OK: $deviceOK, Warnings: $deviceWarnings, Errors: $deviceErrors, Info: $deviceInfo)"
+            Write-Host "   $deviceName [$osVersion]: $status (OK: $deviceOK, Warnings: $deviceWarnings, Errors: $deviceErrors, Info: $deviceInfo)" -ForegroundColor Green
         }
 
         # Detailed Issues per Device
@@ -76,7 +76,7 @@ function Write-ConsolidatedResults {
             if ($deviceErrors.Count -gt 0 -or $deviceWarnings.Count -gt 0) {
                 $hasAnyIssues = $true
                 $osVersion = if ($script:deviceOSVersions[$deviceName]) { $script:deviceOSVersions[$deviceName] } else { "Unknown OS" }
-                Write-Host "`n  DEVICE: $deviceName [$osVersion]"
+                Write-Host "`n  DEVICE: $deviceName [$osVersion]" -ForegroundColor Green
                 Write-Host ""
 
                 # Display Errors first
@@ -146,15 +146,15 @@ function Write-ConsolidatedResults {
 
                 # Display Warnings
                 if ($deviceWarnings.Count -gt 0) {
-                    Write-Host "  WARNINGS (Recommended to Address):" -ForegroundColor Yellow
+                    Write-Host "  WARNINGS (Recommended to Address):"
                     foreach ($warning in $deviceWarnings) {
-                        Write-Host "    $($warning.Check): $($warning.Details)" -ForegroundColor Yellow
+                        Write-Host "    $($warning.Check): $($warning.Details)"
 
                         # Provide specific recommendations
                         switch ($warning.Check) {
                             "PowerShell Version" {
                                 Write-Host "      Recommendation:"
-                                Write-Host "        - Consider upgrading to PowerShell 7.x for enhanced Azure features"
+                                Write-Host "        - Consider upgrading to PowerShell 7.x for enhanced Azure features" -ForegroundColor Yellow
                                 Write-Host "        - PowerShell 7 offers better cross-platform support"
                             }
                             "Az Module" {
@@ -189,7 +189,7 @@ function Write-ConsolidatedResults {
                             }
                             "OS Version" {
                                 Write-Host "      Recommendation:"
-                                Write-Host "        - Verify compatibility with latest Azure Arc features"
+                                Write-Host "        - Verify compatibility with latest Azure Arc features" -ForegroundColor Yellow
                                 Write-Host "        - Check Azure Arc supported operating systems documentation"
                             }
                             default {
@@ -211,7 +211,7 @@ function Write-ConsolidatedResults {
             } else {
                 # Device has no issues
                 $osVersion = if ($script:deviceOSVersions[$deviceName]) { $script:deviceOSVersions[$deviceName] } else { "Unknown OS" }
-                Write-Host "`n`n  DEVICE: $deviceName [$osVersion]"
+                Write-Host "`n`n  DEVICE: $deviceName [$osVersion]" -ForegroundColor Green
                 Write-Host ""
                 Write-Host " No issues found - Ready for Azure Arc onboarding!"
             }
@@ -230,13 +230,13 @@ function Write-ConsolidatedResults {
             # Critical errors summary
             $criticalErrors = $consolidatedResults | Where-Object { $_.Result -eq "Error" }
             if ($criticalErrors.Count -gt 0) {
-                Write-Host "`n CRITICAL ISSUES (Must Fix Before Arc Onboarding):" -ForegroundColor Red
+                Write-Host "`n CRITICAL ISSUES (Must Fix Before Arc Onboarding):"
                 $errorGroups = $criticalErrors | Group-Object -Property Check | Sort-Object Name
                 foreach ($group in $errorGroups) {
                     $affectedDevices = ($group.Group | Select-Object -Property Device -Unique).Device -join ", "
-                    Write-Host "    $($group.Name)" -ForegroundColor Red
-                    Write-Host "     Affected devices: $affectedDevices" -ForegroundColor Gray
-                    Write-Host "     Impact: Blocks Azure Arc onboarding process" -ForegroundColor Gray
+                    Write-Host "    $($group.Name)"
+                    Write-Host "     Affected devices: $affectedDevices"
+                    Write-Host "     Impact: Blocks Azure Arc onboarding process"
                     Write-Host ""
                 }
             }
@@ -251,87 +251,93 @@ function Write-ConsolidatedResults {
                 $warningGroups = $highPriorityWarnings | Group-Object -Property Check | Sort-Object Name
                 foreach ($group in $warningGroups) {
                     $affectedDevices = ($group.Group | Select-Object -Property Device -Unique).Device -join ", "
-                    Write-Host "    $($group.Name)" -ForegroundColor Yellow
-                    Write-Host "     Affected devices: $affectedDevices" -ForegroundColor Gray
-                    Write-Host "     Impact: May affect Azure Arc functionality or performance" -ForegroundColor Gray
+                    Write-Host "    $($group.Name)"
+                    Write-Host "     Affected devices: $affectedDevices"
+                    Write-Host "     Impact: May affect Azure Arc functionality or performance"
                     Write-Host ""
                 }
             }
 
             # Azure configuration status
-            Write-Host " AZURE CONFIGURATION STATUS:" -ForegroundColor Cyan
+            Write-Host " AZURE CONFIGURATION STATUS:"
             if ($AzureLoginSuccess) {
-                Write-Host "    Azure Authentication: Successfully completed" -ForegroundColor Green
+                Write-Host "    Azure Authentication: Successfully completed"
             } else {
-                Write-Host "    Azure Authentication: Failed - required for resource provider checks" -ForegroundColor Red
+                Write-Host "    Azure Authentication: Failed - required for resource provider checks"
             }
 
             if ($script:resourceProvidersChecked) {
                 if ($script:unregisteredProviders.Count -eq 0) {
-                    Write-Host "    Resource Providers: All required providers are registered" -ForegroundColor Green
+                    Write-Host "    Resource Providers: All required providers are registered"
                     if ($script:resourceProvidersRegistered) {
-                        Write-Host "    Resource Provider Registration: New providers were registered during this session" -ForegroundColor Blue
+                        Write-Host "    Resource Provider Registration: New providers were registered during this session"
                     }
                 } else {
-                    Write-Host "     Resource Providers: $($script:unregisteredProviders.Count) provider(s) still need registration" -ForegroundColor Yellow
-                    Write-Host "      Unregistered: $($script:unregisteredProviders -join ', ')" -ForegroundColor Gray
+                    Write-Host "     Resource Providers: $($script:unregisteredProviders.Count) provider(s) still need registration"
+                    Write-Host "      Unregistered: $($script:unregisteredProviders -join ', ')"
                     if ($script:resourceProvidersRegistered) {
-                        Write-Host "    Some providers were registered this session, but registration incomplete" -ForegroundColor Yellow
+                        Write-Host "    Some providers were registered this session, but registration incomplete"
                     }
                 }
             } else {
                 if ($AzureLoginSuccess) {
-                    Write-Host "     Resource Providers: Check incomplete - some providers may not be registered" -ForegroundColor Yellow
+                    Write-Host "     Resource Providers: Check incomplete - some providers may not be registered"
                 } else {
-                    Write-Host "     Resource Providers: Not checked - Azure login required" -ForegroundColor Yellow
+                    Write-Host "     Resource Providers: Not checked - Azure login required"
                 }
             }
 
             # Next steps recommendation
-            Write-Host "`n RECOMMENDED NEXT STEPS:" -ForegroundColor Magenta
-            Write-Host "`t1. Address all critical errors first (red items above)" -ForegroundColor White
-            Write-Host "`t2. Resolve high-priority warnings for optimal experience" -ForegroundColor White
-            Write-Host "`t3. Ensure Azure authentication is completed" -ForegroundColor White
+            Write-Host "`n RECOMMENDED NEXT STEPS:" -ForegroundColor Yellow
+            Write-Host "`t1. Address all critical errors first (red items above)"
+            Write-Host "`t2. Resolve high-priority warnings for optimal experience"
+            Write-Host "`t3. Ensure Azure authentication is completed"
             if ($script:resourceProvidersRegistered) {
-                Write-Host "`t4. Resource providers registered - ready for Arc onboarding" -ForegroundColor White
+                Write-Host "`t4. Resource providers registered - ready for Arc onboarding"
             } else {
-                Write-Host "`t4. Verify Azure resource providers are registered (script can assist)" -ForegroundColor White
+                Write-Host "`t4. Verify Azure resource providers are registered (script can assist)"
             }
-            Write-Host "`t5. Re-run this script to validate fixes" -ForegroundColor White
-            Write-Host "`t6. Proceed with Azure Arc onboarding process" -ForegroundColor White
+            Write-Host "`t5. Re-run this script to validate fixes"
+            Write-Host "`t6. Proceed with Azure Arc onboarding process"
         }
 
-        Write-Host "`n Consolidated log saved as: $($script:globalLogFile)" -ForegroundColor Gray
+        Write-Host "`n Consolidated log saved as: $($script:globalLogFile)"
 
         # Final status determination
         # Use the stored unregistered providers information instead of re-checking
         $allProvidersRegistered = ($AzureLoginSuccess -and $script:unregisteredProviders.Count -eq 0)
 
         if ($errorCount -eq 0 -and $warningCount -eq 0 -and $AzureLoginSuccess -and $script:resourceProvidersChecked -and $allProvidersRegistered) {
-            Write-Host "`n ALL SYSTEMS GO! All prerequisites passed for all devices!" -ForegroundColor Green
-            Write-Host "   Systems are fully ready for Azure Arc and MDE integration." -ForegroundColor Green
+            Write-Host "`n ALL SYSTEMS GO! All prerequisites passed for all devices!"
+            Write-Host "   Systems are fully ready for Azure Arc and MDE integration."
         } elseif ($errorCount -eq 0 -and $AzureLoginSuccess -and $allProvidersRegistered) {
-            Write-Host "`n  READY WITH MINOR ITEMS: Prerequisites check completed with warnings only." -ForegroundColor Yellow
-            Write-Host "   You can proceed with Azure Arc onboarding, but addressing warnings is recommended." -ForegroundColor Yellow
+            Write-Host "`n  READY WITH MINOR ITEMS: Prerequisites check completed with warnings only."
+            Write-Host "   You can proceed with Azure Arc onboarding, but addressing warnings is recommended."
         } elseif ($errorCount -eq 0 -and $AzureLoginSuccess -and -not $allProvidersRegistered) {
-            Write-Host "`n  PARTIALLY READY: Device checks passed but resource provider registration incomplete." -ForegroundColor Yellow
-            Write-Host "   Please register all required Azure resource providers before Arc onboarding." -ForegroundColor Yellow
+            Write-Host "`n  PARTIALLY READY: Device checks passed but resource provider registration incomplete."
+            Write-Host "   Please register all required Azure resource providers before Arc onboarding."
             if ($script:unregisteredProviders.Count -gt 0) {
-                Write-Host "   Missing providers: $($script:unregisteredProviders -join ", ")" -ForegroundColor Gray
+                Write-Host "   Missing providers: $($script:unregisteredProviders -join ", ")"
             }
         } else {
-            Write-Host "`n NOT READY: Prerequisites check completed with critical errors." -ForegroundColor Red
-            Write-Host "   Please resolve all critical errors before proceeding with Azure Arc onboarding." -ForegroundColor Red
+            Write-Host "`n NOT READY: Prerequisites check completed with critical errors."
+            Write-Host "   Please resolve all critical errors before proceeding with Azure Arc onboarding."
         }
     } else {
-        Write-Host " No results collected. Please check device connectivity and permissions." -ForegroundColor Red
+        Write-Host " No results collected. Please check device connectivity and permissions."
     }
 
     Write-Host
-    Write-Host "" -ForegroundColor Cyan
-    Write-Host "END: Multi-Device Azure Arc and MDC/MDE Prerequisites Checks" -ForegroundColor Cyan
-    Write-Host "" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "END: Multi-Device Azure Arc and MDC/MDE Prerequisites Checks"
+    Write-Host ""
 }
+
+
+
+
+
+
 
 
 

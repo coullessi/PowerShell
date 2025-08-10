@@ -98,19 +98,39 @@ $environment = Initialize-StandardizedEnvironment -ScriptName "Set-AzureArcResou
 
 # Check if user chose to quit (return to main menu)
 if ($environment.UserQuit) {
-    Write-Host "Returning to main menu..." -ForegroundColor Yellow
+    Write-Host "Returning to main menu..."
     return
 }
 
 # Check if initialization failed
 if (-not $environment.Success) {
-    Write-Host "Failed to initialize environment. Exiting..." -ForegroundColor Red
+    Write-Host "Failed to initialize environment. Exiting..."
     return
 }
 
 # Set up paths from standardized environment
 $workingFolder = $environment.FolderPath
 $logFile = $environment.FilePaths["DeviceLog"]
+$startTime = Get-Date
+
+# Initialize log file
+try {
+    ("=" * 120) | Out-File -FilePath $logFile
+    "AZURE ARC RESOURCE PRICING CONFIGURATION SESSION - COMPREHENSIVE REPORT" | Out-File -FilePath $logFile -Append
+    ("=" * 120) | Out-File -FilePath $logFile -Append
+    "Session Started: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')" | Out-File -FilePath $logFile -Append
+    "Working Folder: $workingFolder" | Out-File -FilePath $logFile -Append
+    "PowerShell Version: $($PSVersionTable.PSVersion)" | Out-File -FilePath $logFile -Append
+    "User: $($env:USERNAME)" | Out-File -FilePath $logFile -Append
+    "Computer: $($env:COMPUTERNAME)" | Out-File -FilePath $logFile -Append
+    "Script Version: 2.0" | Out-File -FilePath $logFile -Append
+    "" | Out-File -FilePath $logFile -Append
+    Write-Host "`[+`] Comprehensive log file initialized: $logFile" -ForegroundColor Green
+} catch {
+    Write-Host "`[-`] Warning: Failed to initialize log file: $($_.Exception.Message)" -ForegroundColor Yellow
+    Write-Host "    Continuing without logging..."
+    $logFile = $null
+}
 
 # Initialize counters and arrays
 $failureCount = 0
@@ -125,16 +145,126 @@ $vmResponseMachines = @()
 $vmssResponseMachines = @()
 $arcResponseMachines = @()
 
+# Helper function to safely write to log file
+function Write-SafeLog {
+    param([string]$Message)
+    if ($logFile) {
+        try {
+            $Message | Out-File -FilePath $logFile -Append
+        } catch {
+            # Silently continue if logging fails
+        }
+    }
+}
+
+# Helper function to log detailed resource information
+function Write-ResourceDetailsToLog {
+    param(
+        [Parameter(Mandatory=$true)]
+        $Resource,
+        [Parameter(Mandatory=$true)]
+        [string]$ResourceType,
+        [Parameter(Mandatory=$true)]
+        [string]$Action,
+        [Parameter(Mandatory=$false)]
+        [string]$Result = "",
+        [Parameter(Mandatory=$false)]
+        [string]$ErrorDetails = "",
+        [Parameter(Mandatory=$false)]
+        $PricingResponse = $null
+    )
+    
+    if (-not $logFile) { return }
+    
+    try {
+        Write-SafeLog ""
+        Write-SafeLog ("-" * 80)
+        Write-SafeLog "RESOURCE PROCESSING DETAILS"
+        Write-SafeLog ("-" * 80)
+        Write-SafeLog "Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
+        Write-SafeLog "Resource Type: $ResourceType"
+        Write-SafeLog "Resource Name: $($Resource.name)"
+        Write-SafeLog "Resource ID: $($Resource.id)"
+        Write-SafeLog "Location: $($Resource.location)"
+        Write-SafeLog "Action Performed: $($Action.ToUpper())"
+        Write-SafeLog "Result: $Result"
+        
+        # Log resource tags if available
+        if ($Resource.tags -and $Resource.tags.PSObject.Properties.Count -gt 0) {
+            Write-SafeLog "Resource Tags:"
+            $Resource.tags.PSObject.Properties | ForEach-Object {
+                Write-SafeLog "  - $($_.Name): $($_.Value)"
+            }
+        } else {
+            Write-SafeLog "Resource Tags: None"
+        }
+        
+        # Log pricing response details if available
+        if ($PricingResponse -and $PricingResponse.properties) {
+            Write-SafeLog "Pricing Configuration Details:"
+            Write-SafeLog "  - Pricing Tier: $($PricingResponse.properties.pricingTier)"
+            if ($PricingResponse.properties.subPlan) {
+                Write-SafeLog "  - Sub Plan: $($PricingResponse.properties.subPlan)"
+            }
+            if ($PricingResponse.properties.enablementTime) {
+                Write-SafeLog "  - Enabled On: $($PricingResponse.properties.enablementTime)"
+            }
+            if ($PricingResponse.properties.freeTrialRemainingTime) {
+                Write-SafeLog "  - Free Trial Remaining: $($PricingResponse.properties.freeTrialRemainingTime)"
+            }
+            if ($PricingResponse.properties.deprecated) {
+                Write-SafeLog "  - Deprecated: $($PricingResponse.properties.deprecated)"
+            }
+            
+            # Log extensions if available
+            if ($PricingResponse.properties.extensions -and $PricingResponse.properties.extensions.Count -gt 0) {
+                Write-SafeLog "  - Security Extensions:"
+                foreach ($extension in $PricingResponse.properties.extensions) {
+                    Write-SafeLog "    * $($extension.name): $(if ($extension.isEnabled) { 'ENABLED' } else { 'DISABLED' })"
+                }
+            }
+        }
+        
+        # Log additional details for Arc machines
+        if ($ResourceType -eq "ARC" -and $Resource.properties) {
+            Write-SafeLog "Azure Arc Agent Details:"
+            Write-SafeLog "  - Connection Status: $($Resource.properties.status)"
+            Write-SafeLog "  - Agent Version: $($Resource.properties.agentVersion)"
+            Write-SafeLog "  - OS Name: $($Resource.properties.osName)"
+            Write-SafeLog "  - OS Version: $($Resource.properties.osVersion)"
+            if ($Resource.properties.lastStatusChange) {
+                Write-SafeLog "  - Last Status Change: $($Resource.properties.lastStatusChange)"
+            }
+            if ($Resource.properties.vmId) {
+                Write-SafeLog "  - VM ID: $($Resource.properties.vmId)"
+            }
+        }
+        
+        # Log error details if provided
+        if (-not [string]::IsNullOrEmpty($ErrorDetails)) {
+            Write-SafeLog "Error Details:"
+            Write-SafeLog "  $ErrorDetails"
+        }
+        
+        Write-SafeLog ("-" * 80)
+    } catch {
+        # Silently continue if detailed logging fails
+    }
+}
+
 #region Authentication and Setup
-Write-Host "`[*`] Azure Authentication `& Setup" -ForegroundColor Cyan
+Write-Host "`[*`] Azure Authentication `& Setup"
 
 Clear-Host
 
 # Use standardized authentication and subscription selection
 $authResult = Initialize-AzureAuthenticationAndSubscription -SubscriptionId $SubscriptionId
 if (-not $authResult.Success) {
-    Write-Host "`[-`] Azure authentication or subscription selection failed: $($authResult.Message)" -ForegroundColor Red
-    Write-Host "Script execution aborted.`n" -ForegroundColor Gray
+    $errorMsg = "`[-`] Azure authentication or subscription selection failed: $($authResult.Message)"
+    Write-Host $errorMsg
+    Write-SafeLog $errorMsg
+    Write-Host "Script execution aborted.`n"
+    Write-SafeLog "Script execution aborted."
     return
 }
 
@@ -142,36 +272,54 @@ if (-not $authResult.Success) {
 $subName = $authResult.SubscriptionName
 $subId = $authResult.SubscriptionId
 
+# Log successful authentication
+Write-SafeLog ""
+Write-SafeLog "AUTHENTICATION & SUBSCRIPTION DETAILS"
+Write-SafeLog ("=" * 50)
+Write-SafeLog "Authentication Status: SUCCESS"
+Write-SafeLog "Subscription Name: $subName"
+Write-SafeLog "Subscription ID: $subId"
+Write-SafeLog "Azure Context Account: $((Get-AzContext).Account.Id)"
+Write-SafeLog "Azure Context Tenant: $((Get-AzContext).Tenant.Id)"
+Write-SafeLog "Authentication Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
+Write-SafeLog ""
+
 #endregion
 
 #region Operation Mode Selection
-Write-Host "`[*`] Operation Mode Selection" -ForegroundColor Cyan
+Write-Host "`[*`] Operation Mode Selection"
 
 # Use provided mode or prompt user
 if ($Mode) {
-    Write-Host "`[+`] Using provided mode: $Mode" -ForegroundColor Green
+    Write-Host "`[+`] Using provided mode: $Mode"
     $mode = $Mode
+    Write-SafeLog "OPERATION CONFIGURATION"
+    Write-SafeLog ("=" * 50)
+    Write-SafeLog "Operation Mode: $Mode (provided as parameter)"
 } else {
     $choices = @("RG", "TAG")
     Write-Host ""
-    Write-Host "`[*`] Operation Mode:" -ForegroundColor Green
+    Write-Host "`[*`] Operation Mode:"
     Write-Host "1. RG: `t`tSet pricing for all resources under a Resource Group"
     Write-Host "2. TAG: `tSet pricing for all resources with a specific tag"
     $defaultChoice = 1
     $choice = Read-Host "`nEnter your choice (1 or 2, default: $defaultChoice)"
     if ([string]::IsNullOrWhiteSpace($choice)) { $choice = $defaultChoice }
     while ($choice -notin 1..2) {
-        Write-Host -ForegroundColor Yellow "[-] Invalid choice. Please enter a number between 1 and 2"
+        Write-Host "[-] Invalid choice. Please enter a number between 1 and 2" -ForegroundColor Green
         $choice = Read-Host "`nEnter your choice (1 or 2, default: $defaultChoice)"
         if ([string]::IsNullOrWhiteSpace($choice)) { $choice = $defaultChoice }
     }
     $mode = $choices[$choice - 1]
+    Write-SafeLog "OPERATION CONFIGURATION"
+    Write-SafeLog ("=" * 50)
+    Write-SafeLog "Operation Mode: $mode (selected interactively - choice $choice)"
 }
 
 #endregion
 
 #region Resource Group/Tag Configuration
-Write-Host "`[*`] Resource Configuration" -ForegroundColor Cyan
+Write-Host "`[*`] Resource Configuration"
 
 # Only show resource groups if RG mode is selected
 if ($mode.ToLower() -eq "rg") {
@@ -180,48 +328,56 @@ if ($mode.ToLower() -eq "rg") {
 
     if (-not $ResourceGroupName) {
         Write-Host ""
-        Write-Host "`[*`] Resource groups in '$subName' subscription:" -ForegroundColor Green
+        Write-Host "`[*`] Resource groups in '$subName' subscription:"
         $rgNumbers = @()
         for ($i = 0; $i -lt $azRGs.Count; $i++) {
             "$($i+1). $($azRGs[$i])"
             $rgNumbers += $i + 1
         }
         Write-Host ""
-        Write-Host "Note: Enter a valid resource group name or type 'exit' to quit the script." -ForegroundColor Yellow
+        Write-Host "Note: Enter a valid resource group name or type 'exit' to quit the script."
 
         do {
             $resourceGroupName = Read-Host "Enter the name of the resource group"
 
             if ($resourceGroupName.ToLower() -eq 'exit') {
-                Write-Host "`[*`] Exiting script as requested." -ForegroundColor Yellow
+                Write-Host "`[*`] Exiting script as requested."
                 exit 0
             }
 
             if ([string]::IsNullOrWhiteSpace($resourceGroupName)) {
-                Write-Host "`[-`] Resource group name cannot be empty. Please enter a valid name or 'exit' to quit." -ForegroundColor Red
+                Write-Host "`[-`] Resource group name cannot be empty. Please enter a valid name or 'exit' to quit."
                 continue
             }
 
             # Verify the resource group exists
             try {
                 $rg = Get-AzResourceGroup -Name $resourceGroupName -ErrorAction Stop
-                Write-Host "`[+`] Found resource group: $($rg.ResourceGroupName) in location: $($rg.Location)" -ForegroundColor Green
+                Write-Host "`[+`] Found resource group: $($rg.ResourceGroupName) in location: $($rg.Location)"
+                Write-SafeLog "Resource Group Selection: $($rg.ResourceGroupName)"
+                Write-SafeLog "Resource Group Location: $($rg.Location)"
+                Write-SafeLog "Resource Group ID: $($rg.ResourceId)"
+                Write-SafeLog "Selection Method: Interactive user input"
                 break
             }
             catch {
-                Write-Host "`[-`] Resource group '$resourceGroupName' not found in subscription '$subName'." -ForegroundColor Red
-                Write-Host "Please verify the resource group name, enter a valid name, or type 'exit' to quit." -ForegroundColor Yellow
+                Write-Host "`[-`] Resource group '$resourceGroupName' not found in subscription '$subName'."
+                Write-Host "Please verify the resource group name, enter a valid name, or type 'exit' to quit."
             }
         } while ($true)
     } else {
         # Verify provided resource group exists
         try {
             $rg = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction Stop
-            Write-Host "`[+`] Using provided resource group: $($rg.ResourceGroupName) in location: $($rg.Location)" -ForegroundColor Green
+            Write-Host "`[+`] Using provided resource group: $($rg.ResourceGroupName) in location: $($rg.Location)"
+            Write-SafeLog "Resource Group Selection: $($rg.ResourceGroupName)"
+            Write-SafeLog "Resource Group Location: $($rg.Location)"
+            Write-SafeLog "Resource Group ID: $($rg.ResourceId)"
+            Write-SafeLog "Selection Method: Provided as parameter"
             $resourceGroupName = $ResourceGroupName
         }
         catch {
-            Write-Host "`[-`] Resource group '$ResourceGroupName' not found in subscription '$subName'." -ForegroundColor Red
+            Write-Host "`[-`] Resource group '$ResourceGroupName' not found in subscription '$subName'."
             exit 1
         }
     }
@@ -241,7 +397,7 @@ function Get-FreshAccessToken {
         # Get tenant name instead of ID
         $tenant = Get-AzTenant -TenantId $context.Tenant.Id -ErrorAction SilentlyContinue
         $tenantName = if ($tenant -and $tenant.Name) { $tenant.Name } else { "Unknown Tenant" }
-        Write-Host "`[*`] Getting token for tenant: $tenantName" -ForegroundColor Cyan
+        Write-Host "`[*`] Getting token for tenant: $tenantName"
 
         # Get token specifically for Azure Resource Manager with explicit tenant
         $tokenInfo = Get-AzAccessToken -ResourceUrl "https://management.azure.com/" -TenantId $context.Tenant.Id -ErrorAction Stop
@@ -255,7 +411,7 @@ function Get-FreshAccessToken {
             [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
         }
 
-        Write-Host "`[+`] Token obtained successfully" -ForegroundColor Green
+        Write-Host "`[+`] Token obtained successfully"
 
         return @{
             Token = $tokenValue
@@ -263,8 +419,8 @@ function Get-FreshAccessToken {
         }
     }
     catch {
-        Write-Host "`[-`] Failed to get access token: $($_.Exception.Message)" -ForegroundColor Red
-        Write-Host "Please ensure you are logged in to Azure with 'Connect-AzAccount'" -ForegroundColor Yellow
+        Write-Host "`[-`] Failed to get access token: $($_.Exception.Message)"
+        Write-Host "Please ensure you are logged in to Azure with 'Connect-AzAccount'"
         throw $_
     }
 }
@@ -280,15 +436,15 @@ function Update-TokenIfNeeded {
     $bufferMinutes = 5  # Refresh token 5 minutes before expiry
 
     if ($currentTime.AddMinutes($bufferMinutes) -ge $ExpiresOn.Value) {
-        Write-Host "`[*`] Token is about to expire, refreshing..." -ForegroundColor Yellow
+        Write-Host "`[*`] Token is about to expire, refreshing..."
         try {
             $tokenInfo = Get-FreshAccessToken
             $AccessToken.Value = $tokenInfo.Token
             $ExpiresOn.Value = $tokenInfo.ExpiresOn
-            Write-Host "`[+`] Token refreshed successfully. New expiry: $($ExpiresOn.Value)" -ForegroundColor Green
+            Write-Host "`[+`] Token refreshed successfully. New expiry: $($ExpiresOn.Value)"
         }
         catch {
-            Write-Host "`[-`] Failed to refresh token: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "`[-`] Failed to refresh token: $($_.Exception.Message)"
             throw $_
         }
     }
@@ -325,7 +481,7 @@ function Format-PricingConfiguration {
             Write-Host "  Resource ID           : $($ResourceDetails.id)"
         }
         if ($ResourceDetails.tags -and $ResourceDetails.tags.PSObject.Properties.Count -gt 0) {
-            Write-Host "  Tags                  :"
+            Write-Host "  Tags                  :" -ForegroundColor Yellow
             $ResourceDetails.tags.PSObject.Properties | ForEach-Object {
                 Write-Host "    $($_.Name) = $($_.Value)"
             }
@@ -334,7 +490,7 @@ function Format-PricingConfiguration {
     }
 
     # Pricing Configuration Section
-    Write-Host "DEFENDER FOR SERVERS PRICING CONFIGURATION"
+    Write-Host "DEFENDER FOR SERVERS PRICING CONFIGURATION" -ForegroundColor Yellow
     Write-Host ""
 
     if ($PricingResponse -and $PricingResponse.properties) {
@@ -382,7 +538,7 @@ function Format-PricingConfiguration {
 
     # Security Extensions Section
     if ($PricingResponse -and $PricingResponse.properties -and $PricingResponse.properties.extensions -and $PricingResponse.properties.extensions.Count -gt 0) {
-        Write-Host "SECURITY EXTENSIONS & FEATURES"
+        Write-Host "SECURITY EXTENSIONS & FEATURES" -ForegroundColor Yellow
         Write-Host ""
 
         foreach ($extension in $PricingResponse.properties.extensions) {
@@ -409,34 +565,60 @@ function Format-PricingConfiguration {
             $extensionsUrl = "https://management.azure.com$($ResourceDetails.id)/extensions?api-version=2022-12-27"
             $extensionsResponse = Invoke-RestMethod -Method Get -Uri $extensionsUrl -Headers @{Authorization = "Bearer $script:accessToken"} -TimeoutSec 120
 
-            # Look for MDE.Windows extension
-            $mdeExtension = $extensionsResponse.value | Where-Object { $_.properties.type -eq "MDE.Windows" }
+            # Look for various MDE extension types (Windows and Linux)
+            $mdeExtensions = $extensionsResponse.value | Where-Object { 
+                $_.properties.type -eq "MDE.Windows" -or 
+                $_.properties.type -eq "MDE.Linux" -or 
+                $_.name -like "*MDE*" -or 
+                $_.properties.publisher -eq "Microsoft.Azure.AzureDefenderForServers"
+            }
 
-            if ($mdeExtension) {
-                $provisioningState = $mdeExtension.properties.provisioningState
-                $typeHandlerVersion = $mdeExtension.properties.typeHandlerVersion
+            if ($mdeExtensions -and $mdeExtensions.Count -gt 0) {
+                foreach ($mdeExtension in $mdeExtensions) {
+                    $provisioningState = $mdeExtension.properties.provisioningState
+                    $typeHandlerVersion = $mdeExtension.properties.typeHandlerVersion
+                    $extensionType = $mdeExtension.properties.type
 
-                Write-Host "  MDE Extension         : $provisioningState"
-                Write-Host "  Extension Name        : $($mdeExtension.name)"
-                Write-Host "  Type Handler Version  : $typeHandlerVersion"
+                    Write-Host "  MDE Extension         : $provisioningState"
+                    Write-Host "  Extension Name        : $($mdeExtension.name)"
+                    Write-Host "  Extension Type        : $extensionType"
+                    Write-Host "  Type Handler Version  : $typeHandlerVersion"
 
-                # Additional MDE extension properties
-                if ($mdeExtension.properties.publisher) {
-                    Write-Host "  Publisher             : $($mdeExtension.properties.publisher)"
+                    # Additional MDE extension properties
+                    if ($mdeExtension.properties.publisher) {
+                        Write-Host "  Publisher             : $($mdeExtension.properties.publisher)"
+                    }
+
+                    if ($mdeExtension.properties.enableAutomaticUpgrade) {
+                        Write-Host "  Auto Upgrade          : $($mdeExtension.properties.enableAutomaticUpgrade)"
+                    }
+
+                    # Show settings if available
+                    if ($mdeExtension.properties.settings) {
+                        Write-Host "  Configuration         : Available"
+                    }
+
+                    Write-Host ""
                 }
-
-                if ($mdeExtension.properties.enableAutomaticUpgrade) {
-                    Write-Host "  Auto Upgrade          : $($mdeExtension.properties.enableAutomaticUpgrade)"
-                }
-
             } else {
                 Write-Host "  MDE Extension         : NOT INSTALLED"
                 Write-Host "  Note                  : Microsoft Defender for Endpoint extension not found"
+                Write-Host "  Available Extensions  :"
+                
+                # List all extensions for debugging
+                if ($extensionsResponse.value -and $extensionsResponse.value.Count -gt 0) {
+                    foreach ($ext in $extensionsResponse.value) {
+                        Write-Host "    - $($ext.name) ($($ext.properties.type))"
+                    }
+                } else {
+                    Write-Host "    - No extensions found on this machine"
+                }
             }
 
         } catch {
             Write-Host "  MDE Extension         : UNABLE TO QUERY"
             Write-Host "  Error                 : $($_.Exception.Message)"
+            Write-SafeLog "ERROR: Failed to query MDE extension for $($ResourceDetails.name): $($_.Exception.Message)"
         }
 
         Write-Host ""
@@ -493,19 +675,19 @@ function Format-PricingConfiguration {
 }
 
 #region Token Acquisition
-Write-Host "`[*`] Token Acquisition" -ForegroundColor Cyan
+Write-Host "`[*`] Token Acquisition"
 
 # Get initial token
 try {
-    Write-Host "`[*`] Obtaining access token..." -ForegroundColor Yellow
+    Write-Host "`[*`] Obtaining access token..."
     $tokenInfo = Get-FreshAccessToken
     $script:accessToken = $tokenInfo.Token
     $script:expireson = $tokenInfo.ExpiresOn
-    Write-Host "`[+`] Token obtained successfully. Expires: $script:expireson" -ForegroundColor Green
+    Write-Host "`[+`] Token obtained successfully. Expires: $script:expireson"
 }
 catch {
-    Write-Host "`[-`] Failed to obtain access token: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "Please run 'Connect-AzAccount' and try again." -ForegroundColor Yellow
+    Write-Host "`[-`] Failed to obtain access token: $($_.Exception.Message)"
+    Write-Host "Please run 'Connect-AzAccount' and try again."
     exit 1
 }
 
@@ -515,12 +697,12 @@ $SubscriptionId = $subId
 #endregion
 
 #region Resource Discovery
-Write-Host "`[*`] Resource Discovery" -ForegroundColor Cyan
+Write-Host "`[*`] Resource Discovery"
 
 if ($mode.ToLower() -eq "rg") {
     # Fetch resources under a given Resource Group
     try {
-        Write-Host "`[*`] Fetching resources from Resource Group '$resourceGroupName'..." -ForegroundColor Yellow
+        Write-Host "`[*`] Fetching resources from Resource Group '$resourceGroupName'..."
 
         # Check if token needs refresh before API calls
         Update-TokenIfNeeded -AccessToken ([ref]$script:accessToken) -ExpiresOn ([ref]$script:expireson)
@@ -533,7 +715,19 @@ if ($mode.ToLower() -eq "rg") {
             $vmResponseMachines += $vmResponse.value
             $vmUrl = $vmResponse.nextLink
         } while (![string]::IsNullOrEmpty($vmUrl))
-        Write-Host "`[+`] Found $($vmResponseMachines.Count) VMs" -ForegroundColor Green
+        Write-Host "`[+`] Found $($vmResponseMachines.Count) VMs"
+        Write-SafeLog ""
+        Write-SafeLog "RESOURCE DISCOVERY SUMMARY"
+        Write-SafeLog ("=" * 50)
+        Write-SafeLog "Discovery Method: Resource Group"
+        Write-SafeLog "Target Resource Group: $resourceGroupName"
+        Write-SafeLog "Virtual Machines Found: $($vmResponseMachines.Count)"
+        if ($vmResponseMachines.Count -gt 0) {
+            Write-SafeLog "VM Details:"
+            foreach ($vm in $vmResponseMachines) {
+                Write-SafeLog "  - $($vm.name) (Location: $($vm.location), Type: $($vm.type))"
+            }
+        }
 
         $vmssUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resourceGroups/$resourceGroupName/providers/Microsoft.Compute/virtualMachineScaleSets?api-version=2021-04-01"
         do{
@@ -541,7 +735,14 @@ if ($mode.ToLower() -eq "rg") {
             $vmssResponseMachines += $vmssResponse.value
             $vmssUrl = $vmssResponse.nextLink
         } while (![string]::IsNullOrEmpty($vmssUrl))
-        Write-Host "`[+`] Found $($vmssResponseMachines.Count) VMSSs" -ForegroundColor Green
+        Write-Host "`[+`] Found $($vmssResponseMachines.Count) VMSSs"
+        Write-SafeLog "Virtual Machine Scale Sets Found: $($vmssResponseMachines.Count)"
+        if ($vmssResponseMachines.Count -gt 0) {
+            Write-SafeLog "VMSS Details:"
+            foreach ($vmss in $vmssResponseMachines) {
+                Write-SafeLog "  - $($vmss.name) (Location: $($vmss.location), Type: $($vmss.type))"
+            }
+        }
 
         $arcUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resourceGroups/$resourceGroupName/providers/Microsoft.HybridCompute/machines?api-version=2022-12-27"
         do{
@@ -560,17 +761,26 @@ if ($mode.ToLower() -eq "rg") {
             }
             $arcUrl = $arcResponse.nextLink
         } while (![string]::IsNullOrEmpty($arcUrl))
-        Write-Host "`[+`] Found $($arcResponseMachines.Count) ARC machines" -ForegroundColor Green
+        Write-Host "`[+`] Found $($arcResponseMachines.Count) ARC machines"
+        Write-SafeLog "Azure Arc Machines Found: $($arcResponseMachines.Count)"
+        if ($arcResponseMachines.Count -gt 0) {
+            Write-SafeLog "Arc Machine Details:"
+            foreach ($arc in $arcResponseMachines) {
+                $osInfo = if ($arc.properties.osName) { " (OS: $($arc.properties.osName))" } else { "" }
+                $statusInfo = if ($arc.properties.status) { " [Status: $($arc.properties.status)]" } else { "" }
+                Write-SafeLog "  - $($arc.name) (Location: $($arc.location))$osInfo$statusInfo"
+            }
+        }
     }
     catch {
-        Write-Host "`[-`] Failed to get resources!" -ForegroundColor Red
+        Write-Host "`[-`] Failed to get resources!"
         if ($_.Exception.Response.StatusCode.value__ -eq 401) {
-            Write-Host "Authentication failed. Token may be invalid or expired." -ForegroundColor Red
-            Write-Host "Please try running 'Connect-AzAccount' and run the script again." -ForegroundColor Yellow
+            Write-Host "Authentication failed. Token may be invalid or expired."
+            Write-Host "Please try running 'Connect-AzAccount' and run the script again."
         }
-        Write-Host "Response StatusCode:" $_.Exception.Response.StatusCode.value__  -ForegroundColor Red
-        Write-Host "Response StatusDescription:" $_.Exception.Response.StatusDescription -ForegroundColor Red
-        Write-Host "Error from response:" $_.ErrorDetails -ForegroundColor Red
+        Write-Host "Response StatusCode:" -ForegroundColor Yellow
+        Write-Host "Response StatusDescription:" -ForegroundColor Yellow
+        Write-Host "Error from response:" -ForegroundColor Yellow
         exit 1
     }
 } elseif ($mode.ToLower() -eq "tag") {
@@ -581,7 +791,7 @@ if ($mode.ToLower() -eq "rg") {
         if ([string]::IsNullOrWhiteSpace($tagName)) { $tagName = $defaultTagName }
     } else {
         $tagName = $TagName
-        Write-Host "`[+`] Using provided tag name: $tagName" -ForegroundColor Green
+        Write-Host "`[+`] Using provided tag name: $tagName"
     }
 
     if (-not $TagValue) {
@@ -590,11 +800,15 @@ if ($mode.ToLower() -eq "rg") {
         if ([string]::IsNullOrWhiteSpace($tagValue)) { $tagValue = $defaultTagValue }
     } else {
         $tagValue = $TagValue
-        Write-Host "`[+`] Using provided tag value: $tagValue" -ForegroundColor Green
+        Write-Host "`[+`] Using provided tag value: $tagValue"
     }
 
+    Write-SafeLog "Tag Name: $tagName"
+    Write-SafeLog "Tag Value: $tagValue"
+    Write-SafeLog "Selection Method: $(if ($TagName -and $TagValue) { 'Provided as parameters' } else { 'Interactive user input' })"
+
     try {
-        Write-Host "`[*`] Fetching resources by tag '$tagName=$tagValue'..." -ForegroundColor Yellow
+        Write-Host "`[*`] Fetching resources by tag '$tagName=$tagValue'..."
 
         # Check if token needs refresh before API calls
         Update-TokenIfNeeded -AccessToken ([ref]$script:accessToken) -ExpiresOn ([ref]$script:expireson)
@@ -606,7 +820,7 @@ if ($mode.ToLower() -eq "rg") {
             $vmResponseMachines += $vmResponse.value | Where-Object {$_.tags.$tagName -eq $tagValue}
             $vmUrl = $vmResponse.nextLink
         } while (![string]::IsNullOrEmpty($vmUrl))
-        Write-Host "`[+`] Found $($vmResponseMachines.Count) VMs with tag '$tagName=$tagValue'" -ForegroundColor Green
+        Write-Host "`[+`] Found $($vmResponseMachines.Count) VMs with tag '$tagName=$tagValue'"
 
         $vmssUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resources?`$filter=resourceType eq 'Microsoft.Compute/virtualMachineScaleSets'`&api-version=2021-04-01"
         do{
@@ -614,7 +828,7 @@ if ($mode.ToLower() -eq "rg") {
             $vmssResponseMachines += $vmssResponse.value | Where-Object {$_.tags.$tagName -eq $tagValue}
             $vmssUrl = $vmssResponse.nextLink
         } while (![string]::IsNullOrEmpty($vmssUrl))
-        Write-Host "`[+`] Found $($vmssResponseMachines.Count) VMSSs with tag '$tagName=$tagValue'" -ForegroundColor Green
+        Write-Host "`[+`] Found $($vmssResponseMachines.Count) VMSSs with tag '$tagName=$tagValue'"
 
         $arcUrl = "https://management.azure.com/subscriptions/" + $SubscriptionId + "/resources?`$filter=resourceType eq 'Microsoft.HybridCompute/machines'`&api-version=2023-07-01"
         do{
@@ -634,80 +848,105 @@ if ($mode.ToLower() -eq "rg") {
             }
             $arcUrl = $arcResponse.nextLink
         } while (![string]::IsNullOrEmpty($arcUrl))
-        Write-Host "`[+`] Found $($arcResponseMachines.Count) ARC machines with tag '$tagName=$tagValue'" -ForegroundColor Green
+        Write-Host "`[+`] Found $($arcResponseMachines.Count) ARC machines with tag '$tagName=$tagValue'"
+        
+        Write-SafeLog ""
+        Write-SafeLog "RESOURCE DISCOVERY SUMMARY"
+        Write-SafeLog ("=" * 50)
+        Write-SafeLog "Discovery Method: Tag-based"
+        Write-SafeLog "Tag Filter: $tagName = $tagValue"
+        Write-SafeLog "Virtual Machines Found: $($vmResponseMachines.Count)"
+        Write-SafeLog "Virtual Machine Scale Sets Found: $($vmssResponseMachines.Count)"
+        Write-SafeLog "Azure Arc Machines Found: $($arcResponseMachines.Count)"
+        Write-SafeLog "Total Resources Found: $(($vmResponseMachines.Count) + ($vmssResponseMachines.Count) + ($arcResponseMachines.Count))"
     }
     catch {
-        Write-Host "`[-`] Failed to get resources!" -ForegroundColor Red
+        $errorMsg = "`[-`] Failed to get resources! Error: $($_.Exception.Message)"
+        Write-Host $errorMsg
+        Write-SafeLog $errorMsg
+        
         if ($_.Exception.Response.StatusCode.value__ -eq 401) {
-            Write-Host "Authentication failed. Token may be invalid or expired." -ForegroundColor Red
-            Write-Host "Please try running 'Connect-AzAccount' and run the script again." -ForegroundColor Yellow
+            $authErrorMsg = "Authentication failed. Token may be invalid or expired. Please try running 'Connect-AzAccount' and run the script again."
+            Write-Host $authErrorMsg
+            Write-SafeLog $authErrorMsg
         }
-        Write-Host "Response StatusCode:" $_.Exception.Response.StatusCode.value__  -ForegroundColor Red
-        Write-Host "Response StatusDescription:" $_.Exception.Response.StatusDescription -ForegroundColor Red
-        Write-Host "Error from response:" $_.ErrorDetails -ForegroundColor Red
+        
+        Write-SafeLog "Response StatusCode: $($_.Exception.Response.StatusCode.value__)"
+        Write-SafeLog "Response StatusDescription: $($_.Exception.Response.StatusDescription)"
+        Write-SafeLog "Full Error Details: $($_.Exception.ToString())"
+        
+        Write-Host "Response StatusCode:" -ForegroundColor Yellow
+        Write-Host "Response StatusDescription:" -ForegroundColor Yellow
+        Write-Host "Error from response:" -ForegroundColor Yellow
         exit 1
     }
 } else {
-    Write-Host "`[-`] Entered invalid mode. Exiting script." -ForegroundColor Red
+    Write-Host "`[-`] Entered invalid mode. Exiting script."
     exit 1;
 }
 
 #endregion
 
 #region Resource Summary
-Write-Host "`[*`] Resource Summary" -ForegroundColor Cyan
+Write-Host "`[*`] Resource Summary"
 
 # Display found resources
-Write-Host "`[*`] Found the following resources:" -ForegroundColor Green
+Write-Host "`[*`] Found the following resources:"
 
-Write-Host "`n[*] Virtual Machines ($($vmResponseMachines.Count)):" -ForegroundColor Cyan
+Write-Host "`n[*] Virtual Machines ($($vmResponseMachines.Count)):" -ForegroundColor Green
 if ($vmResponseMachines.Count -gt 0) {
     $count = 0
     foreach ($machine in $vmResponseMachines) {
         $count++
-        Write-Host "  $count. $($machine.name)" -ForegroundColor White
+        Write-Host "  $count. $($machine.name)"
         $vmCount = $count
     }
 } else {
-    Write-Host "  No virtual machines found" -ForegroundColor Gray
+    Write-Host "  No virtual machines found"
 }
 
-Write-Host "`n[*] Virtual Machine Scale Sets ($($vmssResponseMachines.Count)):" -ForegroundColor Cyan
+Write-Host "`n[*] Virtual Machine Scale Sets ($($vmssResponseMachines.Count)):" -ForegroundColor Green
 if ($vmssResponseMachines.Count -gt 0) {
     $count = 0
     foreach ($machine in $vmssResponseMachines) {
         $count++
-        Write-Host "  $count. $($machine.name)" -ForegroundColor White
+        Write-Host "  $count. $($machine.name)"
         $vmssCount = $count
     }
 } else {
-    Write-Host "  No virtual machine scale sets found" -ForegroundColor Gray
+    Write-Host "  No virtual machine scale sets found"
 }
 
-Write-Host "`n[*] ARC Machines ($($arcResponseMachines.Count)):" -ForegroundColor Cyan
+Write-Host "`n[*] ARC Machines ($($arcResponseMachines.Count)):" -ForegroundColor Green
 if ($arcResponseMachines.Count -gt 0) {
     $count = 0
     foreach ($machine in $arcResponseMachines) {
         $count++
-        Write-Host "  $count. $($machine.name)" -ForegroundColor White
+        Write-Host "  $count. $($machine.name)"
         $arcCount = $count
     }
 } else {
-    Write-Host "  No ARC machines found" -ForegroundColor Gray
+    Write-Host "  No ARC machines found"
 }
 
 #endregion
 
 #region Action Selection
-Write-Host "`[*`] Action Selection" -ForegroundColor Cyan
+Write-Host "`[*`] Action Selection"
 
 # Use provided action or prompt user
 if ($Action) {
-    Write-Host "`[+`] Using provided action: $($Action.ToUpper())" -ForegroundColor Green
+    Write-Host "`[+`] Using provided action: $($Action.ToUpper())"
     $PricingTier = $Action.ToLower()
+    Write-SafeLog ""
+    Write-SafeLog "ACTION CONFIGURATION"
+    Write-SafeLog ("=" * 50)
+    Write-SafeLog "Action Selected: $($Action.ToUpper())"
+    Write-SafeLog "Selection Method: Provided as parameter"
+    Write-SafeLog "Configuration Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
 } else {
     Write-Host ""
-    Write-Host "`[*`] Choose your action:" -ForegroundColor Green
+    Write-Host "`[*`] Choose your action:"
     Write-Host "1. READ: `tRead the current configuration"
     Write-Host "2. FREE: `tRemove the Defender protection"
     Write-Host "3. STANDARD: `tEnable 'P1'"
@@ -719,21 +958,47 @@ if ($Action) {
     $choice = Read-Host "Enter your choice (1-4, default: $defaultPricingChoice)"
     if ([string]::IsNullOrWhiteSpace($choice)) { $choice = $defaultPricingChoice }
     while ($choice -notin 1..4) {
-        Write-Host -ForegroundColor Yellow "[-] Invalid choice. Please enter a number between 1 and 4"
+        Write-Host "[-] Invalid choice. Please enter a number between 1 and 4" -ForegroundColor Green
         $choice = Read-Host "Enter the number corresponding to your choice (default: $defaultPricingChoice)"
         if ([string]::IsNullOrWhiteSpace($choice)) { $choice = $defaultPricingChoice }
     }
     $PricingTier = $choices[$choice - 1]
+    Write-SafeLog ""
+    Write-SafeLog "ACTION CONFIGURATION"
+    Write-SafeLog ("=" * 50)
+    Write-SafeLog "Action Selected: $($PricingTier.ToUpper())"
+    Write-SafeLog "Selection Method: Interactive user input (choice $choice)"
+    Write-SafeLog "Configuration Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
+    
+    # Log action description
+    $actionDescription = switch ($PricingTier.ToLower()) {
+        "read" { "Read current pricing configuration without making changes" }
+        "free" { "Remove Defender for Servers protection (set to Free tier)" }
+        "standard" { "Enable Defender for Servers Plan 1 (P1)" }
+        "delete" { "Remove resource-level configuration (inherit from parent)" }
+    }
+    Write-SafeLog "Action Description: $actionDescription"
 }
 
 #endregion
 
 #region Resource Processing
-Write-Host "`[*`] Resource Processing" -ForegroundColor Cyan
+Write-Host "`[*`] Resource Processing"
+
+# Log the start of resource processing
+Write-SafeLog ""
+Write-SafeLog "RESOURCE PROCESSING PHASE INITIATED"
+Write-SafeLog ("=" * 50)
+Write-SafeLog "Processing Start Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
+Write-SafeLog "Total Resources to Process: $(($vmResponseMachines.Count) + ($vmssResponseMachines.Count) + ($arcResponseMachines.Count))"
+Write-SafeLog "Action to Perform: $($PricingTier.ToUpper())"
+Write-SafeLog ""
 
 # Process Virtual Machines
 if ($vmResponseMachines.Count -gt 0) {
-    Write-Host "`[*`] Processing Virtual Machines:" -ForegroundColor Cyan
+    Write-Host "`[*`] Processing Virtual Machines:"
+    Write-SafeLog "PROCESSING VIRTUAL MACHINES ($($vmResponseMachines.Count) resources)"
+    Write-SafeLog ("-" * 40)
     Write-Host ""
     foreach ($machine in $vmResponseMachines) {
         # Check if token needs refresh, refresh only if needed
@@ -756,41 +1021,52 @@ if ($vmResponseMachines.Count -gt 0) {
             }
         }
         Write-Host "`[*`] Processing pricing configuration for '$($machine.name)':"
+        Write-SafeLog "Processing VM: $($machine.name) with action: $($PricingTier.ToUpper())"
+        
         try {
             if($PricingTier.ToLower() -eq "delete") {
                 $pricingResponse = Invoke-RestMethod -Method Delete -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -ContentType "application/json" -TimeoutSec 120
-                Write-Host "`[+`] Successfully deleted pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully deleted pricing configuration for $($machine.name)"
+                Write-ResourceDetailsToLog -Resource $machine -ResourceType "VM" -Action $PricingTier -Result "SUCCESS - Configuration deleted"
                 $successCount++
                 $vmSuccessCount++
             } elseif ($PricingTier.ToLower() -eq "read") {
                 $pricingResponse = Invoke-RestMethod -Method Get -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -ContentType "application/json" -TimeoutSec 120
-                Write-Host "`[+`] Successfully read pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully read pricing configuration for $($machine.name)"
+                Write-ResourceDetailsToLog -Resource $machine -ResourceType "VM" -Action $PricingTier -Result "SUCCESS - Configuration read" -PricingResponse $pricingResponse
                 Format-PricingConfiguration -PricingResponse $pricingResponse -ResourceName $machine.name -ResourceDetails $machine
                 $successCount++
                 $vmSuccessCount++
             } else {
                 $pricingResponse = Invoke-RestMethod -Method Put -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -Body ($pricingBody | ConvertTo-Json) -ContentType "application/json" -TimeoutSec 120
-                Write-Host "`[+`] Successfully updated pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully updated pricing configuration for $($machine.name)"
+                Write-ResourceDetailsToLog -Resource $machine -ResourceType "VM" -Action $PricingTier -Result "SUCCESS - Configuration updated to $($PricingTier.ToUpper())" -PricingResponse $pricingResponse
                 $successCount++
                 $vmSuccessCount++
             }
         }
         catch {
             $failureCount++
-            Write-Host "`[-`] Failed to update pricing configuration for $($machine.name)" -ForegroundColor Red
-            Write-Host "Response StatusCode:" $_.Exception.Response.StatusCode.value__  -ForegroundColor Red
-            Write-Host "Response StatusDescription:" $_.Exception.Response.StatusDescription -ForegroundColor Red
-            Write-Host "Error from response:" $_.ErrorDetails -ForegroundColor Red
+            $errorMessage = "Error processing VM $($machine.name): $($_.Exception.Message)"
+            Write-Host "`[-`] Failed to update pricing configuration for $($machine.name)"
+            Write-ResourceDetailsToLog -Resource $machine -ResourceType "VM" -Action $PricingTier -Result "FAILED" -ErrorDetails $errorMessage
+            
+            Write-Host "Response StatusCode:" -ForegroundColor Yellow
+            Write-Host "Response StatusDescription:" -ForegroundColor Yellow
+            Write-Host "Error from response:" -ForegroundColor Yellow
         }
         Write-Host ""
         Start-Sleep -Seconds 0.3
     }
-    Write-Host "-" * 80 -ForegroundColor DarkGray
+    Write-Host "-" * 80
 }
 
 # Process Virtual Machine Scale Sets
 if ($vmssResponseMachines.Count -gt 0) {
-    Write-Host "`[*`] Processing Virtual Machine Scale Sets:" -ForegroundColor Cyan
+    Write-Host "`[*`] Processing Virtual Machine Scale Sets:"
+    Write-SafeLog ""
+    Write-SafeLog "PROCESSING VIRTUAL MACHINE SCALE SETS ($($vmssResponseMachines.Count) resources)"
+    Write-SafeLog ("-" * 40)
     Write-Host ""
     foreach ($machine in $vmssResponseMachines) {
         # Check if token needs refresh, refresh only if needed
@@ -816,38 +1092,47 @@ if ($vmssResponseMachines.Count -gt 0) {
         try {
             if($PricingTier.ToLower() -eq "delete") {
                 $pricingResponse = Invoke-RestMethod -Method Delete -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -ContentType "application/json" -TimeoutSec 120
-                Write-Host "`[+`] Successfully deleted pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully deleted pricing configuration for $($machine.name)"
+                Write-ResourceDetailsToLog -Resource $machine -ResourceType "VMSS" -Action $PricingTier -Result "SUCCESS - Configuration deleted"
                 $successCount++
                 $vmssSuccessCount++
             } elseif ($PricingTier.ToLower() -eq "read") {
                 $pricingResponse = Invoke-RestMethod -Method Get -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -ContentType "application/json" -TimeoutSec 120
-                Write-Host "`[+`] Successfully read pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully read pricing configuration for $($machine.name)"
+                Write-ResourceDetailsToLog -Resource $machine -ResourceType "VMSS" -Action $PricingTier -Result "SUCCESS - Configuration read" -PricingResponse $pricingResponse
                 Format-PricingConfiguration -PricingResponse $pricingResponse -ResourceName $machine.name -ResourceDetails $machine
                 $successCount++
                 $vmssSuccessCount++
             } else {
                 $pricingResponse = Invoke-RestMethod -Method Put -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -Body ($pricingBody | ConvertTo-Json) -ContentType "application/json" -TimeoutSec 120
-                Write-Host "`[+`] Successfully updated pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully updated pricing configuration for $($machine.name)"
+                Write-ResourceDetailsToLog -Resource $machine -ResourceType "VMSS" -Action $PricingTier -Result "SUCCESS - Configuration updated to $($PricingTier.ToUpper())" -PricingResponse $pricingResponse
                 $successCount++
                 $vmssSuccessCount++
             }
         }
         catch {
             $failureCount++
-            Write-Host "`[-`] Failed to update pricing configuration for $($machine.name)" -ForegroundColor Red
-            Write-Host "Response StatusCode:" $_.Exception.Response.StatusCode.value__  -ForegroundColor Red
-            Write-Host "Response StatusDescription:" $_.Exception.Response.StatusDescription -ForegroundColor Red
-            Write-Host "Error from response:" $_.ErrorDetails -ForegroundColor Red
+            $errorMessage = "Error processing VMSS $($machine.name): $($_.Exception.Message)"
+            Write-Host "`[-`] Failed to update pricing configuration for $($machine.name)"
+            Write-ResourceDetailsToLog -Resource $machine -ResourceType "VMSS" -Action $PricingTier -Result "FAILED" -ErrorDetails $errorMessage
+            
+            Write-Host "Response StatusCode:" -ForegroundColor Yellow
+            Write-Host "Response StatusDescription:" -ForegroundColor Yellow
+            Write-Host "Error from response:" -ForegroundColor Yellow
         }
         Write-Host ""
         Start-Sleep -Seconds 0.3
     }
-    Write-Host "-" * 80 -ForegroundColor DarkGray
+    Write-Host "-" * 80
 }
 
 # Process ARC Machines
 if ($arcResponseMachines.Count -gt 0) {
-    Write-Host "`[*`] Processing ARC Machines:" -ForegroundColor Cyan
+    Write-Host "`[*`] Processing ARC Machines:"
+    Write-SafeLog ""
+    Write-SafeLog "PROCESSING AZURE ARC MACHINES ($($arcResponseMachines.Count) resources)"
+    Write-SafeLog ("-" * 40)
     Write-Host ""
     foreach ($machine in $arcResponseMachines) {
         # Check if token needs refresh, refresh only if needed
@@ -869,32 +1154,38 @@ if ($arcResponseMachines.Count -gt 0) {
                 }
             }
         }
-        Write-Host "`[*`] Processing pricing configuration for '$($machine.name)':" -ForegroundColor Cyan
+        Write-Host "`[*`] Processing pricing configuration for '$($machine.name)':"
         try {
             if($PricingTier.ToLower() -eq "delete") {
                 $pricingResponse = Invoke-RestMethod -Method Delete -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -ContentType "application/json" -TimeoutSec 120
-                Write-Host "`[+`] Successfully deleted pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully deleted pricing configuration for $($machine.name)"
+                Write-ResourceDetailsToLog -Resource $machine -ResourceType "ARC" -Action $PricingTier -Result "SUCCESS - Configuration deleted"
                 $successCount++
                 $arcSuccessCount++
             } elseif ($PricingTier.ToLower() -eq "read") {
                 $pricingResponse = Invoke-RestMethod -Method Get -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -ContentType "application/json" -TimeoutSec 120
-                Write-Host "`[+`] Successfully read pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully read pricing configuration for $($machine.name)"
+                Write-ResourceDetailsToLog -Resource $machine -ResourceType "ARC" -Action $PricingTier -Result "SUCCESS - Configuration read" -PricingResponse $pricingResponse
                 Format-PricingConfiguration -PricingResponse $pricingResponse -ResourceName $machine.name -ResourceDetails $machine
                 $successCount++
                 $arcSuccessCount++
             } else {
                 $pricingResponse = Invoke-RestMethod -Method Put -Uri $pricingUrl -Headers @{Authorization = "Bearer $script:accessToken"} -Body ($pricingBody | ConvertTo-Json) -ContentType "application/json" -TimeoutSec 120
-                Write-Host "`[+`] Successfully updated pricing configuration for $($machine.name)" -ForegroundColor Green
+                Write-Host "`[+`] Successfully updated pricing configuration for $($machine.name)"
+                Write-ResourceDetailsToLog -Resource $machine -ResourceType "ARC" -Action $PricingTier -Result "SUCCESS - Configuration updated to $($PricingTier.ToUpper())" -PricingResponse $pricingResponse
                 $successCount++
                 $arcSuccessCount++
             }
         }
         catch {
             $failureCount++
-            Write-Host "`[-`] Failed to update pricing configuration for $($machine.name)" -ForegroundColor Red
-            Write-Host "Response StatusCode:" $_.Exception.Response.StatusCode.value__  -ForegroundColor Red
-            Write-Host "Response StatusDescription:" $_.Exception.Response.StatusDescription -ForegroundColor Red
-            Write-Host "Error from response:" $_.ErrorDetails -ForegroundColor Red
+            $errorMessage = "Error processing ARC machine $($machine.name): $($_.Exception.Message)"
+            Write-Host "`[-`] Failed to update pricing configuration for $($machine.name)"
+            Write-ResourceDetailsToLog -Resource $machine -ResourceType "ARC" -Action $PricingTier -Result "FAILED" -ErrorDetails $errorMessage
+            
+            Write-Host "Response StatusCode:" -ForegroundColor Yellow
+            Write-Host "Response StatusDescription:" -ForegroundColor Yellow
+            Write-Host "Error from response:" -ForegroundColor Yellow
         }
         Write-Host ""
         Start-Sleep -Seconds 0.3
@@ -904,38 +1195,111 @@ if ($arcResponseMachines.Count -gt 0) {
 #endregion
 
 #region Final Summary
-Write-Host "`[*`] Final Summary" -ForegroundColor Cyan
+Write-Host "`[*`] Final Summary"
 
-Write-Host "`[*`] Summary of Pricing API Results:" -ForegroundColor Green
+Write-Host "`[*`] Summary of Pricing API Results:"
 
 Write-Host ""
-Write-Host "`[*`] Virtual Machines:" -ForegroundColor Cyan
-Write-Host "   Found: $vmCount" -ForegroundColor White
+Write-Host "`[*`] Virtual Machines:"
+Write-Host "   Found: $vmCount"
 Write-Host "   [+] Successful: $vmSuccessCount" -ForegroundColor Green
-Write-Host "   [-] Failed: $($vmCount - $vmSuccessCount)" -ForegroundColor $(if ($($vmCount - $vmSuccessCount) -gt 0) {'Red'} else {'Green'})
+$vmFailedColor = if ($($vmCount - $vmSuccessCount) -gt 0) { 'Red' } else { 'Green' }
+Write-Host "   [-] Failed: $($vmCount - $vmSuccessCount)" -ForegroundColor $vmFailedColor
 
 Write-Host ""
-Write-Host "`[*`] Virtual Machine Scale Sets:" -ForegroundColor Cyan
-Write-Host "   Found: $vmssCount" -ForegroundColor White
+Write-Host "`[*`] Virtual Machine Scale Sets:"
+Write-Host "   Found: $vmssCount"
 Write-Host "   [+] Successful: $vmssSuccessCount" -ForegroundColor Green
-Write-Host "   [-] Failed: $($vmssCount - $vmssSuccessCount)" -ForegroundColor $(if ($($vmssCount - $vmssSuccessCount) -gt 0) {'Red'} else {'Green'})
+$vmssFailedColor = if ($($vmssCount - $vmssSuccessCount) -gt 0) { 'Red' } else { 'Green' }
+Write-Host "   [-] Failed: $($vmssCount - $vmssSuccessCount)" -ForegroundColor $vmssFailedColor
 
 Write-Host ""
-Write-Host "`[*`] ARC Machines:" -ForegroundColor Cyan
-Write-Host "   Found: $arcCount" -ForegroundColor White
+Write-Host "`[*`] ARC Machines:"
+Write-Host "   Found: $arcCount"
 Write-Host "   [+] Successful: $arcSuccessCount" -ForegroundColor Green
-Write-Host "   [-] Failed: $($arcCount - $arcSuccessCount)" -ForegroundColor $(if ($($arcCount - $arcSuccessCount) -gt 0) {'Red'} else {'Green'})
+$arcFailedColor = if ($($arcCount - $arcSuccessCount) -gt 0) { 'Red' } else { 'Green' }
+Write-Host "   [-] Failed: $($arcCount - $arcSuccessCount)" -ForegroundColor $arcFailedColor
 
 Write-Host ""
-Write-Host "`[*`] Overall Results:" -ForegroundColor Magenta
+Write-Host "`[*`] Overall Results:"
 Write-Host "   [+] Total Successful: $successCount" -ForegroundColor Green
-Write-Host "   [-] Total Failures: $failureCount" -ForegroundColor $(if ($failureCount -gt 0) {'Red'} else {'Green'})
+$totalFailedColor = if ($failureCount -gt 0) { 'Red' } else { 'Green' }
+Write-Host "   [-] Total Failures: $failureCount" -ForegroundColor $totalFailedColor
 
 Write-Host ""
-Write-Host "Function execution completed!`n" -ForegroundColor Green
+Write-Host "Function execution completed!`n"
+
+# Write final summary to log file
+Write-SafeLog ""
+Write-SafeLog ("=" * 120)
+Write-SafeLog "COMPREHENSIVE SESSION SUMMARY & ANALYSIS"
+Write-SafeLog ("=" * 120)
+Write-SafeLog "Session Completed: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
+Write-SafeLog "Total Processing Time: $((Get-Date) - $startTime)"
+Write-SafeLog ""
+Write-SafeLog "CONFIGURATION SUMMARY:"
+Write-SafeLog "- Operation Mode: $mode"
+if ($mode.ToLower() -eq "rg") {
+    Write-SafeLog "- Target Resource Group: $resourceGroupName"
+} else {
+    Write-SafeLog "- Tag Filter: $tagName = $tagValue"
+}
+Write-SafeLog "- Action Performed: $($PricingTier.ToUpper())"
+Write-SafeLog "- Subscription: $subName ($subId)"
+Write-SafeLog ""
+Write-SafeLog "PROCESSING RESULTS BY RESOURCE TYPE:"
+Write-SafeLog "┌─────────────────────────────────┬───────────┬─────────────┬────────────┬─────────────────┐"
+Write-SafeLog "│ Resource Type                   │ Found     │ Successful  │ Failed     │ Success Rate    │"
+Write-SafeLog "├─────────────────────────────────┼───────────┼─────────────┼────────────┼─────────────────┤"
+$vmSuccessRate = if ($vmCount -gt 0) { [math]::Round(($vmSuccessCount / $vmCount) * 100, 1) } else { 0 }
+Write-SafeLog "│ Virtual Machines                │ $($vmCount.ToString().PadLeft(9)) │ $($vmSuccessCount.ToString().PadLeft(11)) │ $(($vmCount - $vmSuccessCount).ToString().PadLeft(10)) │ $($vmSuccessRate.ToString().PadLeft(13))%  │"
+$vmssSuccessRate = if ($vmssCount -gt 0) { [math]::Round(($vmssSuccessCount / $vmssCount) * 100, 1) } else { 0 }
+Write-SafeLog "│ Virtual Machine Scale Sets      │ $($vmssCount.ToString().PadLeft(9)) │ $($vmssSuccessCount.ToString().PadLeft(11)) │ $(($vmssCount - $vmssSuccessCount).ToString().PadLeft(10)) │ $($vmssSuccessRate.ToString().PadLeft(13))%  │"
+$arcSuccessRate = if ($arcCount -gt 0) { [math]::Round(($arcSuccessCount / $arcCount) * 100, 1) } else { 0 }
+Write-SafeLog "│ Azure Arc Machines              │ $($arcCount.ToString().PadLeft(9)) │ $($arcSuccessCount.ToString().PadLeft(11)) │ $(($arcCount - $arcSuccessCount).ToString().PadLeft(10)) │ $($arcSuccessRate.ToString().PadLeft(13))%  │"
+Write-SafeLog "└─────────────────────────────────┴───────────┴─────────────┴────────────┴─────────────────┘"
+Write-SafeLog ""
+$totalResources = $vmCount + $vmssCount + $arcCount
+$overallSuccessRate = if ($totalResources -gt 0) { [math]::Round(($successCount / $totalResources) * 100, 1) } else { 0 }
+Write-SafeLog "OVERALL STATISTICS:"
+Write-SafeLog "- Total Resources Processed: $totalResources"
+Write-SafeLog "- Total Successful Operations: $successCount"
+Write-SafeLog "- Total Failed Operations: $failureCount"
+Write-SafeLog "- Overall Success Rate: $overallSuccessRate%"
+Write-SafeLog ""
+if ($failureCount -gt 0) {
+    Write-SafeLog "RECOMMENDATIONS:"
+    Write-SafeLog "- Review failed operations above for detailed error information"
+    Write-SafeLog "- Verify Azure permissions for Defender for Cloud pricing management"
+    Write-SafeLog "- Check network connectivity and authentication status"
+    Write-SafeLog "- Consider re-running failed operations individually"
+} else {
+    Write-SafeLog "RESULT: All operations completed successfully!"
+}
+Write-SafeLog ""
+Write-SafeLog "AUDIT TRAIL:"
+Write-SafeLog "- Log File Location: $logFile"
+Write-SafeLog "- PowerShell Version: $($PSVersionTable.PSVersion)"
+Write-SafeLog "- Execution User: $($env:USERNAME)"
+Write-SafeLog "- Execution Computer: $($env:COMPUTERNAME)"
+Write-SafeLog "- Script Version: 2.0"
+Write-SafeLog ("=" * 120)
+
+if ($logFile) {
+    Write-Host "`[*`] Session log saved to: $logFile" -ForegroundColor Green
+}
 #endregion
 
 }
+
+
+
+
+
+
+
+
+
 
 
 
