@@ -193,7 +193,7 @@ Set-AzureArcResourcePricing -Mode "RG" -ResourceGroupName "rg-production" -Actio
 
 ## Version History
 
-### v1.0.0 (Current - July 2025)
+### v1.0.0 (Current - August 2025)
 - **🎯 Initial Release** - Complete enterprise-grade Azure Arc deployment solution
 - **🔍 Prerequisites Testing** - Comprehensive system and network validation with TLS verification
 - **🏗️ Device Creation** - Automated Azure Arc device setup with Group Policy deployment
