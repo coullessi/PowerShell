@@ -89,7 +89,7 @@ function Test-AzureResourceProviders {
                     }
                 }
             } catch {
-                Write-Host "     $provider : Registration failed - $($_.Exception.Message)"
+                Write-Host "     $provider : Registration failed" -ForegroundColor Red
                 $results += [PSCustomObject]@{
                     Provider = $provider
                     Status = "Registration Failed"
@@ -592,7 +592,7 @@ function Test-DeviceCheck {
         }
 
     } catch {
-        Write-Host "`n Error during prerequisites check for $DeviceName`: $($_.Exception.Message)"
+        Write-Host "`n Error during prerequisites check for $DeviceName. Check connectivity and permissions." -ForegroundColor Red
         Test-Prerequisite $DeviceName "Prerequisites Check" "Error" "Failed to complete prerequisites check: $($_.Exception.Message)"
     } finally {
         if ($session) {

@@ -36,7 +36,7 @@ Get-ChildItem -Path "$ModulePath\Private\*.ps1" -ErrorAction SilentlyContinue | 
         Write-Verbose "Imported private function: $($_.BaseName)"
     }
     catch {
-        Write-Error "Failed to import private function $($_.BaseName): $($_.Exception.Message)"
+        Write-Error "Failed to import private function $($_.BaseName)"
     }
 }
 
@@ -47,7 +47,7 @@ Get-ChildItem -Path "$ModulePath\Public\*.ps1" -ErrorAction SilentlyContinue | F
         Write-Verbose "Imported public function: $($_.BaseName)"
     }
     catch {
-        Write-Error "Failed to import public function $($_.BaseName): $($_.Exception.Message)"
+        Write-Error "Failed to import public function $($_.BaseName)"
     }
 }
 

@@ -3,7 +3,7 @@
 > **Enterprise-Grade Server Protection through Azure Arc Device Deployment & Microsoft Defender for Servers Integration**
 
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-blue.svg)](https://github.com/PowerShell/PowerShell)
-[![Version](https://img.shields.io/badge/Version-1.0.0-brightgreen.svg)](https://github.com/coullessi/PowerShell/releases)
+[![Version](https://img.shields.io/badge/Version-1.0.1-brightgreen.svg)](https://github.com/coullessi/PowerShell/releases)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/coullessi/PowerShell/blob/main/LICENSE)
 [![PowerShell Gallery](https://img.shields.io/badge/PowerShell%20Gallery-ServerProtection-blue.svg)](https://www.powershellgallery.com/packages/ServerProtection)
 
@@ -21,9 +21,19 @@
 - [Contributing](#contributing)
 - [License](#license)
 
-## Overview
+## 🎯 Purpose
 
-The **ServerProtection (ARC-DFS)** module provides a comprehensive PowerShell solution for enterprise server protection through Azure Arc-enabled servers and **Microsoft Defender for Servers** integration. Designed for large-scale environments, it delivers professional automation tools with an intuitive interactive interface and robust error handling for mission-critical deployments.
+The **ServerProtection** PowerShell module is a professional enterprise tool designed to simplify and automate the deployment of Azure Arc and Microsoft Defender for Servers across Windows Server environments. This module addresses the complex requirements of enterprise Azure Arc deployments while providing comprehensive validation, automated deployment, and ongoing management capabilities.
+
+### 🔧 Core Capabilities
+
+- **Azure Arc Prerequisites Validation** - Test servers for Azure Arc compatibility with detailed reporting
+- **Automated Azure Arc Device Creation** - Generate deployment resources and Group Policy objects
+- **Enterprise Group Policy Deployment** - Streamlined agent deployment across multiple servers
+- **Advanced Diagnostics and Troubleshooting** - Monitor agent health and resolve deployment issues
+- **Defender for Servers Pricing Management** - Configure and optimize security pricing tiers
+- **Interactive Management Interface** - Professional menu-driven experience for all operations
+- **Professional Error Handling** - User-friendly error messages with technical details logged separately
 
 ## Microsoft Defender for Servers Integration
 
@@ -87,6 +97,8 @@ The interactive interface provides:
 - **Built-in help system** with comprehensive documentation
 - **Operation confirmations** for safe execution
 - **Guided workflow** ensuring proper deployment sequence
+- **Professional error handling** with color-coded results (Green=Success, Yellow=Warning, Red=Failure)
+- **Clean user experience** with technical details automatically logged to files
 
 ## Functions
 
@@ -164,7 +176,33 @@ Set-AzureArcResourcePricing -Mode "RG" -ResourceGroupName "rg-production" -Actio
 
 ## System Requirements
 
-### Prerequisites
+#### 🛡️ Enhanced Error Handling
+
+The ServerProtection module implements professional-grade error handling designed for enterprise environments:
+
+#### 🎨 User-Friendly Experience
+- **Clean Output** - Only user-relevant information displayed in the console
+- **Color-Coded Results** - Green for success, Yellow for warnings, Red for failures
+- **No Technical Exceptions** - Raw PowerShell errors never shown to end users
+- **Simple Status Reporting** - Clear Yes/No readiness indicators
+
+#### 📊 Technical Logging
+- **Detailed Logging** - All technical details automatically logged to files
+- **Troubleshooting Support** - Complete error information available for support teams
+- **Separate Log Files** - Different operations maintain separate log files for easy analysis
+- **Timestamp Tracking** - All log entries include precise timestamps
+
+#### 🔍 Error Categories
+- **Prerequisites Failures** - Clear indication of missing requirements with remediation guidance
+- **Network Issues** - User-friendly network connectivity problem descriptions
+- **Authentication Problems** - Simplified Azure authentication failure messages
+- **System Compatibility** - Easy-to-understand system requirement violations
+
+This approach ensures that end users see only actionable, professional feedback while technical teams have access to comprehensive diagnostic information when needed.
+
+---
+
+## 📋 Prerequisites
 - **PowerShell**: 5.1 or higher (PowerShell 7+ recommended)
 - **Azure PowerShell**: Az.Accounts (v2.12.1+), Az.Resources (v6.0.0+)
 - **Permissions**: Local administrator rights, Azure subscription access
@@ -205,6 +243,13 @@ Set-AzureArcResourcePricing -Mode "RG" -ResourceGroupName "rg-production" -Actio
 
 ## Version History
 
+### v1.0.1 (Released - August 2025)
+- **🔧 Code Quality Improvements** - Fixed PSScriptAnalyzer warnings for unused parameters
+- **📋 Enhanced Documentation** - Updated publishing checklist and quality standards
+- **✅ Validated Module Integrity** - Confirmed all functions work correctly after optimizations
+- **🛡️ Maintained Professional Error Handling** - User-friendly messages with comprehensive technical logging
+- **🎨 Preserved Enhanced User Experience** - Color-coded output with clean, professional feedback
+
 ### v1.0.0 (Released - August 2025)
 - **🎯 Initial Release** - Complete enterprise-grade Azure Arc deployment solution
 - **🔍 Prerequisites Testing** - Comprehensive system and network validation with TLS verification
@@ -216,6 +261,8 @@ Set-AzureArcResourcePricing -Mode "RG" -ResourceGroupName "rg-production" -Actio
 - **🏢 Enterprise Support** - Multi-device batch processing and enterprise deployment features
 - **📦 PowerShell Gallery** - Published and available for installation via Install-PSResource
 - **🧹 Code Quality** - PowerShell Script Analyzer validated with production-ready code quality
+- **🛡️ Professional Error Handling** - User-friendly messages with comprehensive technical logging
+- **🎨 Enhanced User Experience** - Color-coded output with clean, professional feedback
 
 ## Author
 

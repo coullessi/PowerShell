@@ -14,7 +14,6 @@ Extended-Test.ps1
 Quick-Test.ps1
 
 # Development documentation
-PUBLISHING-CHECKLIST.md
 TEST-RESULTS.md
 TESTING-SUMMARY.md
 notes.txt

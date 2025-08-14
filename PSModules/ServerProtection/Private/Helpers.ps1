@@ -87,7 +87,7 @@ function Get-StandardizedOutputDirectory {
                     }
                     catch {
                         Write-Host ""
-                        Write-Host " [FAIL] Could not create default folder: $($_.Exception.Message)" -ForegroundColor Green
+                        Write-Host " [FAIL] Could not create default folder. Check permissions." -ForegroundColor Red
                         Write-Host " Please try a custom folder location."
                         Write-Host ""
                         continue
@@ -145,7 +145,7 @@ function Get-StandardizedOutputDirectory {
                         Write-Host " [SUCCESS] Folder is writable" -ForegroundColor Green
                     }
                     catch {
-                        Write-Host " [FAIL] Cannot write to folder: $($_.Exception.Message)" -ForegroundColor Green
+                        Write-Host " [FAIL] Cannot write to folder. Check permissions." -ForegroundColor Red
                         Write-Host ""
                         continue
                     }
@@ -154,7 +154,7 @@ function Get-StandardizedOutputDirectory {
                     return $resolvedPath
                 }
                 catch {
-                    Write-Host " [FAIL] Invalid folder path: $($_.Exception.Message)" -ForegroundColor Green
+                    Write-Host " [FAIL] Invalid folder path. Please check the path format." -ForegroundColor Red
                     Write-Host " Please provide a valid folder path in one of the supported formats."
                     Write-Host ""
                     continue
@@ -260,9 +260,6 @@ function Initialize-StandardizedEnvironment {
     #>
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory = $true)]
-        [string]$ScriptName,
-
         [Parameter(Mandatory = $false)]
         [ValidateSet("DeviceList", "OrgUnitList", "DiagnosticLog", "PrerequisiteLog", "DeviceLog")]
         [string[]]$RequiredFileTypes = @()
@@ -389,14 +386,13 @@ $env:COMPUTERNAME
                         $notepadProcess.WaitForExit()
                         Write-Host " [OK] Device list editing completed" -ForegroundColor Green
                     } catch {
-                        Write-Host " [WARN] Could not open Notepad: $($_.Exception.Message)" -ForegroundColor Green
-                        Write-Host " Continuing with default device list..."
+                        Write-Host " [WARN] Could not open Notepad. Continuing with default device list..." -ForegroundColor Yellow
                     }
 
                     return $DefaultDeviceFile
 
                 } catch {
-                    Write-Host " [FAIL] Failed to create device list file: $($_.Exception.Message)" -ForegroundColor Green
+                    Write-Host " [FAIL] Failed to create device list file. Check permissions." -ForegroundColor Red
                     Write-Host " Please try again."
                     Write-Host ""
                     continue
@@ -441,7 +437,7 @@ $env:COMPUTERNAME
                     return $destinationPath
 
                 } catch {
-                    Write-Host " [FAIL] Failed to copy device list file: $($_.Exception.Message)" -ForegroundColor Green
+                    Write-Host " [FAIL] Failed to copy device list file. Check file permissions." -ForegroundColor Red
                     Write-Host " Please try again."
                     Write-Host ""
                     continue
@@ -590,9 +586,7 @@ function Get-RemediationGuidance {
         Additional details about the failure.
     #>
     param(
-        [string]$Check,
-        [string]$Result,
-        [string]$Details
+        [string]$Check
     )
 
     switch ($Check) {
@@ -686,7 +680,6 @@ function Get-DeviceOSVersion {
         String containing the OS version.
     #>
     param(
-        [string]$DeviceName,
         [System.Management.Automation.Runspaces.PSSession]$Session = $null
     )
 
@@ -740,7 +733,7 @@ function Install-AzModule {
         }
         return $true
     } catch {
-        Write-Host " Failed to install Az module: $($_.Exception.Message)"
+        Write-Host " Failed to install Az module. Check your PowerShell execution policy and internet connection." -ForegroundColor Red
         return $false
     }
 }
@@ -774,7 +767,7 @@ function Confirm-AzureAuthentication {
         }
     }
     catch {
-        Write-Host "     Error during Azure authentication: $($_.Exception.Message)"
+        Write-Host "     Error during Azure authentication. Check your credentials and try again." -ForegroundColor Red
         return $false
     }
 }

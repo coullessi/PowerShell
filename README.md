@@ -48,4 +48,28 @@ Whether you're looking to automate routine security tasks, develop custom threat
 
 ---
 
+## 📦 Featured Modules
+
+### ServerProtection Module
+The **ServerProtection** PowerShell module is our flagship enterprise tool for Azure Arc and Microsoft Defender for Servers deployment automation. 
+
+#### Key Features:
+- **Enterprise-Grade Error Handling** - Professional user experience with user-friendly messages and comprehensive technical logging
+- **Azure Arc Automation** - Complete prerequisites validation, device creation, and deployment workflows
+- **Defender for Servers Integration** - Automated pricing management and security configuration
+- **Interactive Management Interface** - Menu-driven experience for all security operations
+- **Color-Coded Feedback** - Green for success, Yellow for warnings, Red for failures
+
+#### Professional Error Handling Philosophy:
+The ServerProtection module implements a dual-layer error handling approach designed for enterprise environments:
+- **User Layer**: Clean, actionable messages with no technical exceptions visible to end users
+- **Technical Layer**: Comprehensive logging of all technical details for troubleshooting and support
+
+This ensures that security operators see only relevant, professional feedback while technical teams have access to complete diagnostic information when needed.
+
+**Location**: `PSModules/ServerProtection/`  
+**Installation**: Available via PowerShell Gallery - `Install-PSResource ServerProtection`
+
+---
+
 *Empowering security professionals with automation and intelligence.*

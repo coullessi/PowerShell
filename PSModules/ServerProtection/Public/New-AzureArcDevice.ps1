@@ -79,7 +79,7 @@ function New-AzureArcDevice {
     }
 
     # Initialize standardized environment
-    $environment = Initialize-StandardizedEnvironment -ScriptName "New-AzureArcDevice" -RequiredFileTypes @("DeviceLog", "OrgUnitList")
+    $environment = Initialize-StandardizedEnvironment -RequiredFileTypes @("DeviceLog", "OrgUnitList")
 
     # Check if user chose to quit
     if ($environment.UserQuit) {
@@ -205,7 +205,7 @@ function New-AzureArcDevice {
             Write-Host " Resource group created successfully!"
         }
         catch {
-            Write-Host " Failed to create resource group: $($_.Exception.Message)"
+            Write-Host " Failed to create resource group. Check your Azure permissions and try again." -ForegroundColor Red
             throw
         }
     }
@@ -277,7 +277,7 @@ function New-AzureArcDevice {
             if ($_.Exception.Message -match "already exists" -or $_.Exception.Message -match "already shared" -or $_.Exception.Message -match "name has already been shared") {
                 Write-Host "  SMB share '$shareName' already exists"
             } else {
-                Write-Host " Failed to create SMB share: $($_.Exception.Message)"
+                Write-Host " Failed to create SMB share. Check permissions and try again." -ForegroundColor Red
                 throw
             }
         }
@@ -329,7 +329,7 @@ function New-AzureArcDevice {
         }
     }
     catch {
-        Write-Host " Failed to download Azure Connected Machine Agent: $($_.Exception.Message)"
+        Write-Host " Failed to download Azure Connected Machine Agent. Check network connectivity." -ForegroundColor Red
         throw
     }
 
@@ -382,7 +382,7 @@ function New-AzureArcDevice {
 
     }
     catch {
-        Write-Host " Failed to download latest ArcEnabledServersGroupPolicy: $($_.Exception.Message)"
+        Write-Host " Failed to download latest ArcEnabledServersGroupPolicy. Check network connectivity." -ForegroundColor Red
         Write-Host "  Falling back to hardcoded version 1.0.5..."
 
         try {
@@ -398,7 +398,7 @@ function New-AzureArcDevice {
             Write-Host " Fallback archive extracted successfully"
         }
         catch {
-            Write-Host " Fallback download also failed: $($_.Exception.Message)"
+            Write-Host " Fallback download also failed. Check network connectivity and firewall settings." -ForegroundColor Red
             throw "Failed to download ArcEnabledServersGroupPolicy from both latest and fallback sources"
         }
     }
@@ -448,12 +448,12 @@ function New-AzureArcDevice {
                     Write-Host " Role assignment completed successfully!"
                 }
                 catch {
-                    Write-Host "  Role assignment attempt $retryCount failed: $($_.Exception.Message)"
+                    Write-Host "  Role assignment attempt $retryCount failed. Retrying..." -ForegroundColor Yellow
                     if ($retryCount -lt $maxRetries) {
                         Write-Host "  Waiting 15 seconds before retry..."
                         Start-Sleep -Seconds 15
                     } else {
-                        Write-Host " All role assignment attempts failed. Service principal created but role not assigned."
+                        Write-Host " All role assignment attempts failed. Service principal created but role not assigned." -ForegroundColor Red
                         Write-Host " You may need to manually assign the 'Azure Connected Machine Onboarding' role to the service principal."
                     }
                 }
@@ -491,7 +491,7 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
         }
     }
     catch {
-        Write-Host " Failed to create service principal: $($_.Exception.Message)"
+        Write-Host " Failed to create service principal. Check your Azure permissions." -ForegroundColor Red
         throw
     }
 
@@ -549,7 +549,7 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
                 }
             }
         } catch {
-            Write-Host " Error searching for DeployGPO.ps1: $($_.Exception.Message)"
+            Write-Host " Error searching for DeployGPO.ps1. Check file permissions." -ForegroundColor Red
         }
     }
 
@@ -578,7 +578,7 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
         Write-Host " Group Policy deployment completed"
     }
     catch {
-        Write-Host " Failed to deploy Group Policy: $($_.Exception.Message)"
+        Write-Host " Failed to deploy Group Policy. Check domain permissions and connectivity." -ForegroundColor Red
         throw
     }
 
@@ -917,8 +917,8 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
                                 }
                             }
                             catch {
-                                Write-Host "   ERROR: Failed to process OU '$cleanOUName': $($_.Exception.Message)"
-                                $skippedTargets += @{Name = $cleanOUName; Reason = "Processing error: $($_.Exception.Message)"}
+                                Write-Host "   ERROR: Failed to process OU '$cleanOUName'. Check permissions." -ForegroundColor Red
+                                $skippedTargets += @{Name = $cleanOUName; Reason = "Processing error"}
                             }
                         }
 
@@ -953,8 +953,7 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
                                         Write-Host "   INFO: GPO already linked to this target"
                                         $successCount++  # Count as success since it's already linked
                                     } else {
-                                        Write-Host "   ERROR: Failed to link GPO"
-                                        Write-Host "   REASON: $($_.Exception.Message)"
+                                        Write-Host "   ERROR: Failed to link GPO. Check permissions." -ForegroundColor Red
                                         $failureCount++
                                     }
                                 }
@@ -979,8 +978,7 @@ Expiration Date: $($expirationDate.ToString('yyyy-MM-dd HH:mm:ss'))
                 }
             }
             catch {
-                Write-Host " Could not read OU file contents: $($_.Exception.Message)"
-                Write-Host " File may be corrupted or inaccessible"
+                Write-Host " Could not read OU file contents. File may be corrupted or inaccessible." -ForegroundColor Red
             }
         } else {
             Write-Host " Error accessing OU file: $($ouFileValidation.Error)"

@@ -165,7 +165,7 @@
                             Write-Host "`n Prerequisites testing completed successfully."
                         }
                         catch {
-                            Write-Host "`n Error during prerequisites testing: $($_.Exception.Message)"
+                            Write-Host "`n Error during prerequisites testing. Please check your setup." -ForegroundColor Red
                             Write-Host "Please ensure the ServerProtection module is properly imported and try again."
                             Write-Host "Try running: Import-Module ServerProtection -Force"
                         }
@@ -221,7 +221,7 @@
                         Write-Host "`n Azure Arc deployment completed successfully."
                     }
                     catch {
-                        Write-Host "`n Error during Azure Arc deployment: $($_.Exception.Message)"
+                        Write-Host "`n Error during Azure Arc deployment. Please check your configuration." -ForegroundColor Red
                         Write-Host "Please check the error details and try again."
                         Write-Host "Try running: Import-Module ServerProtection -Force"
                     }
@@ -300,7 +300,7 @@
                         }
                     }
                     catch {
-                        Write-Host "`n Error during Azure Arc diagnostics: $($_.Exception.Message)"
+                        Write-Host "`n Error during Azure Arc diagnostics. Please check your setup." -ForegroundColor Red
                         Write-Host "Please check the error details and try again."
                         Write-Host "Try running: Import-Module ServerProtection -Force"
                     }
@@ -369,7 +369,7 @@
                         Write-Host "`n Defender pricing configuration completed successfully."
                     }
                     catch {
-                        Write-Host "`n Error during pricing configuration: $($_.Exception.Message)"
+                        Write-Host "`n Error during pricing configuration. Please check your Azure setup." -ForegroundColor Red
                         Write-Host "Please check your Azure permissions and network connectivity."
                         Write-Host "Try running: Import-Module ServerProtection -Force"
                     }

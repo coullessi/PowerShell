@@ -94,7 +94,7 @@ param(
 
 # MANDATORY: Initialize standardized environment at the very beginning
 # This ensures the folder selection menu is ALWAYS shown and AzureArc folder is configured
-$environment = Initialize-StandardizedEnvironment -ScriptName "Set-AzureArcResourcePricing" -RequiredFileTypes @("DeviceLog")
+$environment = Initialize-StandardizedEnvironment -RequiredFileTypes @("DeviceLog")
 
 # Check if user chose to quit (return to main menu)
 if ($environment.UserQuit) {
@@ -127,8 +127,7 @@ try {
     "" | Out-File -FilePath $logFile -Append
     Write-Host "`[+`] Comprehensive log file initialized: $logFile" -ForegroundColor Green
 } catch {
-    Write-Host "`[-`] Warning: Failed to initialize log file: $($_.Exception.Message)" -ForegroundColor Yellow
-    Write-Host "    Continuing without logging..."
+    Write-Host "`[-`] Warning: Failed to initialize log file. Continuing without logging..." -ForegroundColor Yellow
     $logFile = $null
 }
 
@@ -419,8 +418,8 @@ function Get-FreshAccessToken {
         }
     }
     catch {
-        Write-Host "`[-`] Failed to get access token: $($_.Exception.Message)"
-        Write-Host "Please ensure you are logged in to Azure with 'Connect-AzAccount'"
+        Write-Host "`[-`] Failed to get access token. Please ensure you are logged in to Azure." -ForegroundColor Red
+        Write-Host "Please run 'Connect-AzAccount' and try again."
         throw $_
     }
 }
@@ -444,7 +443,7 @@ function Update-TokenIfNeeded {
             Write-Host "`[+`] Token refreshed successfully. New expiry: $($ExpiresOn.Value)"
         }
         catch {
-            Write-Host "`[-`] Failed to refresh token: $($_.Exception.Message)"
+            Write-Host "`[-`] Failed to refresh token. Please re-authenticate." -ForegroundColor Red
             throw $_
         }
     }
@@ -617,7 +616,7 @@ function Format-PricingConfiguration {
 
         } catch {
             Write-Host "  MDE Extension         : UNABLE TO QUERY"
-            Write-Host "  Error                 : $($_.Exception.Message)"
+            Write-Host "  Error                 : Query failed"
             Write-SafeLog "ERROR: Failed to query MDE extension for $($ResourceDetails.name): $($_.Exception.Message)"
         }
 
@@ -686,7 +685,7 @@ try {
     Write-Host "`[+`] Token obtained successfully. Expires: $script:expireson"
 }
 catch {
-    Write-Host "`[-`] Failed to obtain access token: $($_.Exception.Message)"
+    Write-Host "`[-`] Failed to obtain access token. Please ensure you are authenticated." -ForegroundColor Red
     Write-Host "Please run 'Connect-AzAccount' and try again."
     exit 1
 }

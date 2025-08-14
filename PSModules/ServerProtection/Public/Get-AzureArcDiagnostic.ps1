@@ -226,7 +226,7 @@ function Get-AzureArcDiagnostic {
 
         # MANDATORY: Initialize standardized environment at the very beginning
         # This ensures the folder selection menu is ALWAYS shown and AzureArc folder is configured
-        $environment = Initialize-StandardizedEnvironment -ScriptName "Get-AzureArcDiagnostic" -RequiredFileTypes @("DeviceList", "DiagnosticLog")
+        $environment = Initialize-StandardizedEnvironment -RequiredFileTypes @("DeviceList", "DiagnosticLog")
 
         # Check if user chose to quit (return to main menu)
         if ($environment.UserQuit) {
@@ -352,7 +352,7 @@ function Get-AzureArcDiagnostic {
                     }
 
                 } catch {
-                    Write-Host "   [FAIL] Failed to read device list: $($_.Exception.Message)" -ForegroundColor Green
+                    Write-Host "   [FAIL] Failed to read device list file" -ForegroundColor Red
                     Write-Host "   Using localhost only..."
                     $devicesToDiagnose = @($env:COMPUTERNAME)
                 }
@@ -466,9 +466,9 @@ function Get-AzureArcDiagnostic {
                         Write-Host "   [OK] Remote device is reachable" -ForegroundColor Green
                         "Remote Connectivity: Device is reachable via ping" | Out-File -FilePath $script:globalLogFile -Append
                     } catch {
-                        Write-Host "   [WARN] Remote device not reachable: $($_.Exception.Message)" -ForegroundColor Green
+                        Write-Host "   [WARN] Remote device not reachable via network" -ForegroundColor Yellow
                         "WARNING: Remote device not reachable - $($_.Exception.Message)" | Out-File -FilePath $script:globalLogFile -Append
-                        $deviceResult.Warnings += "Remote device not reachable: $($_.Exception.Message)"
+                        $deviceResult.Warnings += "Remote device not reachable via network"
                     }
 
                     # Test PowerShell remoting
@@ -486,7 +486,7 @@ function Get-AzureArcDiagnostic {
                         Write-Host "   [OK] PowerShell remoting is available" -ForegroundColor Green
                         "Remote Connectivity: PowerShell remoting is available" | Out-File -FilePath $script:globalLogFile -Append
                     } catch {
-                        Write-Host "   [FAIL] PowerShell remoting not available: $($_.Exception.Message)" -ForegroundColor Green
+                        Write-Host "   [FAIL] PowerShell remoting not available" -ForegroundColor Red
                         Write-Host "   This device will be skipped. Enable PowerShell remoting on the target device."
 
                         "ERROR: PowerShell remoting not available - $($_.Exception.Message)" | Out-File -FilePath $script:globalLogFile -Append
@@ -495,7 +495,7 @@ function Get-AzureArcDiagnostic {
                         "" | Out-File -FilePath $script:globalLogFile -Append
 
                         $deviceResult.OverallSuccess = $false
-                        $deviceResult.Errors += "PowerShell remoting not available: $($_.Exception.Message)"
+                        $deviceResult.Errors += "PowerShell remoting not available"
                         $deviceResult.DiagnosticResults += @{
                             Step = 1
                             Name = "Remote Connectivity Test"
@@ -884,7 +884,7 @@ function Get-AzureArcDiagnostic {
                                                 $deviceResult.ZipFiles += $localZipPath
                                                 Write-Host "     Copied log archive: $($copyResult.FileName)"
                                             } catch {
-                                                Write-Host "     Could not write $($copyResult.FileName): $($_.Exception.Message)"
+                                                Write-Host "     Could not write $($copyResult.FileName): Copy failed" -ForegroundColor Red
                                                 $deviceResult.ZipFiles += "Remote: $($copyResult.FileName) (Copy failed: $($_.Exception.Message))"
                                             }
                                         } else {
@@ -893,7 +893,7 @@ function Get-AzureArcDiagnostic {
                                         }
                                     }
                                 } catch {
-                                    Write-Host "     Remote file copy failed: $($_.Exception.Message)"
+                                    Write-Host "     Remote file copy failed" -ForegroundColor Red
                                     # Fallback: try UNC path method for backward compatibility
                                     foreach ($remoteZipFile in $remoteResult.ZipFiles) {
                                         try {
@@ -905,7 +905,7 @@ function Get-AzureArcDiagnostic {
                                             $deviceResult.ZipFiles += $localZipPath
                                             Write-Host "     Copied log archive via UNC: $localZipName"
                                         } catch {
-                                            Write-Host "     Could not copy $remoteZipFile via UNC: $($_.Exception.Message)"
+                                            Write-Host "     Could not copy $remoteZipFile via UNC path" -ForegroundColor Red
                                             # Add the remote path to the results anyway for reference
                                             $deviceResult.ZipFiles += "Remote: $(Split-Path $remoteZipFile -Leaf) (Available on $deviceName)"
                                         }
@@ -1197,7 +1197,8 @@ function Get-AzureArcDiagnostic {
             return $overallSuccess
         }
         catch {
-            Write-Error "Critical error during diagnostic collection: $($_.Exception.Message)"
+            Write-Host "Critical error during diagnostic collection. Check log file for details." -ForegroundColor Red
+            "Critical error during diagnostic collection: $($_.Exception.Message)" | Out-File -FilePath $script:globalLogFile -Append
             return $false
         }
     }
